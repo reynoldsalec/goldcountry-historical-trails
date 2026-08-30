@@ -1,0 +1,108 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-121.030000, 39.000000],
+            [-120.990000, 39.000000],
+            [-120.990000, 39.030000],
+            [-121.030000, 39.030000],
+            [-121.030000, 39.000000]
+          ]
+        ]
+      },
+      "properties": {
+        "observation_id": "fixture-obs-topo-1954",
+        "obs_type": "topo_sheet",
+        "date_start": "1954",
+        "date_end": null,
+        "source_citation": "FIXTURE topographic sheet, synthetic fixture record, not a real document",
+        "source_url": null,
+        "rights": "public_domain",
+        "sensitivity": "public",
+        "declarant_name": null,
+        "document_path": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-121.010000, 39.010000],
+          [-121.000000, 39.013000]
+        ]
+      },
+      "properties": {
+        "observation_id": "fixture-obs-decl-1958",
+        "obs_type": "declaration",
+        "date_start": "1958",
+        "date_end": "2019",
+        "source_citation": "FIXTURE public-use declaration, synthetic fixture record, not a real document",
+        "source_url": null,
+        "rights": "restricted",
+        "sensitivity": "restricted",
+        "declarant_name": "FIXTURE DECLARANT",
+        "document_path": "data/raw/declarations/fixture-declarant-0001.pdf"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-121.030000, 39.000000],
+            [-120.990000, 39.000000],
+            [-120.990000, 39.030000],
+            [-121.030000, 39.030000],
+            [-121.030000, 39.000000]
+          ]
+        ]
+      },
+      "properties": {
+        "observation_id": "fixture-obs-plan-1978",
+        "obs_type": "county_plan",
+        "date_start": "1978",
+        "date_end": null,
+        "source_citation": "FIXTURE community plan sheet, synthetic fixture record, not a real document",
+        "source_url": null,
+        "rights": "public_domain",
+        "sensitivity": "public",
+        "declarant_name": null,
+        "document_path": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-121.025000, 39.015000],
+            [-121.010000, 39.015000],
+            [-121.010000, 39.025000],
+            [-121.025000, 39.025000],
+            [-121.025000, 39.015000]
+          ]
+        ]
+      },
+      "properties": {
+        "observation_id": "fixture-obs-aerial-1988",
+        "obs_type": "aerial_frame",
+        "date_start": "1988",
+        "date_end": null,
+        "source_citation": "FIXTURE aerial frame, synthetic fixture record, not a real document",
+        "source_url": null,
+        "rights": "unknown",
+        "sensitivity": "public",
+        "declarant_name": null,
+        "document_path": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+# Source manifest. Populated in M1 (README §7).
+#
+# One entry per source, each with:
+#   id:           stable slug
+#   title:        as printed on the document
+#   url:          canonical location, or null if unpublished
+#   rights:       public_domain | cc_by_nc_sa | restricted | unknown
+#   sensitivity:  public | restricted
+#   attribution:  string shown in the viewer's attribution control (AGENTS.md §2.7)
+#
+# A source with rights: unknown may be used for digitizing but its imagery must not be
+# published as a tile layer (AGENTS.md §2.7).
+
+sources: []

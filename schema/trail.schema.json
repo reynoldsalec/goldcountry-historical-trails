@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trail.schema.json",
+  "title": "Trail",
+  "description": "A persistent named corridor concept (README §3, trails.json). Validated per array element; data/authoritative/trails.json is a JSON array of these.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "trail_id",
+    "name",
+    "aka",
+    "corridor",
+    "tier",
+    "current_status",
+    "notes"
+  ],
+  "properties": {
+    "trail_id": {
+      "description": "Stable slug, e.g. brct-crother-to-simpson-bridge.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "x-sensitivity": "public"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "x-sensitivity": "public"
+    },
+    "aka": {
+      "description": "Local/colloquial names.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "x-sensitivity": "public"
+    },
+    "corridor": {
+      "type": "string",
+      "enum": ["brct", "bowman", "simpson", "combie", "sugar-pine", "other"],
+      "x-sensitivity": "public"
+    },
+    "tier": {
+      "type": "integer",
+      "enum": [1, 2, 3],
+      "x-sensitivity": "public"
+    },
+    "current_status": {
+      "type": "string",
+      "enum": ["secured", "unsecured", "threatened", "lost", "unknown"],
+      "x-sensitivity": "public"
+    },
+    "notes": {
+      "description": "Human-authored. Never LLM-generated (AGENTS.md §5.5).",
+      "type": "string",
+      "x-sensitivity": "public"
+    }
+  }
+}

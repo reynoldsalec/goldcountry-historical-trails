@@ -1,0 +1,6 @@
+alignment_id,observation_id,role,confidence,note
+fixture-alpha-1954,fixture-obs-topo-1954,attests_existence,high,FIXTURE — shown as dashed trail on the synthetic 1954 sheet
+fixture-alpha-1954,fixture-obs-decl-1958,attests_public_use,medium,FIXTURE — declarant describes use of this corridor
+fixture-alpha-1978,fixture-obs-plan-1978,attests_alignment,medium,FIXTURE — reroute shown on the synthetic 1978 plan
+fixture-beta-1962,fixture-obs-topo-1954,attests_existence,low,FIXTURE — faint on the synthetic sheet
+fixture-beta-1962,fixture-obs-aerial-1988,attests_closure,medium,FIXTURE — corridor absent and fenced in the synthetic frame

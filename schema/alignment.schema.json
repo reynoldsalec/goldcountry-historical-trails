@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "alignment.schema.json",
+  "title": "Alignment",
+  "description": "One dated geometry version of a trail (README §3, alignments.geojson). Validated per GeoJSON Feature.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "geometry", "properties"],
+  "properties": {
+    "type": { "const": "Feature", "x-sensitivity": "public" },
+    "geometry": {
+      "description": "EPSG:4326, 6 decimal places. LineString only — no MultiLineString (AGENTS.md §3).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "coordinates"],
+      "x-sensitivity": "public",
+      "properties": {
+        "type": { "const": "LineString" },
+        "coordinates": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "prefixItems": [
+              { "type": "number", "minimum": -180, "maximum": 180 },
+              { "type": "number", "minimum": -90, "maximum": 90 }
+            ]
+          }
+        }
+      }
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alignment_id",
+        "trail_id",
+        "earliest_known_open",
+        "latest_known_open",
+        "earliest_known_closed",
+        "latest_known_closed",
+        "positional_confidence",
+        "side",
+        "superseded_by",
+        "parcel_apns"
+      ],
+      "properties": {
+        "alignment_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "x-sensitivity": "public"
+        },
+        "trail_id": {
+          "description": "FK → trails.json trail_id.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "x-sensitivity": "public"
+        },
+        "earliest_known_open": {
+          "description": "ISO YYYY or YYYY-MM-DD. Null means unobserved, not absent (AGENTS.md §2.3).",
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$",
+          "x-sensitivity": "public"
+        },
+        "latest_known_open": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$",
+          "x-sensitivity": "public"
+        },
+        "earliest_known_closed": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$",
+          "x-sensitivity": "public"
+        },
+        "latest_known_closed": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$",
+          "x-sensitivity": "public"
+        },
+        "positional_confidence": {
+          "type": "string",
+          "enum": ["surveyed", "digitized_topo", "interpreted_aerial", "sketched_testimony"],
+          "x-sensitivity": "public"
+        },
+        "side": {
+          "type": "string",
+          "enum": ["berm", "bank", "road", "na"],
+          "x-sensitivity": "public"
+        },
+        "superseded_by": {
+          "description": "alignment_id of a later reroute, or null.",
+          "type": ["string", "null"],
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "x-sensitivity": "public"
+        },
+        "parcel_apns": {
+          "description": "From county records only (AGENTS.md §2.1). Must never reach build/public/ (AGENTS.md §2.5).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "x-sensitivity": "restricted"
+        }
+      }
+    }
+  }
+}

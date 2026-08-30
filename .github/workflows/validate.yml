@@ -1,0 +1,27 @@
+name: validate
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A failing validation is a stop condition (AGENTS.md §5.3).
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python and dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: make lint
+
+      - name: Validate authoritative data
+        run: make validate

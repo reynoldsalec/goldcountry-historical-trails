@@ -1,0 +1,73 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-121.010000, 39.010000],
+          [-121.005000, 39.012000],
+          [-121.000000, 39.013000]
+        ]
+      },
+      "properties": {
+        "alignment_id": "fixture-alpha-1954",
+        "trail_id": "fixture-alpha",
+        "earliest_known_open": "1954",
+        "latest_known_open": null,
+        "earliest_known_closed": null,
+        "latest_known_closed": null,
+        "positional_confidence": "digitized_topo",
+        "side": "berm",
+        "superseded_by": "fixture-alpha-1978",
+        "parcel_apns": []
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-121.010000, 39.010000],
+          [-121.006000, 39.008000],
+          [-121.000000, 39.013000]
+        ]
+      },
+      "properties": {
+        "alignment_id": "fixture-alpha-1978",
+        "trail_id": "fixture-alpha",
+        "earliest_known_open": "1978-06-01",
+        "latest_known_open": "2021",
+        "earliest_known_closed": null,
+        "latest_known_closed": null,
+        "positional_confidence": "interpreted_aerial",
+        "side": "bank",
+        "superseded_by": null,
+        "parcel_apns": ["FIXTURE-APN-000-000-001"]
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-121.020000, 39.020000],
+          [-121.015000, 39.022000]
+        ]
+      },
+      "properties": {
+        "alignment_id": "fixture-beta-1962",
+        "trail_id": "fixture-beta",
+        "earliest_known_open": "1962",
+        "latest_known_open": "1969",
+        "earliest_known_closed": "1988",
+        "latest_known_closed": "1993",
+        "positional_confidence": "sketched_testimony",
+        "side": "na",
+        "superseded_by": null,
+        "parcel_apns": ["FIXTURE-APN-000-000-002"]
+      }
+    }
+  ]
+}

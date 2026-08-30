@@ -1,0 +1,24 @@
+# Immutable downloads and intermediates (AGENTS.md §2.2). Contents are never
+# committed, but the directories themselves are kept so the layout in README §5
+# exists on a fresh clone.
+data/raw/*
+!data/raw/.gitkeep
+data/working/*
+!data/working/.gitkeep
+
+# Derived output (README §5).
+build/*
+!build/.gitkeep
+
+# Environments
+.venv/
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# macOS
+.DS_Store

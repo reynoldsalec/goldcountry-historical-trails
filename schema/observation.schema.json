@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "observation.schema.json",
+  "title": "Observation",
+  "description": "One dated piece of evidence (README §3, observations.geojson). Validated per GeoJSON Feature.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "geometry", "properties"],
+  "$defs": {
+    "position": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        { "type": "number", "minimum": -180, "maximum": 180 },
+        { "type": "number", "minimum": -90, "maximum": 90 }
+      ]
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$"
+    }
+  },
+  "properties": {
+    "type": { "const": "Feature", "x-sensitivity": "public" },
+    "geometry": {
+      "description": "Sheet footprint, photo point, or declared corridor. EPSG:4326, 6 decimal places.",
+      "type": "object",
+      "x-sensitivity": "public",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": ["type", "coordinates"],
+          "properties": {
+            "type": { "const": "Point" },
+            "coordinates": { "$ref": "#/$defs/position" }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["type", "coordinates"],
+          "properties": {
+            "type": { "const": "LineString" },
+            "coordinates": {
+              "type": "array",
+              "minItems": 2,
+              "items": { "$ref": "#/$defs/position" }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["type", "coordinates"],
+          "properties": {
+            "type": { "const": "Polygon" },
+            "coordinates": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 4,
+                "items": { "$ref": "#/$defs/position" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "obs_type",
+        "date_start",
+        "date_end",
+        "source_citation",
+        "source_url",
+        "rights",
+        "sensitivity",
+        "declarant_name",
+        "document_path"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "x-sensitivity": "public"
+        },
+        "obs_type": {
+          "type": "string",
+          "enum": [
+            "topo_sheet",
+            "aerial_frame",
+            "county_plan",
+            "recorded_map",
+            "declaration",
+            "photograph",
+            "oral_account",
+            "deed"
+          ],
+          "x-sensitivity": "public"
+        },
+        "date_start": {
+          "description": "ISO YYYY or YYYY-MM-DD. Not nullable.",
+          "$ref": "#/$defs/date",
+          "x-sensitivity": "public"
+        },
+        "date_end": {
+          "description": "For range evidence like 'used 1958–present'.",
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$",
+          "x-sensitivity": "public"
+        },
+        "source_citation": {
+          "description": "Human-readable. Never fabricated (AGENTS.md §2.1).",
+          "type": "string",
+          "minLength": 1,
+          "x-sensitivity": "public"
+        },
+        "source_url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "x-sensitivity": "public"
+        },
+        "rights": {
+          "type": "string",
+          "enum": ["public_domain", "cc_by_nc_sa", "restricted", "unknown"],
+          "x-sensitivity": "public"
+        },
+        "sensitivity": {
+          "description": "Record-level gate. A restricted observation is withheld from build/public/ entirely (AGENTS.md §2.5).",
+          "type": "string",
+          "enum": ["public", "restricted"],
+          "x-sensitivity": "public"
+        },
+        "declarant_name": {
+          "description": "Must never reach build/public/ (AGENTS.md §2.5).",
+          "type": ["string", "null"],
+          "minLength": 1,
+          "x-sensitivity": "restricted"
+        },
+        "document_path": {
+          "description": "Path to unpublished scan. Must never reach build/public/ (AGENTS.md §2.5).",
+          "type": ["string", "null"],
+          "minLength": 1,
+          "x-sensitivity": "restricted"
+        }
+      }
+    }
+  }
+}

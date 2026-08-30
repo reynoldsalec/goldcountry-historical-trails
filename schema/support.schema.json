@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "support.schema.json",
+  "title": "Support",
+  "description": "A link from an alignment to an observation (README §3, support.csv). Validated per CSV row, with every cell read as a string.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["alignment_id", "observation_id", "role", "confidence", "note"],
+  "properties": {
+    "alignment_id": {
+      "description": "FK → alignments.geojson alignment_id.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "x-sensitivity": "public"
+    },
+    "observation_id": {
+      "description": "FK → observations.geojson observation_id.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "x-sensitivity": "public"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["attests_existence", "attests_public_use", "attests_closure", "attests_alignment"],
+      "x-sensitivity": "public"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "x-sensitivity": "public"
+    },
+    "note": {
+      "description": "Human-authored. May be empty. See docs/open-questions.md — README §3 gives support.csv no sensitivity column, so this is treated as public.",
+      "type": "string",
+      "x-sensitivity": "public"
+    }
+  }
+}
