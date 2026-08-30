@@ -6,8 +6,8 @@ UV := uv
 RUN := $(UV) run
 
 .DEFAULT_GOAL := all
-.PHONY: all setup fetch-topo rasters validate tiles build-public build-restricted dev \
-        fmt lint clean
+.PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
+        dev fmt lint clean
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -30,6 +30,10 @@ setup:
 ## schemas, referential integrity, temporal coherence, geometry, leak test
 validate:
 	$(RUN) python scripts/validate.py
+
+## fetch the Placer + Nevada acquisition AOI from Census TIGERweb
+fetch-aoi:
+	$(RUN) python scripts/fetch_aoi.py
 
 ## pull Tier 1 quads from the TNM Access API into data/raw/topo/
 fetch-topo:

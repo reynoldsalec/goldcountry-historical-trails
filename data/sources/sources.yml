@@ -11,4 +11,14 @@
 # A source with rights: unknown may be used for digitizing but its imagery must not be
 # published as a tile layer (AGENTS.md §2.7).
 
-sources: []
+sources:
+  - id: census-tigerweb-counties
+    title: US Census Bureau TIGERweb, State_County/MapServer, Counties (Census 2020)
+    url: https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/55
+    rights: public_domain
+    sensitivity: public
+    attribution: "County boundaries: US Census Bureau TIGER/Line"
+    used_for: >-
+      data/sources/aoi_counties.geojson — the Placer + Nevada acquisition envelope.
+      Pinned to the Census 2020 vintage rather than the rolling "current" layer so a
+      re-run reproduces the same geometry. Rebuild with `make fetch-aoi`.

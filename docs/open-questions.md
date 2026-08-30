@@ -5,19 +5,38 @@ was tried, and what would resolve it (AGENTS.md §5.4). Do not resolve one by gu
 
 ---
 
-## 2026-08-29 — `data/sources/aoi_tier1.geojson` cannot be authored by an agent
+## 2026-08-29 — AOI: acquisition envelope RESOLVED, digitizing bound still open
 
-**Question.** README §2 and AGENTS.md §6 both say the Tier 1 AOI is *defined by*
-`data/sources/aoi_tier1.geojson`, and M0 asks for the README §5 layout. But drawing that
-polygon means inventing geometry, which AGENTS.md §2.1 forbids.
+**Resolved.** Direction on 2026-08-29: use only GIS data sourceable online at this stage,
+and scope acquisition to all of Placer and Nevada County. `data/sources/aoi_counties.geojson`
+is now built by `make fetch-aoi` from Census TIGERweb (Census 2020 vintage, public domain,
+pinned so it cannot drift). Nothing was hand-drawn. AGENTS.md §5.1 permits the widening
+because the task said so explicitly; the exception is recorded there and in README §2, and
+is limited to acquisition — digitizing scope is unchanged.
 
-**What was tried.** Left the file absent rather than committing a placeholder box. The
-directory exists; the file does not. Nothing in M0 reads it.
+**Still open: `data/sources/aoi_tier1.geojson`.** The digitizing bound does not exist yet.
+It cannot be hand-drawn at this stage per the same direction, so it has to be derived from
+an online source. Candidates, none yet verified as fit:
 
-**To resolve.** A human draws the Bear River Canal corridor AOI (Crother Rd to Placer
-Hills Rd, plus the Bowman feeder and Meadow Vista connectors) in QGIS and commits it, or
-names an authoritative source polygon to derive it from. Needed before M1, since
-`fetch-topo` selects quads by AOI intersection.
+- OSM (`README.md` §8, ODbL, attribution required) — the canal is plausibly mapped as
+  `waterway=canal` and the trail as `highway=path`. Cheapest to test.
+- USGS NHD canal/ditch flowlines via The National Map — public domain, same infrastructure
+  as the M1 topo fetch. Worth checking whether the Bear River Canal is carried and
+  correctly named; a GNIS name search returned an ambiguous distance-to-Meadow-Vista
+  result that was not chased down.
+- Placer County Open Data (`README.md` §8) — may publish a trails or canal layer.
+
+**What is known about the corridor,** from public trail listings corroborated 2026-08-29:
+it runs from Crother Rd (below the Waldorf school) via Meadow Gate Rd to Placer Hills Rd
+(by the Winchester entrance), roughly 4 miles one way. Sources describe a PG&E maintenance
+gravel road on one bank and singletrack on the other, which matches the berm/bank
+distinction in AGENTS.md §6. This is orientation only — it is not a citation and must not
+be used as one.
+
+**To resolve.** Confirm which online source to derive the Tier 1 bound from, and the
+buffer distance. The buffer has to be generous enough to contain historical reroutes and
+19c alignments, because a tight buffer around the modern trace silently assumes the
+historical trail followed it — the inference AGENTS.md §2.1 forbids.
 
 ---
 
@@ -111,3 +130,22 @@ field saying the record is synthetic and not evidence.
 **To resolve.** Delete all `fixture-*` records in M3 when the real OTCA data lands. If
 that slips, consider moving fixtures to `tests/` and pointing `validate.py --data-dir` at
 them, at the cost of `make validate` no longer exercising the real directory by default.
+
+---
+
+## 2026-08-29 — Acquisition AOI is ~2,365 sq mi, which resizes M1
+
+**Question.** Not a blocker, but M1 was scoped against a 4-mile corridor and is now scoped
+against two counties. The combined AOI bbox is roughly 128 km x 90 km, about 84 cells on a
+7.5-minute grid and realistically 55-65 quads once clipped to the county shapes. topoView
+carries several editions per quad across 1884-2006, so `make fetch-topo` plausibly means
+several hundred GeoTIFFs and multiple GB.
+
+**What was tried.** Nothing yet — no quads have been fetched. Flagged before M1 starts
+rather than at download time.
+
+**To resolve.** Decide whether `fetch-topo` pulls every edition of every quad, or filters
+by date first (the 1967-1972 hinge in README §1 argues for prioritising mid-century
+editions). Also worth deciding whether it fetches lazily per-quad on demand. `data/raw/`
+is gitignored and fetched by script per AGENTS.md §4.4, so nothing here threatens the
+repo; it is a time and disk question.

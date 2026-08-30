@@ -58,6 +58,13 @@ Work Tier 1 to completion before touching Tier 2. Breadth is the failure mode.
 
 Tier 1 AOI is defined by `data/sources/aoi_tier1.geojson`. Do not widen it.
 
+**Acquisition is scoped wider than digitizing.** As of 2026-08-29, raster acquisition and
+clipping cover all of Placer and Nevada County, bounded by
+`data/sources/aoi_counties.geojson` (Census TIGERweb, Census 2020 vintage, built by
+`make fetch-aoi`). Segment-level digitizing remains Tier 1. The two AOIs are not
+interchangeable: `aoi_counties.geojson` answers "which sheets do we pull and warp",
+`aoi_tier1.geojson` answers "what do we trace". Widening the second is still forbidden.
+
 ---
 
 ## 3. Data model
@@ -194,7 +201,8 @@ Key choices and why:
 │   ├── working/                # gitignored intermediates
 │   ├── sources/                # COMMITTED
 │   │   ├── sources.yml         # source manifest: id, url, rights, sensitivity
-│   │   ├── aoi_tier1.geojson
+│   │   ├── aoi_counties.geojson  # Placer + Nevada, acquisition/clip envelope
+│   │   ├── aoi_tier1.geojson     # Bear River Canal corridor, digitizing bound
 │   │   └── gcp/                # *.points files from QGIS Georeferencer
 │   └── authoritative/          # COMMITTED — source of truth
 │       ├── trails.json
@@ -207,6 +215,7 @@ Key choices and why:
 │   ├── observation.schema.json
 │   └── support.schema.json
 ├── scripts/
+│   ├── fetch_aoi.py            # Census TIGERweb → data/sources/aoi_counties.geojson
 │   ├── fetch_topoview.py       # TNM Access API → data/raw/topo/
 │   ├── warp_raster.py          # GCPs + GDAL → COG
 │   ├── ingest_gaia.py          # GPX → candidate alignments
@@ -230,7 +239,8 @@ Key choices and why:
 | Command | Does |
 | --- | --- |
 | `make setup` | `uv sync`, check for `gdal`, `tippecanoe`, `node` |
-| `make fetch-topo` | pull Tier 1 quads from TNM Access API into `data/raw/topo/` |
+| `make fetch-aoi` | rebuild `data/sources/aoi_counties.geojson` from Census TIGERweb |
+| `make fetch-topo` | pull quads covering the acquisition AOI from TNM Access API into `data/raw/topo/` |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |

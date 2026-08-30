@@ -152,6 +152,12 @@ The project is tiered (README §Scope). Tier 1 is the Bear River Canal corridor 
 Meadow Vista. Do not start Tier 2 or Tier 3 work, or widen the AOI, unless the task
 explicitly says so. Breadth is the failure mode that kills this project.
 
+Standing exception, granted 2026-08-29: **raster acquisition and clipping** cover all of
+Placer and Nevada County, bounded by `data/sources/aoi_counties.geojson`. This does not
+extend to digitizing, which stays inside `data/sources/aoi_tier1.geojson`. Fetching and
+warping a sheet is cheap and automated; tracing segments off it is neither, and it is the
+tracing that has to stay narrow.
+
 ### 5.2 Before writing code
 
 Check whether a script already covers the step. This repo should stay small. Prefer
@@ -195,4 +201,4 @@ a human would need to resolve it. This is preferred over a plausible guess, ever
 | **Support** | A link from an alignment to an observation, with a role and a confidence. |
 | **Berm side** | Downhill side of the Bear River Canal (northwestern), single-track. |
 | **Bank side** | Uphill side (southeastern), maintenance road. |
-| **AOI** | Area of interest. Tier 1 AOI is defined in `data/sources/aoi_tier1.geojson`. |
+| **AOI** | Area of interest. Two of them: `data/sources/aoi_counties.geojson` bounds raster acquisition (Placer + Nevada County); `data/sources/aoi_tier1.geojson` bounds digitizing (Bear River Canal corridor). |
