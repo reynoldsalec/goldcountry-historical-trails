@@ -5,38 +5,39 @@ was tried, and what would resolve it (AGENTS.md §5.4). Do not resolve one by gu
 
 ---
 
-## 2026-08-29 — AOI: acquisition envelope RESOLVED, digitizing bound still open
+## 2026-08-30 — AOI: both files now built from online sources
 
-**Resolved.** Direction on 2026-08-29: use only GIS data sourceable online at this stage,
-and scope acquisition to all of Placer and Nevada County. `data/sources/aoi_counties.geojson`
-is now built by `make fetch-aoi` from Census TIGERweb (Census 2020 vintage, public domain,
-pinned so it cannot drift). Nothing was hand-drawn. AGENTS.md §5.1 permits the widening
-because the task said so explicitly; the exception is recorded there and in README §2, and
-is limited to acquisition — digitizing scope is unchanged.
+**Resolved.** `data/sources/aoi_tier1.geojson` now exists, derived from OpenStreetMap via
+a date-pinned Overpass attic query (`make fetch-aoi`). Nothing was hand-drawn. OSM carries
+the corridor in detail: `Bear River Canal` (14 ways, merging to one 20.77 mi line), a
+named `Bear River Canal Trail` (8 ways, 5.03 mi, `highway=path`, `surface=dirt`), and
+`Bowman Feeder Canal`. The canal was cut between its Crother Road and Placer Hills Road
+crossings — 5.03 mi — unioned with the trail and the feeder, and buffered 250 m, giving
+1.43 sq mi. It sits fully inside the acquisition AOI, which was checked.
 
-**Still open: `data/sources/aoi_tier1.geojson`.** The digitizing bound does not exist yet.
-It cannot be hand-drawn at this stage per the same direction, so it has to be derived from
-an online source. Candidates, none yet verified as fit:
+The corridor identity question is settled: of the four canals in the area, `Bear River
+Canal` is the only one touching all three named roads (Crother, Meadow Gate, Placer
+Hills, all at 0 m). `Boardman Canal` is 64 m from Placer Hills Road and is a different
+corridor. The README naming is correct.
 
-- OSM (`README.md` §8, ODbL, attribution required) — the canal is plausibly mapped as
-  `waterway=canal` and the trail as `highway=path`. Cheapest to test.
-- USGS NHD canal/ditch flowlines via The National Map — public domain, same infrastructure
-  as the M1 topo fetch. Worth checking whether the Bear River Canal is carried and
-  correctly named; a GNIS name search returned an ambiguous distance-to-Meadow-Vista
-  result that was not chased down.
-- Placer County Open Data (`README.md` §8) — may publish a trails or canal layer.
+**Still open: the 250 m buffer is a default, not a decision.** It was chosen to be
+generous — a tight buffer around the modern trace would assume historical alignments
+followed it, the inference AGENTS.md §2.1 forbids — but nobody has confirmed it is right.
+For scale: 100 m gives 0.68 sq mi, 250 m gives 1.43, 400 m gives 2.18, 800 m gives 4.33.
+Change with `uv run python scripts/fetch_aoi.py tier1 --buffer N`. Someone who knows how
+far the 19c and mid-century alignments wander from the present ditch should set it.
 
-**What is known about the corridor,** from public trail listings corroborated 2026-08-29:
-it runs from Crother Rd (below the Waldorf school) via Meadow Gate Rd to Placer Hills Rd
-(by the Winchester entrance), roughly 4 miles one way. Sources describe a PG&E maintenance
-gravel road on one bank and singletrack on the other, which matches the berm/bank
-distinction in AGENTS.md §6. This is orientation only — it is not a citation and must not
-be used as one.
+**Still open: "Meadow Vista connectors".** README §2 includes them in Tier 1 but does not
+name them, so they are not in the AOI. OSM has a `Sugar Pine Mountain Trail` touching the
+corridor, which matches the `sugar-pine` value in the `corridor` enum, and `Simpson
+Spillway` and `Combie Ophir Canal` are nearby, matching `simpson` and `combie`. That the
+enum maps onto real named OSM features is a good sign, but which of them count as Tier 1
+connectors is a scoping decision, not something to infer.
 
-**To resolve.** Confirm which online source to derive the Tier 1 bound from, and the
-buffer distance. The buffer has to be generous enough to contain historical reroutes and
-19c alignments, because a tight buffer around the modern trace silently assumes the
-historical trail followed it — the inference AGENTS.md §2.1 forbids.
+**Caveat carried into the data.** The AOI records `rights: odbl` and the required
+attribution. OSM is not an authoritative record of historical trail extent, so no OSM way
+may become an alignment in `data/authoritative/` (AGENTS.md §2.1). The file states this in
+its own `role` property.
 
 ---
 

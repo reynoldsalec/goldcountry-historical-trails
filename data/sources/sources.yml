@@ -22,3 +22,22 @@ sources:
       data/sources/aoi_counties.geojson — the Placer + Nevada acquisition envelope.
       Pinned to the Census 2020 vintage rather than the rolling "current" layer so a
       re-run reproduces the same geometry. Rebuild with `make fetch-aoi`.
+
+  - id: osm-overpass-brc-corridor
+    title: OpenStreetMap via Overpass API — Bear River Canal corridor
+    url: https://overpass-api.de/api/interpreter
+    rights: odbl
+    sensitivity: public
+    attribution: "© OpenStreetMap contributors, ODbL"
+    osm_snapshot: "2026-08-30T00:00:00Z"
+    used_for: >-
+      data/sources/aoi_tier1.geojson — the Tier 1 digitizing bound, built from the
+      named ways "Bear River Canal", "Bear River Canal Trail" and "Bowman Feeder
+      Canal", cut between the Crother Road and Placer Hills Road crossings and
+      buffered 250 m. Pinned to a dated Overpass attic query so re-runs reproduce the
+      same geometry. Rebuild with `make fetch-aoi`.
+    caution: >-
+      Scoping boundary only. OSM is not an authoritative record of historical trail
+      extent and no OSM way may become an alignment in data/authoritative/
+      (AGENTS.md 2.1).
+

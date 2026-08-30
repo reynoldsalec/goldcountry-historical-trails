@@ -31,9 +31,10 @@ setup:
 validate:
 	$(RUN) python scripts/validate.py
 
-## fetch the Placer + Nevada acquisition AOI from Census TIGERweb
+## rebuild both AOIs from online sources (Census TIGERweb + OpenStreetMap)
 fetch-aoi:
-	$(RUN) python scripts/fetch_aoi.py
+	$(RUN) python scripts/fetch_aoi.py counties
+	$(RUN) python scripts/fetch_aoi.py tier1
 
 ## pull Tier 1 quads from the TNM Access API into data/raw/topo/
 fetch-topo:
