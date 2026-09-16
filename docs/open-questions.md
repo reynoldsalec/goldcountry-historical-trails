@@ -3,9 +3,110 @@
 Gaps and ambiguities that need a human decision. Append with a date, the question, what
 was tried, and what would resolve it (AGENTS.md §5.4). Do not resolve one by guessing.
 
+Current scope: historical foot trails throughout Nevada and Placer Counties from 1950
+to the present. Earlier entries retain the research history. References to Tier 1,
+the 1967–1972 priority window, and a required 19th-century layer are superseded by the
+2026-09-16 scope correction below and must not guide new work.
+
+---
+
+## 2026-08-30 — Which topo date dates an observation?
+
+**Question.** A USGS sheet carries up to six dates: date on map, imprint year, aerial
+photo year, field check year, photo revision year, edit year. `CA_Auburn_100355_1953_24000`
+is titled 1953, was imprinted in 1981, and was photo-revised in 1981 from 1978 aerials.
+A trail traced off that sheet is evidence about *what year*?
+
+The four-field temporal model (AGENTS.md §2.3) makes this sharper, not softer. If a
+segment appears on that sheet, is `earliest_known_open` 1953 (the sheet's nominal date,
+which its base planimetry does reflect) or 1978 (the aerials the revision was drawn
+from)? And if the segment appears on the 1953 original *and* the 1981 revision, that is
+two observations, not one.
+
+**What was tried.** `scripts/fetch_topoview.py index` records every date field per sheet
+in `data/sources/topo_index.csv` rather than choosing among them, and derives one
+convenience column, `content_year` — the latest of photo revision, aerial photo and field
+check — as the most recent ground condition the sheet can attest to. 149 of the 615
+indexed sheets have a `content_year` later than their printed date; the largest gap is 28
+years. No script picks a date for an observation.
+
+**To resolve.** Decide the rule for M3, and write it into `docs/data-model.md`. A
+defensible starting position is that a photo-revised sheet is *two* observations — the
+base compilation at `date_on_map` and the revision at `content_year` — since the revision
+overprints only changed features, usually in purple. Someone should look at an actual
+1973-revised Auburn sheet and confirm whether the corridor is on the base or the
+overprint before this is decided. This is not a question a script can settle.
+
+---
+
+## 2026-08-30 — No aerial frames identified for the 1967–1972 hinge
+
+**Status, 2026-09-16:** retained as a local research gap. The legal framing and narrow
+date priority below belong to the previous plan. Countywide aerial coverage from 1950
+onward is the current task; this locality is not a prerequisite.
+
+**Question.** Which aerial flights and frames cover the Bear River Canal corridor between
+1967 and 1972, the window Civil Code 1009 turns on (README §1)?
+
+**What was tried.** Both candidate indexes were probed and neither can be queried by this
+repo:
+
+- **USGS EarthExplorer** (`earthexplorer.usgs.gov`, Aerial Photo Single Frames) needs a
+  free USGS ERS account to search and a token for the M2M API. No credentials are held
+  here and none may be committed (AGENTS.md §4.4).
+- **UCSB FrameFinder** (`mil.library.ucsb.edu/ap_indexes/FrameFinder/`) is an Esri Web
+  AppBuilder application. Its `config.json` was fetched and contains only an ArcGIS
+  geometry utility endpoint, no queryable feature service, so its flights cannot be
+  enumerated without reverse-engineering the app further.
+
+Both are recorded in `data/sources/sources.yml` as candidates with `blocked_on` set. **No
+frame IDs are recorded, because none were verified and inventing one is forbidden**
+(AGENTS.md §2.1).
+
+**What partially covers the gap.** All three Tier 1 7.5-minute quads have a 1973 photo
+revision flown in 1973, and originals from 1949–1953. That brackets the window but does
+not sit inside it.
+
+**To resolve.** A human with a USGS ERS account should search EarthExplorer for
+single-frame aerials over the corridor for 1965–1975, and check FrameFinder for
+Cartwright Aerial Surveys flights in the same window. Record flight ID, date, scale and
+frame numbers in `data/sources/sources.yml`. Frames then need manual GCPs committed to
+`data/sources/gcp/` (AGENTS.md §3).
+
+---
+
+## 2026-08-30 — No 19th-century Placer County map located
+
+**Status, 2026-09-16:** outside the core 1950-to-present study period. Retained as
+background research, not a blocking requirement.
+
+**Question.** Tier 1 lies in Placer County. What 19c source shows the corridor there?
+
+**What was tried.** The David Rumsey collection was searched. It holds Hartwell's 1880
+*Map of Nevada County* (1:79,200, `RUMSEY~8~1~200202~3000113`), whose title advertises
+"Mining Ditches" — the Bear River Canal is one, so it is the strongest 19c candidate
+found. But it covers **Nevada County only**. The earliest county-level *Placer* sheet in
+the collection is Weber 1914 (1:177,000), which is not 19c and belongs to no decade the
+viewer renders. Britton & Rey 1857 exists but at 1:1,520,640 puts the entire corridor in
+about 5 mm.
+
+The remaining candidate is BLM GLO township plats and survey field notes
+(`glorecords.blm.gov`), recorded in `data/sources/sources.yml`. **The specific Mount
+Diablo Meridian townships and ranges covering the corridor have not been identified, so
+no plat is cited** — citing an unverified one would be fabrication (AGENTS.md §2.1).
+
+**To resolve.** Identify the township/range grid over `data/sources/aoi_tier1.geojson`,
+then pull the corresponding GLO plats and field notes and record them. Whether Hartwell
+1880 covers any part of the Tier 1 corridor also needs checking: the Placer/Nevada county
+line runs near the corridor and the sheet may reach it.
+
 ---
 
 ## 2026-08-30 — AOI: both files now built from online sources
+
+**Status, 2026-09-16:** both files remain available, but the county boundary now scopes
+digitizing as well as acquisition. The corridor buffer and connector questions below
+only concern the optional legacy work area. They do not restrict countywide mapping.
 
 **Resolved.** `data/sources/aoi_tier1.geojson` now exists, derived from OpenStreetMap via
 a date-pinned Overpass attic query (`make fetch-aoi`). Nothing was hand-drawn. OSM carries
@@ -136,6 +237,10 @@ them, at the cost of `make validate` no longer exercising the real directory by 
 
 ## 2026-08-29 — Acquisition AOI is ~2,365 sq mi, which resizes M1
 
+**Status, 2026-09-16:** the index now records 615 sheets across both counties and the
+default download is countywide. The old geographic scope and legal-date priority below
+are superseded. Download batching and selection remain implementation concerns.
+
 **Question.** Not a blocker, but M1 was scoped against a 4-mile corridor and is now scoped
 against two counties. The combined AOI bbox is roughly 128 km x 90 km, about 84 cells on a
 7.5-minute grid and realistically 55-65 quads once clipped to the county shapes. topoView
@@ -150,3 +255,36 @@ by date first (the 1967-1972 hinge in README §1 argues for prioritising mid-cen
 editions). Also worth deciding whether it fetches lazily per-quad on demand. `data/raw/`
 is gitignored and fetched by script per AGENTS.md §4.4, so nothing here threatens the
 repo; it is a time and disk question.
+
+---
+
+## 2026-09-16 — Countywide scope and 1950 start confirmed
+
+**Decision.** The project owner clarified that the atlas maps historical foot trails
+throughout Nevada and Placer Counties from 1950 onward. README and AGENTS now apply
+that scope to research, acquisition, digitizing, and the viewer. The former geographic
+tiers, corridor-first requirement, 19th-century layer, and special 1967–1972 priority
+are superseded. Existing source records remain available.
+
+**What was checked.** Read the orientation documents, trail schema, Makefile, and AOI
+and topo acquisition scripts. The county boundary already exists, and the topo index
+and default download cover both counties. The implementation still contains a required
+`tier` field, local `corridor` enums, `in_tier1`, an optional `--tier1` download filter,
+and generated documentation that highlights the corridor subset. `make fetch-aoi`
+still rebuilds both the county and legacy corridor files. The historical topo download
+includes pre-1950 material and does not supply full coverage through the present.
+
+**Remaining implementation work.** Migrate the schema and consumers so trails anywhere
+in either county can be represented without obsolete geographic tiers. Preserve stable
+IDs and provenance. Update generated reports and tool descriptions to treat the
+corridor as an optional work area. Plan acquisition around the 1950-to-present study
+period without discarding older immutable downloads or misdating revised maps.
+
+**Remaining research work.** Build a coverage inventory by quadrangle or source
+footprint and decade across both counties. Locate dated aerials and later maps, record
+unexamined areas, and choose digitizing batches that improve coverage. Local OTCA
+records can contribute without determining the countywide inventory.
+
+**To resolve.** Implement and validate the schema/tooling migration, then populate the
+coverage inventory with verified sources and explicit gaps. The geographic scope is
+decided; missing evidence must be resolved through source research and human review.

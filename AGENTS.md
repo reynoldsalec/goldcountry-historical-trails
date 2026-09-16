@@ -153,15 +153,28 @@ safe to re-run. `make` with no argument runs `validate build-public`.
 
 ### 5.1 Scope discipline
 
-The project is tiered (README §Scope). Tier 1 is the Bear River Canal corridor in
-Meadow Vista. Do not start Tier 2 or Tier 3 work, or widen the AOI, unless the task
-explicitly says so. Breadth is the failure mode that kills this project.
+The project scope is all of Nevada and Placer Counties from 1950 to the present
+(README §2). `data/sources/aoi_counties.geojson` defines the geographic boundary for
+research, acquisition, and digitizing. Countywide digitizing is authorized; no corridor
+must be completed before work elsewhere in either county can begin.
 
-Standing exception, granted 2026-08-29: **raster acquisition and clipping** cover all of
-Placer and Nevada County, bounded by `data/sources/aoi_counties.geojson`. This does not
-extend to digitizing, which stays inside `data/sources/aoi_tier1.geojson`. Fetching and
-warping a sheet is cheap and automated; tracing segments off it is neither, and it is the
-tracing that has to stay narrow.
+Organize work into manageable batches by quadrangle, locality, or source coverage and
+decade. Choose batches to improve coverage across both counties and fill documented
+gaps. Record what has been searched, what has been digitized, and what remains
+unexamined. Uneven source availability must remain visible.
+
+The former Tier 1/2/3 priority system and raster-only countywide restriction are
+superseded. `data/sources/aoi_tier1.geojson` is a legacy Bear River Canal work-area
+reference, not a digitizing boundary. Existing `tier`, `in_tier1`, and `--tier1` names
+are implementation remnants, not instructions to narrow the project.
+
+Pre-1950 sources may supply background, but do not establish a trail's presence in
+1950 or later without supporting observations. A separate 19th-century layer and
+special treatment of 1967–1972 are not project requirements.
+
+Focus on foot trails. Roads, canals, and other linear features are contextual unless
+a cited source supports their relevance to a foot-trail alignment. Do not turn a canal
+or road centerline into a trail merely because it follows a plausible route.
 
 ### 5.2 Before writing code
 
@@ -204,6 +217,5 @@ a human would need to resolve it. This is preferred over a plausible guess, ever
 | **Alignment** | One dated geometry version of a trail. The unit that gets rendered. |
 | **Observation** | One dated piece of evidence: a map sheet, aerial frame, plan, recorded map, declaration, photo. |
 | **Support** | A link from an alignment to an observation, with a role and a confidence. |
-| **Berm side** | Downhill side of the Bear River Canal (northwestern), single-track. |
-| **Bank side** | Uphill side (southeastern), maintenance road. |
-| **AOI** | Area of interest. Two of them: `data/sources/aoi_counties.geojson` bounds raster acquisition (Placer + Nevada County); `data/sources/aoi_tier1.geojson` bounds digitizing (Bear River Canal corridor). |
+| **Berm side / bank side** | Legacy canal-specific alignment terms. Apply only where a source supports the distinction; they do not classify foot trails across the counties. |
+| **AOI** | Area of interest. `data/sources/aoi_counties.geojson` bounds the countywide project, including digitizing. `data/sources/aoi_tier1.geojson` is an optional legacy work area. |

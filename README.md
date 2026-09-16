@@ -1,10 +1,11 @@
-# Foothill Trail Atlas
+# Nevada and Placer Historical Foot Trail Atlas
 
-A temporal GIS dataset and static web viewer documenting historical trail extent in the
-Sierra Nevada foothills of Placer and Nevada County, California: the 19th century as a
-single era, then decade-by-decade from 1950 to the present.
+A temporal GIS dataset and static web viewer mapping historical foot trails throughout
+Nevada and Placer Counties, California, decade by decade from 1950 to the present.
 
-Built for the Open Trails Community Alliance (OTCA), Meadow Vista, CA.
+The full area of both counties is in scope for research and digitizing, including the
+foothills, mountains, and eastern portions. Local collections, including those of the
+Open Trails Community Alliance (OTCA), can contribute evidence to this countywide atlas.
 
 > Agents: read `AGENTS.md` first. It contains the non-negotiable rules. This file
 > contains the plan.
@@ -44,27 +45,40 @@ particular trails do not set its timeline or imply public access rights.
 
 ---
 
-## 2. Scope tiers
+## 2. Scope and coverage
 
-Work Tier 1 to completion before touching Tier 2. Breadth is the failure mode.
+| Dimension | Scope |
+| --- | --- |
+| Geography | The entire area of Nevada and Placer Counties, California |
+| Time | 1950 to the present, with decade views and source dates retained |
+| Subject | Historical foot trails, including changed alignments and documented closures |
+| Detail | Segment-level digitizing wherever cited evidence supports it in either county |
+| Source coverage | Maps, aerials, and other dated observations across both counties |
 
-| Tier | Extent | Resolution | Time slices |
-| --- | --- | --- | --- |
-| **1** | Bear River Canal corridor, Crother Rd to Placer Hills Rd, plus Bowman feeder and Meadow Vista connectors | Segment-level, digitized | 19c + every decade 1950–2020s |
-| **2** | Auburn–Colfax–Grass Valley foothill band | Coarse, principal corridors only | 19c, 1950s, 1970s, 2020s |
-| **3** | Placer + Nevada County | Raster overlays only, no digitizing | Whatever sheets exist |
+`data/sources/aoi_counties.geojson` defines the project boundary for acquisition,
+clipping, and digitizing. It uses Census TIGERweb boundaries, Census 2020 vintage,
+and is built by `make fetch-aoi`. A sheet or flight may extend beyond the boundary;
+its full source extent does not expand the mapping scope.
 
-Tier 1 AOI is defined by `data/sources/aoi_tier1.geojson`. Do not widen it.
+Plan manageable work batches by quadrangle, locality, or source footprint and decade.
+Maintain a countywide coverage inventory that distinguishes sources located, sources
+examined, trails digitized, and unresolved gaps. Prioritize useful evidence and gaps
+across both counties. Work anywhere in either county can proceed without finishing
+another locality first. Countywide scope is a goal, not a claim of completed coverage.
 
-**Acquisition is scoped wider than digitizing.** As of 2026-08-29, raster acquisition and
-clipping cover all of Placer and Nevada County, bounded by
-`data/sources/aoi_counties.geojson` (Census TIGERweb, Census 2020 vintage, built by
-`make fetch-aoi`). Segment-level digitizing remains Tier 1, bounded by
-`data/sources/aoi_tier1.geojson` — the Bear River Canal corridor from the Crother Rd
-crossing to the Placer Hills Rd crossing plus the Bowman feeder, derived from a dated
-OSM snapshot and buffered 250 m. The two AOIs are not
-interchangeable: `aoi_counties.geojson` answers "which sheets do we pull and warp",
-`aoi_tier1.geojson` answers "what do we trace". Widening the second is still forbidden.
+Foot trails are the subject. A road, canal, or maintenance route is relevant only where
+a source connects it to a foot trail or documented walking use. A modern route cannot
+be projected backward in time without evidence. Pre-1950 material may provide context,
+but does not establish presence after 1950 or require a separate earlier-era viewer.
+
+### Legacy implementation
+
+The former Tier 1/2/3 scope system is superseded. `aoi_tier1.geojson` remains an optional
+Bear River Canal work-area reference derived from a dated OSM snapshot. It does not
+limit digitizing. The schema's `tier` and local `corridor` values, the topo index's
+`in_tier1` column, and the `--tier1` download option still exist. They describe the
+earlier implementation, not countywide priorities. Schema and tooling migration work
+is recorded in `docs/open-questions.md`; this document does not imply it is complete.
 
 ---
 
@@ -72,15 +86,15 @@ interchangeable: `aoi_counties.geojson` answers "which sheets do we pull and war
 
 Three entities plus a join. Full JSON Schemas live in `schema/`.
 
-### `trails.geojson` — persistent corridor concepts (no geometry; `null` geometry FeatureCollection is not used, this is a **JSON array**, stored as `data/authoritative/trails.json`)
+### `trails.json` — persistent trail concepts (a JSON array without geometry)
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `trail_id` | string | stable slug, e.g. `brct-crother-to-simpson-bridge` |
+| `trail_id` | string | stable slug; not tied to one locality |
 | `name` | string | |
 | `aka` | string[] | local/colloquial names |
-| `corridor` | enum | `brct` \| `bowman` \| `simpson` \| `combie` \| `sugar-pine` \| `other` |
-| `tier` | 1 \| 2 \| 3 | |
+| `corridor` | enum | Legacy values: `brct` \| `bowman` \| `simpson` \| `combie` \| `sugar-pine` \| `other`; not an inventory of the counties' trails |
+| `tier` | 1 \| 2 \| 3 | Legacy required field pending migration; does not restrict geography, priority, or digitizing |
 | `current_status` | enum | `secured` \| `unsecured` \| `threatened` \| `lost` \| `unknown` |
 | `notes` | string | human-authored |
 
@@ -202,8 +216,9 @@ Key choices and why:
 │   ├── working/                # gitignored intermediates
 │   ├── sources/                # COMMITTED
 │   │   ├── sources.yml         # source manifest: id, url, rights, sensitivity
-│   │   ├── aoi_counties.geojson  # Placer + Nevada, acquisition/clip envelope
-│   │   ├── aoi_tier1.geojson     # Bear River Canal corridor, digitizing bound (OSM)
+│   │   ├── topo_index.csv      # per-sheet USGS topo index with lineage dates
+│   │   ├── aoi_counties.geojson  # both counties: acquisition + digitizing boundary
+│   │   ├── aoi_tier1.geojson     # optional legacy Bear River Canal work area (OSM)
 │   │   └── gcp/                # *.points files from QGIS Georeferencer
 │   └── authoritative/          # COMMITTED — source of truth
 │       ├── trails.json
@@ -229,6 +244,7 @@ Key choices and why:
 └── docs/
     ├── data-model.md
     ├── sources.md
+    ├── topo-editions.md        # generated from topo_index.csv
     ├── georeferencing.md
     └── open-questions.md
 ```
@@ -240,8 +256,8 @@ Key choices and why:
 | Command | Does |
 | --- | --- |
 | `make setup` | `uv sync`, check for `gdal`, `tippecanoe`, `node` |
-| `make fetch-aoi` | rebuild both AOIs: `aoi_counties.geojson` (TIGERweb), `aoi_tier1.geojson` (OSM) |
-| `make fetch-topo` | pull quads covering the acquisition AOI from TNM Access API into `data/raw/topo/` |
+| `make fetch-aoi` | rebuild the countywide AOI (TIGERweb) and the legacy corridor work area (OSM) |
+| `make fetch-topo` | index + pull quads covering both counties from TNM Access API into `data/raw/topo/` (current inventory: 615 sheets, 6.3 GB, including pre-1950 material) |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |
@@ -252,6 +268,11 @@ Key choices and why:
 
 All targets idempotent and safe to re-run.
 
+The optional `make fetch-topo TOPO=--tier1` downloads only the legacy corridor subset
+(91 sheets, 1.0 GB in the current index). It is not the default project scope. The
+current downloader does not enforce the 1950 start date; select evidence by its
+documented content dates when mapping the study period.
+
 ---
 
 ## 7. Milestones
@@ -260,6 +281,7 @@ Each milestone is a stopping point with a verifiable acceptance test. Complete t
 order. Do not start the next until the current one's acceptance test passes.
 
 ### M0 — Scaffold and contracts
+
 Repo skeleton, `pyproject.toml`, `Makefile`, four JSON Schemas, `scripts/validate.py`,
 GitHub Actions running `make validate` on push, `.gitignore`, `docs/open-questions.md`.
 Seed `data/authoritative/` with 2–3 hand-written fixture records so validation has
@@ -269,44 +291,63 @@ something to chew on.
 `support.csv` row, null a required field, or put a restricted value in a public field.
 
 ### M1 — Source manifest and raster acquisition
-`data/sources/sources.yml` populated for Tier 1: every USGS quad covering the AOI
-(verify quad names in topoView — likely Auburn, Colfax, Lake Combie, Chicago Park),
-plus candidate aerial flights and the 19c county maps. `scripts/fetch_topoview.py`
-pulls GeoTIFFs via the TNM Access API.
 
-**Accept when:** `make fetch-topo` downloads every Tier 1 quad edition, and
-`docs/sources.md` lists each with date, scale, rights, and URL.
+Inventory sources throughout both counties for 1950 to the present: historical USGS
+quad editions, modern maps, candidate aerial flights, and local or agency records.
+`scripts/fetch_topoview.py` pulls historical GeoTIFFs via the TNM Access API. Its
+historical collection alone does not cover the full period through the present.
+
+**Accept when:** a coverage inventory accounts for every quadrangle intersecting the
+countywide AOI and every decade from the 1950s onward, identifying available sources
+and explicit gaps. Selected available topo editions are downloaded reproducibly, with
+dates, scales, rights, and URLs recorded. A gap may remain unresolved, but cannot be
+silently excluded or treated as evidence of no trails.
+
+A sheet's printed date is not the date of the ground it shows — 149 of the 615 indexed
+sheets depict later ground, by up to 28 years — so `fetch_topoview.py` harvests each
+sheet's FGDC lineage dates into `data/sources/topo_index.csv`. See `docs/sources.md` and
+`docs/topo-editions.md`. Countywide aerial coverage and later decades remain unresolved;
+see `docs/open-questions.md`.
 
 ### M2 — Raster pipeline
+
 `scripts/warp_raster.py`: already-georeferenced topos get reproject + COG; scans with a
 committed `.points` file get warped. Raster PMTiles or COG output, wired into the
 viewer's layer picker with per-layer attribution.
 
-**Accept when:** `make rasters` produces valid COGs for every Tier 1 topo edition and at
-least one manually georeferenced aerial frame, and RMS error per GCP set is logged.
+**Accept when:** `make rasters` produces valid COGs for the selected topo editions from
+both counties and at least one manually georeferenced aerial frame, and RMS error per
+GCP set is logged. Selection follows the coverage inventory rather than a fixed corridor.
 
 ### M3 — Seed the vector dataset
-Ingest OTCA's existing `Meadow Vista Trail Database.xlsx` into `trails.json`. Ingest
-Gaia GPX tracks as the modern (2020s) alignment baseline. Structure the public-use
-declarations into `observations.geojson` with `obs_type: declaration`, one per
-declarant, geometry = the corridor they describe, `date_start` = first stated year.
-Declarant names go in the restricted field.
 
-**Accept when:** every trail in the spreadsheet has a `trail_id`; every 2020s alignment
-has ≥1 support row; every declaration on file is an observation; `make validate` passes.
+Digitize supported foot-trail segments in work batches across both counties and the
+study period. Use modern tracks only as dated modern observations. Local spreadsheets,
+including OTCA's Meadow Vista inventory, can supply candidates; each alignment still
+requires supporting evidence. Declarations are dated observations with declarant names
+in restricted fields. Do not infer their geometry beyond what the account supports.
+
+**Accept when:** initial batches include supported alignments from both counties and
+multiple decades, every alignment has at least one support row, and `make validate`
+passes. Replace synthetic fixtures before publishing real data. Record remaining
+coverage gaps; completing the seed dataset does not complete countywide mapping.
 
 ### M4 — Viewer
-MapLibre GL JS + `pmtiles`. Decade stepper (19c, 1950s…2020s). Change rendering
-(persisting / newly documented / newly lost). Running "miles lost since 1950" counter.
-Click a line → provenance panel listing supporting observations with dates and links.
-Confidence encoded in line style. 1967–1972 window marked on the stepper.
-Raster overlay picker with opacity + swipe.
+
+MapLibre GL JS + `pmtiles`, opening to the full extent of both counties. Decade stepper
+from the 1950s through the present. Distinguish documented observations, inferred
+continuity, closures, and unknown periods. Click a line for supporting observations,
+dates, and links. Encode confidence in line style. Include coverage gaps and a raster
+overlay picker with opacity + swipe. Any change totals must identify their evidence
+and coverage limits; an unobserved trail is not a lost trail.
 
 **Accept when:** `make build-public && make dev` serves a working viewer; every rendered
-line resolves to at least one citation in the panel; no network calls beyond the static
-origin and the basemap.
+line resolves to at least one citation in the panel; both counties and all study decades
+are reachable; coverage gaps are distinguishable from documented closures; no network
+calls beyond the static origin and the basemap.
 
 ### M5 — Split builds and deploy
+
 `build-public` strips all restricted fields; `build-restricted` retains them behind
 basic auth at the host. Leak test in CI.
 
@@ -314,8 +355,10 @@ basic auth at the host. Leak test in CI.
 and the public build deploys to Cloudflare Pages from `main`.
 
 ### Backlog (not scheduled)
-Tier 2 digitizing · GLO field-note chainage recovery · subdivision-map dedication layer
-· parcel-subdivision-date vs trail-loss analysis · Felt round-trip export.
+
+Continue countywide digitizing and close coverage gaps after the initial release.
+Optional later features include additional contextual layers and Felt round-trip
+export. Pre-1950 reconstruction is outside the core mapping program.
 
 ---
 
@@ -340,3 +383,8 @@ Tier 2 digitizing · GLO field-note chainage recovery · subdivision-map dedicat
 | OSM | current | Yes | ODbL — attribution required |
 
 Anything not in this table needs a `docs/sources.md` entry before use.
+
+The table includes previously investigated sources, not geographic priorities or
+confirmed coverage for every decade. Pre-1950 collections are background only. Seek
+equivalent local and agency records throughout both counties; the Meadow Vista entry
+does not make that locality a prerequisite for other work.
