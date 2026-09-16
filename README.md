@@ -258,6 +258,9 @@ Key choices and why:
 | `make setup` | `uv sync`, check for `gdal`, `tippecanoe`, `node` |
 | `make fetch-aoi` | rebuild the countywide AOI (TIGERweb) and the legacy corridor work area (OSM) |
 | `make fetch-topo` | index + pull quads covering both counties from TNM Access API into `data/raw/topo/` (current inventory: 615 sheets, 6.3 GB, including pre-1950 material) |
+| `make topo-plan` | preview pending downloads from the current index without fetching rasters |
+| `make topo-docs` | regenerate the countywide edition report from the current index |
+| `make test-topo` | run offline acquisition regression tests and source-index integrity checks |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |
@@ -303,8 +306,8 @@ and explicit gaps. Selected available topo editions are downloaded reproducibly,
 dates, scales, rights, and URLs recorded. A gap may remain unresolved, but cannot be
 silently excluded or treated as evidence of no trails.
 
-A sheet's printed date is not the date of the ground it shows — 149 of the 615 indexed
-sheets depict later ground, by up to 28 years — so `fetch_topoview.py` harvests each
+A sheet's printed date does not resolve each feature's observation date — 149 of the 615
+indexed sheets have later lineage dates, by up to 28 years — so `fetch_topoview.py` harvests each
 sheet's FGDC lineage dates into `data/sources/topo_index.csv`. See `docs/sources.md` and
 `docs/topo-editions.md`. Countywide aerial coverage and later decades remain unresolved;
 see `docs/open-questions.md`.

@@ -12,6 +12,11 @@ the 1967–1972 priority window, and a required 19th-century layer are supersede
 
 ## 2026-08-30 — Which topo date dates an observation?
 
+**Status, 2026-09-16:** the acquisition review confirmed that `content_year` is the
+maximum of map, photo-revision, aerial-photo, and field-check years. It is a sorting
+aid, not the date of every depicted feature. The proposed observation-dating rules
+below remain unresolved and require inspection of the relevant base and revision.
+
 **Question.** A USGS sheet carries up to six dates: date on map, imprint year, aerial
 photo year, field check year, photo revision year, edit year. `CA_Auburn_100355_1953_24000`
 is titled 1953, was imprinted in 1981, and was photo-revised in 1981 from 1978 aerials.
@@ -288,3 +293,24 @@ records can contribute without determining the countywide inventory.
 **To resolve.** Implement and validate the schema/tooling migration, then populate the
 coverage inventory with verified sources and explicit gaps. The geographic scope is
 decided; missing evidence must be resolved through source research and human review.
+
+---
+
+## 2026-09-16 — Acquisition review and remaining evidence gaps
+
+**Resolved in code.** Existing raw TIFFs are never overwritten. Downloads use unique
+temporary files and fail without publication on incomplete or non-TIFF responses.
+Metadata parse failures and incomplete API pagination now fail instead of publishing
+an incomplete index. The generated edition report covers both counties, with offline
+regeneration and download-preview Make targets.
+
+**What was checked.** Offline regression tests exercise acquisition failures, existing
+file preservation, county intersection, index IDs, and report generation. The stored
+index is checked against the county boundary and its lineage-year calculation. These
+checks do not independently verify each feature on a historical map or establish that
+the stored online source inventory is still exhaustive.
+
+**Still open.** Trail observation dates require human source inspection. The countywide
+coverage inventory and the trail schema migration remain outstanding. Candidate aerial
+flights and pre-1950 sources remain candidates. Resolve these through verified source
+research; no alignment or observation was created during acquisition review.

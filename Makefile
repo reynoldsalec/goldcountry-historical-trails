@@ -7,7 +7,7 @@ RUN := $(UV) run
 
 .DEFAULT_GOAL := all
 .PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
-        dev fmt lint clean
+        dev fmt lint clean test-topo topo-docs topo-plan
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -36,12 +36,24 @@ fetch-aoi:
 	$(RUN) python scripts/fetch_aoi.py counties
 	$(RUN) python scripts/fetch_aoi.py tier1
 
-## pull Tier 1 quads from the TNM Access API into data/raw/topo/
+## index + pull historical topo sheets covering the acquisition AOI into data/raw/topo/
+# TOPO := --tier1 narrows the download to the legacy work area (91 sheets, 1.0 GB)
+# instead of the whole acquisition AOI (615 sheets, 6.3 GB). The index is always built
+# county-wide so the two scopes cannot drift apart.
+TOPO ?=
 fetch-topo:
-	@echo "make fetch-topo: not implemented until M1 (source manifest and raster acquisition)."
-	@echo "  Needs data/sources/sources.yml populated for Tier 1 and scripts/fetch_topoview.py."
-	@echo "  See README.md §7, M1."
-	@exit 1
+	$(RUN) python scripts/fetch_topoview.py index
+	$(RUN) python scripts/fetch_topoview.py download $(TOPO)
+	$(RUN) python scripts/fetch_topoview.py docs
+
+topo-docs:
+	$(RUN) python scripts/fetch_topoview.py docs
+
+topo-plan:
+	$(RUN) python scripts/fetch_topoview.py download --dry-run $(TOPO)
+
+test-topo:
+	$(RUN) pytest -q scripts/test_fetch_topoview.py
 
 ## warp + COG everything with a GCP file, write to build/rasters/
 rasters:
