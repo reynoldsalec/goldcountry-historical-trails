@@ -19,7 +19,7 @@ sources:
     sensitivity: public
     attribution: "County boundaries: US Census Bureau TIGER/Line"
     used_for: >-
-      data/sources/aoi_counties.geojson — the Placer + Nevada acquisition envelope.
+      data/sources/aoi_counties.geojson — the Nevada and Placer project boundary.
       Pinned to the Census 2020 vintage rather than the rolling "current" layer so a
       re-run reproduces the same geometry. Rebuild with `make fetch-aoi`.
 
@@ -31,7 +31,7 @@ sources:
     attribution: "© OpenStreetMap contributors, ODbL"
     osm_snapshot: "2026-08-30T00:00:00Z"
     used_for: >-
-      data/sources/aoi_tier1.geojson — the Tier 1 digitizing bound, built from the
+      data/sources/aoi_tier1.geojson — the optional legacy work area, built from the
       named ways "Bear River Canal", "Bear River Canal Trail" and "Bowman Feeder
       Canal", cut between the Crother Road and Placer Hills Road crossings and
       buffered 250 m. Pinned to a dated Overpass attic query so re-runs reproduce the
@@ -41,3 +41,118 @@ sources:
       extent and no OSM way may become an alignment in data/authoritative/
       (AGENTS.md 2.1).
 
+  - id: usgs-historical-topo
+    title: USGS Historical Topographic Map Collection (TNM Access API)
+    url: https://tnmaccess.nationalmap.gov/api/v1/products
+    rights: public_domain
+    sensitivity: public
+    attribution: "Historical topographic maps: U.S. Geological Survey"
+    dataset: Historical Topographic Maps
+    browse_url: https://ngmdb.usgs.gov/topoview/
+    used_for: >-
+      data/sources/topo_index.csv and data/raw/topo/. Every sheet whose footprint
+      intersects data/sources/aoi_counties.geojson: 615 sheets, 6.3 GB, 1888-2000, at
+      1:24,000 / 1:31,680 / 1:62,500 / 1:96,000 / 1:100,000 / 1:125,000 / 1:250,000.
+      91 of them cover the legacy corridor work area. Rebuild the index and pull the rasters with
+      `make fetch-topo`. Sheets arrive already georeferenced (AGENTS.md 3): reproject
+      and tile only, never re-georeference.
+    caution: >-
+      The printed date of a sheet is not the date of the ground it shows. USGS reprinted
+      and photo-revised a quadrangle for decades without changing its date, so nine
+      distinct scans of "Auburn, CA 1953" exist, showing conditions from 1952 to 1978.
+      149 of the 615 indexed sheets have selected lineage years later than their printed date. Date an
+      observation from the per-sheet columns in topo_index.csv (date_on_map,
+      photo_revision_year, aerial_photo_year, field_check_year), never from the title.
+      The derived content_year is a sorting aid, not a feature observation date.
+      See docs/topo-editions.md.
+
+  - id: usgs-earthexplorer-aerials
+    title: USGS EarthExplorer — Aerial Photo Single Frames
+    url: https://earthexplorer.usgs.gov/
+    rights: public_domain
+    sensitivity: public
+    attribution: "Aerial photography: U.S. Geological Survey"
+    used_for: >-
+      Candidate only. Not yet acquired and no frames identified. Search for frames
+      across both counties from 1950 onward, particularly where map coverage has gaps.
+      Frames arrive as raw scans and need manual GCPs committed to data/sources/gcp/
+      (AGENTS.md 3).
+    blocked_on: >-
+      Search and download require a free USGS ERS account; the M2M API needs a token.
+      No credentials are held by this repo and none may be committed (AGENTS.md 4.4).
+      A human must run the search and record frame IDs. See docs/open-questions.md.
+
+  - id: ucsb-framefinder-aerials
+    title: UC Santa Barbara Library FrameFinder — California aerial photography index
+    url: https://mil.library.ucsb.edu/ap_indexes/FrameFinder/
+    rights: unknown
+    sensitivity: public
+    attribution: "Aerial photography index: UC Santa Barbara Library"
+    used_for: >-
+      Candidate only. Strong coverage for northern California counties, including
+      Cartwright Aerial Surveys flights from the late 1950s to the early 1980s.
+      Specific coverage across both counties during the study period remains unverified.
+    caution: >-
+      Rights vary by flight and must be checked per flight before publication. Under
+      AGENTS.md 2.7 a flight whose rights are unknown may be used for digitizing but
+      its imagery must not be published as a tile layer.
+    blocked_on: >-
+      The index is an Esri Web AppBuilder application and its config.json exposes no
+      queryable service endpoint, so flights cannot be enumerated automatically without
+      further work. A human must identify candidate flights. See docs/open-questions.md.
+
+  - id: rumsey-hartwell-1880-nevada-county
+    title: Hartwell, J.G., "Map of Nevada County, California", 1880
+    url: https://www.davidrumsey.com/luna/servlet/detail/RUMSEY~8~1~200202~3000113
+    rights: cc_by_nc_sa
+    sensitivity: public
+    attribution: "David Rumsey Map Collection, davidrumsey.com"
+    iiif_manifest: https://www.davidrumsey.com/luna/servlet/iiif/m/RUMSEY~8~1~200202~3000113/manifest
+    scale: 79200
+    used_for: >-
+      Pre-1950 background candidate. Rumsey List No 3935.000, compiled by the county
+      surveyor, 1:79,200. Covers Nevada County. Georeference via Allmaps from the
+      IIIF manifest (README 4). Does not establish foot-trail extent after 1950.
+    caution: >-
+      CC-BY-NC-SA. Attribute and do not use commercially (AGENTS.md 2.7). Not yet
+      georeferenced and not yet examined for corridor content.
+
+  - id: rumsey-britton-rey-1857-california
+    title: Goddard, George H., "Britton & Rey's Map of the State of California", 1857
+    url: https://www.davidrumsey.com/luna/servlet/detail/RUMSEY~8~1~188~10036
+    rights: cc_by_nc_sa
+    sensitivity: public
+    attribution: "David Rumsey Map Collection, davidrumsey.com"
+    iiif_manifest: https://www.davidrumsey.com/luna/servlet/iiif/m/RUMSEY~8~1~188~10036/manifest
+    scale: 1520640
+    used_for: >-
+      Pre-1950 background candidate at 1:1,520,640. Recorded for completeness; it cannot support a
+      segment-level alignment and should not be digitized against.
+    caution: CC-BY-NC-SA. Attribute and do not use commercially (AGENTS.md 2.7).
+
+  - id: rumsey-weber-1914-placer-county
+    title: C.F. Weber & Co., "Weber's Map of Placer County, California", 1914
+    url: https://www.davidrumsey.com/luna/servlet/detail/RUMSEY~8~1~254191~5519294
+    rights: cc_by_nc_sa
+    sensitivity: public
+    attribution: "David Rumsey Map Collection, davidrumsey.com"
+    scale: 177000
+    used_for: >-
+      Pre-1950 background candidate retained from earlier research. Outside the
+      core study period; does not establish foot-trail extent after 1950.
+    caution: >-
+      CC-BY-NC-SA. Attribute and do not use commercially (AGENTS.md 2.7). At 1:177,000
+      it is coarse. Not yet examined for corridor content.
+
+  - id: blm-glo-plats
+    title: BLM General Land Office Records — township plats and survey field notes
+    url: https://glorecords.blm.gov/
+    rights: public_domain
+    sensitivity: public
+    attribution: "Township plats: BLM General Land Office Records"
+    used_for: >-
+      Pre-1950 background candidate. No specific plats have been verified, and this
+      collection is not a prerequisite for mapping the 1950-to-present study period.
+    blocked_on: >-
+      The specific townships and ranges for the earlier corridor search have not been
+      identified, so no plat is cited here. See docs/open-questions.md.
