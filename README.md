@@ -217,6 +217,7 @@ Key choices and why:
 │   ├── sources/                # COMMITTED
 │   │   ├── sources.yml         # source manifest: id, url, rights, sensitivity
 │   │   ├── topo_index.csv      # per-sheet USGS topo index with lineage dates
+│   │   ├── retrievals.jsonl    # source bytes: SHA-256, storage path, retrieval time
 │   │   ├── aoi_counties.geojson  # both counties: acquisition + digitizing boundary
 │   │   ├── aoi_tier1.geojson     # optional legacy Bear River Canal work area (OSM)
 │   │   └── gcp/                # *.points files from QGIS Georeferencer
@@ -229,10 +230,12 @@ Key choices and why:
 │   ├── trail.schema.json
 │   ├── alignment.schema.json
 │   ├── observation.schema.json
+│   ├── retrieval.schema.json   # public USGS download receipts
 │   └── support.schema.json
 ├── scripts/
 │   ├── fetch_aoi.py            # TIGERweb + OSM → the two AOI files
 │   ├── fetch_topoview.py       # TNM Access API → data/raw/topo/
+│   ├── source_archive.py       # receipt catalog, checksum verification, backup/restore
 │   ├── warp_raster.py          # GCPs + GDAL → COG
 │   ├── ingest_gaia.py          # GPX → candidate alignments
 │   ├── ingest_declarations.py  # structured declaration records → observations
@@ -261,6 +264,11 @@ Key choices and why:
 | `make topo-plan` | preview pending downloads from the current index without fetching rasters |
 | `make topo-docs` | regenerate the countywide edition report from the current index |
 | `make test-topo` | run offline acquisition regression tests and source-index integrity checks |
+| `make catalog-sources` | record checksums of existing TIFFs with unknown retrieval dates; preserve their paths |
+| `make verify-sources` | verify every receipted local source against SHA-256 and byte count |
+| `make backup-sources` | copy verified raw TIFFs and a receipt snapshot to the separate archive |
+| `make verify-backup` | verify archived TIFFs against the receipt ledger |
+| `make restore-sources` | restore exact source bytes from the archive without overwriting existing files |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |
@@ -275,6 +283,43 @@ The optional `make fetch-topo TOPO=--tier1` downloads only the legacy corridor s
 (91 sheets, 1.0 GB in the current index). It is not the default project scope. The
 current downloader does not enforce the 1950 start date; select evidence by its
 documented content dates when mapping the study period.
+
+### Retrieval records and storage
+
+Raw TIFF bytes stay out of Git. Commit `data/sources/retrievals.jsonl`, which maps
+each source to its SHA-256, byte count, original index URL, observed retrieval URL,
+UTC retrieval time, and relative storage path. `recorded_at` is the time the receipt
+was created. For files downloaded before receipts existed, `retrieved_at` and
+`retrieval_url` are `null`; the index URL remains available without claiming it was
+observed during retrieval. These timestamps do not date the map's ground content.
+
+New downloads use `data/raw/topo/sha256/<first-two-hash-characters>/<sha256>.tif`.
+The source ID and readable edition name remain in the index and receipts. The original
+91 TIFFs retain their existing names. Before reuse, receipted files must match their
+hashes. If a remote re-download differs from its recorded hash, use the preserved
+archive or investigate the new source version; never silently replace recorded bytes.
+
+The configured backup root is `/Volumes/T7 Shield/historical-trails-backup`.
+It contains `objects/sha256/<first-two-hash-characters>/<sha256>.tif` and immutable
+`manifests/<manifest-sha256>.jsonl` snapshots. Run `make backup-sources` after new
+acquisitions, then `make verify-backup`. Repeated runs reuse verified copies and
+never delete old objects. A successful source download does not itself mean a backup
+exists. This workflow currently covers public USGS GeoTIFFs, not restricted documents
+or other source types.
+
+Set `TRAIL_ARCHIVE_ROOT` to use another dedicated directory; quote paths containing
+spaces, for example `make backup-sources TRAIL_ARCHIVE_ROOT="/path/to/source archive"`.
+The archive root may be a symlink to a mounted drive. The tool fails if its parent
+directory is unavailable, rather than creating a replacement mount directory.
+`make restore-sources` restores paths from the committed receipts. If recovering
+without that ledger, a verified archive manifest snapshot can supply it.
+
+`make validate` validates receipt structure and hashes of available local sources;
+it permits missing local copies in fresh clones. `make verify-sources` requires every
+receipted file locally. Tests cover backup, restoration, corruption, and filesystems
+without hard links. Hashes establish byte identity from the first inventory onward;
+they do not independently authenticate the original source or prove an earlier
+retrieval date.
 
 ---
 

@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -75,6 +76,7 @@ def invoke_download(tmp_path, row, monkeypatch, body, declared="64", extra=()):
     def response(*args, **kwargs):
         stream = io.BytesIO(body)
         stream.headers = {} if declared is None else {"Content-Length": declared}
+        stream.geturl = lambda: row["geotiff_url"]
         return stream
 
     monkeypatch.setattr(topo.urllib.request, "urlopen", response)
@@ -85,7 +87,9 @@ def invoke_download(tmp_path, row, monkeypatch, body, declared="64", extra=()):
             "--index",
             str(path),
             "--dest",
-            str(tmp_path / "raw"),
+            str(tmp_path / "raw" / "topo"),
+            "--receipts",
+            str(tmp_path / "receipts.jsonl"),
             *extra,
         ],
     )
@@ -173,8 +177,8 @@ def test_countywide_index_filters_outside_sheets(tmp_path, row, monkeypatch):
 
 
 def test_existing_raw_file_is_never_replaced(tmp_path, row, monkeypatch):
-    raw = tmp_path / "raw"
-    raw.mkdir()
+    raw = tmp_path / "raw" / "topo"
+    raw.mkdir(parents=True)
     target = raw / f"{row['topo_id']}_geo.tif"
     target.write_bytes(b"original")
     result = invoke_download(tmp_path, row, monkeypatch, b"II*\x00" + bytes(60))
@@ -195,7 +199,7 @@ def test_existing_raw_file_is_never_replaced(tmp_path, row, monkeypatch):
 def test_bad_download_is_not_published(tmp_path, row, monkeypatch, body, declared):
     result = invoke_download(tmp_path, row, monkeypatch, body, declared)
     assert result.exit_code != 0
-    assert list((tmp_path / "raw").iterdir()) == []
+    assert list((tmp_path / "raw" / "topo").iterdir()) == []
 
 
 def test_valid_download_and_rerun(tmp_path, row, monkeypatch, tiff_bytes):
@@ -203,23 +207,28 @@ def test_valid_download_and_rerun(tmp_path, row, monkeypatch, tiff_bytes):
     row["size_bytes"] = str(len(body))
     result = invoke_download(tmp_path, row, monkeypatch, body, declared=str(len(body)))
     assert result.exit_code == 0, result.output
-    target = tmp_path / "raw" / f"{row['topo_id']}_geo.tif"
+    target = topo.archive.object_path(
+        tmp_path / "raw" / "topo", hashlib.sha256(body).hexdigest()
+    )
     before = target.stat().st_mtime_ns
     result = invoke_download(tmp_path, row, monkeypatch, b"must not be fetched")
     assert result.exit_code == 0, result.output
     assert "1 already present" in result.output
     assert target.read_bytes() == body
     assert target.stat().st_mtime_ns == before
+    receipt = topo.archive.load_receipts(tmp_path / "receipts.jsonl")[0]
+    assert receipt["retrieved_at"] is not None
+    assert receipt["sha256"] == hashlib.sha256(body).hexdigest()
 
 
 def test_concurrent_publication_does_not_replace_file(tmp_path, row, monkeypatch, tiff_bytes):
-    real_link = topo.os.link
+    real_link = topo.archive.os.link
 
     def collide(source, target):
         target.write_bytes(b"another process published this")
         return real_link(source, target)
 
-    monkeypatch.setattr(topo.os, "link", collide)
+    monkeypatch.setattr(topo.archive.os, "link", collide)
     row["size_bytes"] = str(len(tiff_bytes))
     result = invoke_download(
         tmp_path,
@@ -229,16 +238,71 @@ def test_concurrent_publication_does_not_replace_file(tmp_path, row, monkeypatch
         declared=str(len(tiff_bytes)),
     )
     assert result.exit_code != 0
-    target = tmp_path / "raw" / f"{row['topo_id']}_geo.tif"
+    target = topo.archive.object_path(
+        tmp_path / "raw" / "topo",
+        hashlib.sha256(tiff_bytes).hexdigest(),
+    )
     assert target.read_bytes() == b"another process published this"
     assert list(target.parent.glob("*.part")) == []
+
+
+def test_same_size_corruption_is_rejected_on_reuse(tmp_path, row, monkeypatch, tiff_bytes):
+    row["size_bytes"] = str(len(tiff_bytes))
+    assert (
+        invoke_download(
+            tmp_path,
+            row,
+            monkeypatch,
+            tiff_bytes,
+            declared=str(len(tiff_bytes)),
+        ).exit_code
+        == 0
+    )
+    record = topo.archive.load_receipts(tmp_path / "receipts.jsonl")[0]
+    target = tmp_path / "raw" / record["raw_path"]
+    changed = tiff_bytes[:-1] + bytes([tiff_bytes[-1] ^ 1])
+    target.write_bytes(changed)
+    result = invoke_download(tmp_path, row, monkeypatch, tiff_bytes)
+    assert result.exit_code != 0
+    assert "Checksum mismatch" in result.output
+    assert target.read_bytes() == changed
+
+
+def test_remote_changed_bytes_do_not_replace_missing_recorded_source(
+    tmp_path,
+    row,
+    monkeypatch,
+    tiff_bytes,
+):
+    row["size_bytes"] = str(len(tiff_bytes))
+    assert (
+        invoke_download(
+            tmp_path,
+            row,
+            monkeypatch,
+            tiff_bytes,
+            declared=str(len(tiff_bytes)),
+        ).exit_code
+        == 0
+    )
+    ledger = tmp_path / "receipts.jsonl"
+    before = ledger.read_bytes()
+    record = topo.archive.load_receipts(ledger)[0]
+    target = tmp_path / "raw" / record["raw_path"]
+    target.unlink()
+    changed = tiff_bytes[:-1] + bytes([tiff_bytes[-1] ^ 1])
+    result = invoke_download(tmp_path, row, monkeypatch, changed, declared=str(len(changed)))
+    assert result.exit_code != 0
+    assert "Remote bytes differ" in result.output
+    assert not target.exists()
+    assert ledger.read_bytes() == before
 
 
 def test_dry_run_does_not_create_destination(tmp_path, row, monkeypatch):
     result = invoke_download(tmp_path, row, monkeypatch, b"", extra=("--dry-run",))
     assert result.exit_code == 0, result.output
     assert "1 sheets selected" in result.output
-    assert not (tmp_path / "raw").exists()
+    assert not (tmp_path / "raw" / "topo").exists()
 
 
 def test_docs_include_non_corridor_sheets_and_are_idempotent(tmp_path, row):

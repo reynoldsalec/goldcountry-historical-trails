@@ -314,3 +314,25 @@ the stored online source inventory is still exhaustive.
 coverage inventory and the trail schema migration remain outstanding. Candidate aerial
 flights and pre-1950 sources remain candidates. Resolve these through verified source
 research; no alignment or observation was created during acquisition review.
+
+---
+
+## 2026-09-16 — Retrieval dates for existing raw TIFFs are unknown
+
+**Question.** What were the original retrieval times and actual response URLs for the
+91 TIFFs downloaded before retrieval receipts were implemented?
+
+**What was tried.** The existing files were matched to the committed source index and
+hashed without changing their names or bytes. No contemporaneous retrieval receipts
+were available. `data/sources/retrievals.jsonl` therefore records an inventory timestamp,
+SHA-256, byte count, index URL, and local path, with `retrieved_at` and `retrieval_url`
+set to `null`. File modification times were not treated as retrieval evidence.
+
+**Preservation completed.** All 91 files and an immutable receipt snapshot were copied
+to `/Volumes/T7 Shield/historical-trails-backup`, then the archived files were read
+back and verified against their SHA-256 values. Future downloads automatically record
+observed UTC retrieval times and URLs. Backup and restore use the receipt hashes.
+
+**To resolve.** Locate contemporaneous download logs before adding any historical
+retrieval-date attestation. The present checksum inventory proves the bytes held when
+inventoried, not when those files were originally downloaded.

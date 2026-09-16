@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Public USGS source retrieval receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "kind",
+    "source",
+    "topo_id",
+    "source_id",
+    "indexed_url",
+    "retrieval_url",
+    "metadata_url",
+    "rights",
+    "sha256",
+    "byte_count",
+    "raw_path",
+    "retrieved_at",
+    "recorded_at",
+    "basis"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "geotiff"
+    },
+    "source": {
+      "const": "usgs-historical-topo"
+    },
+    "topo_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "indexed_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "retrieval_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "metadata_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "rights": {
+      "const": "public_domain"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "byte_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "raw_path": {
+      "type": "string",
+      "pattern": "^topo/[A-Za-z0-9_./-]+\\.tif$"
+    },
+    "retrieved_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "basis": {
+      "enum": [
+        "download",
+        "existing_file"
+      ]
+    }
+  },
+  "if": {
+    "properties": {
+      "basis": {
+        "const": "existing_file"
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "retrieved_at": {
+        "type": "null"
+      },
+      "retrieval_url": {
+        "type": "null"
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "retrieved_at": {
+        "type": "string"
+      },
+      "retrieval_url": {
+        "type": "string"
+      }
+    }
+  }
+}

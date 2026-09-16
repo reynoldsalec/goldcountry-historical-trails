@@ -5,6 +5,7 @@ data/raw/*
 !data/raw/.gitkeep
 data/working/*
 !data/working/.gitkeep
+data/sources/.retrievals.lock
 
 # Derived output (README §5).
 build/*

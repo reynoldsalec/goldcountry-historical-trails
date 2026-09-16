@@ -4,10 +4,13 @@
 
 UV := uv
 RUN := $(UV) run
+TRAIL_ARCHIVE_ROOT ?= /Volumes/T7 Shield/historical-trails-backup
+export TRAIL_ARCHIVE_ROOT
 
 .DEFAULT_GOAL := all
 .PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
-        dev fmt lint clean test-topo topo-docs topo-plan
+        dev fmt lint clean test-topo topo-docs topo-plan catalog-sources verify-sources \
+        backup-sources restore-sources verify-backup
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -30,6 +33,7 @@ setup:
 ## schemas, referential integrity, temporal coherence, geometry, leak test
 validate:
 	$(RUN) python scripts/validate.py
+	$(RUN) python scripts/source_archive.py verify --available
 
 ## rebuild both AOIs from online sources (Census TIGERweb + OpenStreetMap)
 fetch-aoi:
@@ -53,7 +57,22 @@ topo-plan:
 	$(RUN) python scripts/fetch_topoview.py download --dry-run $(TOPO)
 
 test-topo:
-	$(RUN) pytest -q scripts/test_fetch_topoview.py
+	$(RUN) pytest -q scripts/test_fetch_topoview.py scripts/test_source_archive.py
+
+catalog-sources:
+	$(RUN) python scripts/source_archive.py catalog
+
+verify-sources:
+	$(RUN) python scripts/source_archive.py verify
+
+backup-sources:
+	$(RUN) python scripts/source_archive.py backup
+
+restore-sources:
+	$(RUN) python scripts/source_archive.py restore
+
+verify-backup:
+	$(RUN) python scripts/source_archive.py verify-backup
 
 ## warp + COG everything with a GCP file, write to build/rasters/
 rasters:

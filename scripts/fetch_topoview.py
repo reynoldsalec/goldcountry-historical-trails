@@ -43,7 +43,6 @@ import csv
 import http.client
 import itertools
 import json
-import os
 import re
 import shutil
 import sys
@@ -59,6 +58,7 @@ from pathlib import Path
 
 import click
 import rasterio
+import source_archive as archive
 from shapely.geometry import box, shape
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -464,6 +464,7 @@ def index_cmd(timeout: int, refresh: bool, workers: int, out: Path) -> None:
     type=click.Path(file_okay=False, path_type=Path),
     default=RAW_TOPO_DIR,
 )
+@click.option("--receipts", type=click.Path(path_type=Path), default=archive.RECEIPTS_PATH)
 def download(
     tier1_only: bool,
     scale: tuple[str, ...],
@@ -472,6 +473,7 @@ def download(
     timeout: int,
     index_path: Path,
     dest: Path,
+    receipts: Path,
 ) -> None:
     """Download indexed GeoTIFFs into data/raw/topo/ (append-only, never overwritten)."""
     rows = list(read_index(index_path).values())
@@ -489,9 +491,21 @@ def download(
         rows = [r for r in rows if r["scale"] in scale]
     rows.sort(key=sort_key)
 
+    if dest.name != "topo":
+        raise click.ClickException("The --dest directory must be named topo within a raw root.")
+    raw_root = dest.parent
+    known = {record["topo_id"]: record for record in archive.load_receipts(receipts)}
+
     pending, have = [], 0
     for row in rows:
         target = dest / f"{row['topo_id']}_geo.tif"
+        record = known.get(row["topo_id"])
+        if record:
+            target = archive.resolve_raw(raw_root, record["raw_path"])
+            if target.exists() or target.is_symlink():
+                archive.check_record(record, raw_root)
+                have += 1
+                continue
         expected = int(row["size_bytes"]) if str(row["size_bytes"]).isdigit() else None
         if target.exists() or target.is_symlink():
             if target.is_symlink() or not target.is_file() or target.stat().st_size == 0:
@@ -504,10 +518,12 @@ def download(
                     "Check the source metadata and file before retrying."
                 )
             have += 1
+            if not dry_run:
+                archive.record_source(row, target, raw_root, receipts)
             continue
-        pending.append((row, target, expected))
+        pending.append((row, target, expected, record))
 
-    todo_bytes = sum(e for _, _, e in pending if e)
+    todo_bytes = sum(e for _, _, e, _ in pending if e)
     click.echo(
         f"fetch-topo download: {len(rows)} sheets selected, {have} already present, "
         f"{len(pending)} to fetch ({todo_bytes / 1e9:.1f} GB)"
@@ -520,13 +536,14 @@ def download(
     lock = threading.Lock()
 
     def fetch(job: tuple) -> bool:
-        row, target, expected = job
+        row, target, expected, record = job
         part = None
         try:
             request = urllib.request.Request(
                 row["geotiff_url"], headers={"User-Agent": USER_AGENT}
             )
             with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+                retrieval_url = response.geturl()
                 declared = response.headers.get("Content-Length")
                 served = int(declared) if declared and declared.isdigit() else None
                 with tempfile.NamedTemporaryFile(
@@ -534,6 +551,7 @@ def download(
                 ) as handle:
                     part = Path(handle.name)
                     shutil.copyfileobj(response, handle, length=1 << 20)
+            retrieved_at = archive.utc_now()
             size = part.stat().st_size
             if served is not None and size != served:
                 raise ValueError(f"Truncated response: wrote {size} of {served} bytes")
@@ -545,7 +563,30 @@ def download(
             with rasterio.open(part) as dataset:
                 if not dataset.crs or dataset.count < 1:
                     raise ValueError("Response is not a georeferenced raster")
-            os.link(part, target)
+            digest, size = archive.digest_file(part)
+            if record and (digest, size) != (record["sha256"], record["byte_count"]):
+                raise ValueError(
+                    "Remote bytes differ from the receipt; restore from the archive"
+                )
+            if not record:
+                target = archive.object_path(dest, digest)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                archive.publish_file(part, target)
+            except FileExistsError:
+                if archive.digest_file(target) != (digest, size):
+                    raise ValueError(
+                        "Existing content-addressed file differs; left unchanged"
+                    ) from None
+            if not record:
+                archive.record_source(
+                    row,
+                    target,
+                    raw_root,
+                    receipts,
+                    retrieved_at=retrieved_at,
+                    retrieval_url=retrieval_url,
+                )
         except (
             urllib.error.URLError,
             http.client.IncompleteRead,
@@ -553,6 +594,7 @@ def download(
             TimeoutError,
             OSError,
             ValueError,
+            click.ClickException,
         ) as exc:
             with lock:
                 click.echo(f"  failed {target.name}: {exc}", err=True)

@@ -47,6 +47,17 @@ stewardship, and work by organizations such as the Open Trails Community Allianc
   consumes it.
 - `data/raw/` and `data/working/` are gitignored. `data/sources/` and
   `data/authoritative/` are committed.
+- Public USGS TIFF retrieval receipts live in `data/sources/retrievals.jsonl`.
+  Commit the receipts, not raw bytes. Record SHA-256, byte count, source identifiers,
+  relative storage path, and observed UTC retrieval time for new downloads. For
+  existing files without retrieval records, use `retrieved_at: null`; file modification
+  time is not proof of retrieval time.
+- New TIFF names use `data/raw/topo/sha256/<first-two-hash-characters>/<sha256>.tif`.
+  Keep existing raw filenames unchanged. A receipt maps either naming convention to
+  its source. Verify known bytes before reuse; never replace a hash mismatch.
+- Use `make backup-sources` and `make verify-backup` for the separate raw-source
+  archive. Configure its root through `TRAIL_ARCHIVE_ROOT`; the root may be a symlink.
+  Backups are additive, verified copies, not a mirror that deletes older evidence.
 
 ### 2.3 The temporal model has four fields, not two
 
