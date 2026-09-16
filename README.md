@@ -13,26 +13,24 @@ Built for the Open Trails Community Alliance (OTCA), Meadow Vista, CA.
 
 ## 1. Why this exists
 
-California Civil Code 1009 (1972) requires that a claim of *public* prescriptive
-easement be supported by proof of public use for at least five years prior to March
-1972. OTCA holds signed public-use declarations from trail users describing use from
-1956 onward, and Placer County has shown the Bear River Canal Trail in the Meadow Vista
-Community Plan since the 1974 edition.
+Build a traceable record of where foot trails are documented from 1950 onward, how
+their alignments change, and where the historical record is incomplete. Combine dated
+maps, aerial photographs, plans, field records, and accounts with explicit provenance
+and uncertainty.
 
-This project makes that evidence spatial and queryable. **1967–1972 is the hinge**, and
-the interface treats it as such.
-
-The 19th-century layer serves a different purpose: showing that these corridors predate
-every subdivision that now crosses them. That is a persuasion argument, not an
-evidentiary one, and the viewer keeps the two visually distinct.
+Coverage must extend across both counties. Bear River Canal, Meadow Vista, and other
+individual localities are contributing work areas, with no special geographic priority.
+The atlas supports historical research and trail stewardship; legal questions about
+particular trails do not set its timeline or imply public access rights.
 
 ### Success criteria
 
 1. Any rendered line can answer "what document supports this, and from what date?" in
    one click.
-2. A decade stepper shows persisting / newly documented / newly lost segments, with a
-   running "miles lost since 1950" figure.
-3. The 1967–1972 window is directly reachable and visually marked.
+2. A decade stepper spans the 1950s through the present and distinguishes documented
+   trails, inferred continuity, documented closures, and gaps in observation.
+3. Coverage can be inspected by area and decade across both counties. Unexamined areas
+   and incomplete evidence remain visible; missing observations do not count as loss.
 4. The whole thing deploys as static files with no server and no recurring cost.
 5. Public and restricted builds come from one dataset, with the split enforced by a
    failing test rather than by discipline.

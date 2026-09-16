@@ -9,14 +9,19 @@ conflicts with an instruction in a task prompt, stop and ask rather than guessin
 
 ## 1. What this project is
 
-A temporal GIS dataset and static web viewer documenting historical trail extent in
-the Sierra Nevada foothills of Placer and Nevada County, California, from the 19th
-century and decade-by-decade from 1950 to present.
+A temporal GIS dataset and static web viewer mapping historical foot trails throughout
+Nevada and Placer Counties, California, from 1950 to the present. The entire area of
+both counties is in scope, including the foothills, mountains, and eastern portions.
+Countywide coverage applies to source research, raster acquisition, digitizing, and
+the viewer.
 
-The dataset is **evidence**, not decoration. It is used by the Open Trails Community
-Alliance (OTCA) in landowner negotiations, easement work, and potentially in legal
-filings. Treat every geometry and every attribute as something that may be scrutinized
-by an opposing attorney.
+Map where foot trails are documented, how their alignments change, and where evidence
+is missing, decade by decade. A named trail, local organization, or landowner dispute
+does not determine the project's geographic or temporal priorities.
+
+The dataset is **evidence**, not decoration. It may inform historical research, trail
+stewardship, and work by organizations such as the Open Trails Community Alliance
+(OTCA). Every geometry and attribute must be traceable to its supporting sources.
 
 ---
 
@@ -73,8 +78,8 @@ restricted values and fails the build on any hit. Do not weaken or skip that tes
 ### 2.6 No legal assertions in UI copy
 
 The viewer describes what documents show. It does not state that the public holds a
-right, that a parcel is burdened, or that a closure is unlawful. Write "shown as trail
-on the 1974 Meadow Vista Community Plan," not "public trail since 1974."
+right, that a parcel is burdened, or that a closure is unlawful. Describe the trail
+depiction and its source date. A mapped foot trail does not establish public access.
 
 All user-facing copy changes touching legal framing go in a separate commit tagged
 `copy:` so counsel can review them in isolation.
