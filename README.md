@@ -252,7 +252,7 @@ Key choices and why:
 ├── pyproject.toml
 ├── .github/
 │   └── workflows/
-│       └── validate.yml    # runs `make validate` on push and PR
+│       └── validate.yml    # runs lint, validate and the tests on push and PR
 ├── data/
 │   ├── raw/                    # gitignored, immutable
 │   ├── working/                # gitignored intermediates
@@ -303,6 +303,7 @@ Key choices and why:
 | `make topo-plan` | preview pending downloads from the current index without fetching rasters |
 | `make topo-docs` | regenerate the countywide edition report from the current index |
 | `make test-topo` | run offline acquisition regression tests and source-index integrity checks |
+| `make test-validation` | run the offline validator regression suite (schema, provenance, temporal, leak) |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |
