@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import sys
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 import click
@@ -41,6 +43,10 @@ ALLOWED_CRS_NAMES = {
     "urn:ogc:def:crs:EPSG::4326",
     "EPSG:4326",
 }
+
+# Mirrors the date pattern in the schemas. It admits month 13 and day 00, which is why
+# check_temporal has to test each date against the real calendar as well.
+DATE_SHAPE = re.compile(r"^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$")
 
 
 @dataclass(frozen=True)
@@ -376,33 +382,50 @@ def check_orphans(records: dict) -> list[Failure]:
 # --------------------------------------------------------------------------------------
 
 
-def as_bound(value: str, *, upper: bool) -> tuple[int, int, int] | None:
-    """Comparable bound for an ISO YYYY or YYYY-MM-DD date.
+def as_bound(value: str, *, upper: bool) -> date | None:
+    """Comparable bound for an ISO YYYY or YYYY-MM-DD date, or None if impossible.
 
-    A bare year is widened to the whole year, so "1954-06-01" <= "1954" holds rather
-    than failing on a spurious month/day comparison.
+    A bare year is widened to the whole year for comparison only, so "1954-06-01" <=
+    "1954" holds rather than failing on a spurious month/day comparison. The widening
+    does not change the stored precision.
     """
     parts = value.split("-")
     try:
         if len(parts) == 1:
             year = int(parts[0])
-            return (year, 12, 31) if upper else (year, 1, 1)
+            return date(year, 12, 31) if upper else date(year, 1, 1)
         if len(parts) == 3:
-            return (int(parts[0]), int(parts[1]), int(parts[2]))
+            return date(int(parts[0]), int(parts[1]), int(parts[2]))
     except ValueError:
-        return None
+        return None  # year outside 0001-9999, month 13, day 00, 2023-02-29, ...
     return None
 
 
 def check_temporal(records: dict) -> list[Failure]:
     failures: list[Failure] = []
 
+    def check_calendar(rid: str, name: str, raw) -> bool:
+        """True when raw is absent or a real calendar date. Reports it if not."""
+        if not isinstance(raw, str):
+            return True  # null means unobserved, which constrains nothing (AGENTS.md §2.3)
+        if not DATE_SHAPE.match(raw):
+            return False  # a wrong shape is already reported by the schema check
+        if as_bound(raw, upper=False) is None or as_bound(raw, upper=True) is None:
+            failures.append(
+                Failure("temporal", rid, f"{name} ({raw!r}) is not a real calendar date")
+            )
+            return False
+        return True
+
     def compare(rid: str, lo_name: str, lo_raw, hi_name: str, hi_raw) -> None:
+        """Order a pair. Each side is calendar-checked on its own, null partner or not."""
+        lo_ok = check_calendar(rid, lo_name, lo_raw)
+        hi_ok = check_calendar(rid, hi_name, hi_raw)
+        if not (lo_ok and hi_ok):
+            return
         if not isinstance(lo_raw, str) or not isinstance(hi_raw, str):
-            return  # null means unobserved, which constrains nothing (AGENTS.md §2.3)
+            return
         lo, hi = as_bound(lo_raw, upper=False), as_bound(hi_raw, upper=True)
-        if lo is None or hi is None:
-            return  # malformed dates are the schema check's business
         if lo > hi:
             failures.append(
                 Failure(
@@ -412,6 +435,8 @@ def check_temporal(records: dict) -> list[Failure]:
                 )
             )
 
+    # No open-vs-closed rule: a corridor documented closed and later open again is real
+    # data, not an error (docs/open-questions.md, 2026-08-29).
     for index, feature in enumerate(records["alignments"]):
         props = feature.get("properties") if isinstance(feature, dict) else {}
         if not isinstance(props, dict):
