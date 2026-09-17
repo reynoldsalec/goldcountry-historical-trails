@@ -322,7 +322,9 @@ Key choices and why:
 | `make test-validation` | run the offline validator regression suite (schema, provenance, temporal, leak) |
 | `make coverage-grid` | rebuild `data/sources/coverage_grid.geojson` from the committed county AOI |
 | `make coverage-refresh` | rebuild the area/decade cells in `data/sources/coverage.json` and attach candidate source references |
-| `make test-coverage` | run the coverage inventory schema and grid builder tests |
+| `make validate-coverage` | check inventory cross-references, cell coverage and batch readiness |
+| `make coverage-ready` | check the M1 release gate: four ready county/decade batches and an aerial frame |
+| `make test-coverage` | run the coverage inventory schema, grid builder and validator tests |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |
@@ -362,6 +364,26 @@ evidence of a trail: generated cells carry `unsearched`, `not_examined` and
 reviews, batches, notes and manual cell state are preserved across runs; a preserved
 record pointing at an area, decade, source or record that no longer exists stops the run
 for reconciliation and leaves the committed inventory untouched.
+
+`make validate-coverage` checks the inventory against the two schemas, unique ids, one
+cell per grid area per decade through `through_decade`, and every source, search, review
+and batch reference. A recorded gap passes: an unsearched cell is bookkeeping, not an
+error. What fails is a claim with nothing behind it — a `no_source_located` or
+`access_blocked` cell without a matching search, a review or batch linked to a cell it
+did not examine, a review county that does not meet its area, a source footprint that
+does not reach its cell, or a `status: ready` batch without tasks, sources, a
+county-intersecting area and a dated, located foot-trail review for that county and
+decade. `status: digitized` and any `alignment_ids` are rejected for M1; M3 adds the
+source-to-observation linkage that can check them. Clearing `not_digitized` needs a
+digitized batch, so it stays set until then.
+
+`make coverage-ready` adds the M1 gate and reports every unmet criterion at once: two
+decades of `status: ready` batches in each county, one before 2000 and one from 2000
+onward in each, and at least one verified `aerial_frame` candidate with a publisher
+frame ID, `access: available`, explicit rights, fully known bounds reaching the county
+AOI, and a start date of 1950 or later. A date range straddling 1950 is rejected until
+the dating is resolved. Planned batches never count. The gate is expected to fail until
+the research and review work behind it exists; it is a checklist, not a data edit.
 
 The optional `make fetch-topo TOPO=--tier1` downloads only the legacy corridor subset
 (91 sheets, 1.0 GB in the current index). It is not the default project scope. The
