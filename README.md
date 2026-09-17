@@ -307,7 +307,8 @@ Key choices and why:
 | `make setup` | `uv sync`, check for `gdal`, `tippecanoe`, `node` |
 | `make fetch-aoi` | rebuild the countywide AOI (TIGERweb) and the legacy corridor work area (OSM) |
 | `make fetch-topo` | index + pull quads covering both counties from TNM Access API into `data/raw/topo/` (current inventory: 615 sheets, 6.3 GB, including pre-1950 material) |
-| `make topo-plan` | preview pending downloads from the current index without fetching rasters |
+| `make topo-plan` | preview pending downloads from the current index without fetching rasters; add `SELECTION=path.json` to plan named editions only |
+| `make fetch-topo-selected SELECTION=path.json` | download exactly the editions named in a selection file, against the committed index |
 | `make topo-docs` | regenerate the countywide edition report from the current index |
 | `make test-topo` | run offline acquisition regression tests and source-index integrity checks |
 | `make catalog-sources` | record checksums of existing TIFFs with unknown retrieval dates; preserve their paths |
@@ -326,6 +327,13 @@ Key choices and why:
 | `make` | `validate build-public` |
 
 All targets idempotent and safe to re-run.
+
+A selection file is JSON: `{"version": 1, "topo_ids": ["CA_Auburn_302316_1953_24000"]}`.
+Every id must appear in `data/sources/topo_index.csv`; an unknown or duplicated id, an
+empty list, or a `--tier1`/`--scale` filter alongside a selection stops the run before
+any sheet is fetched. `make topo-plan SELECTION=...` reports each named edition as
+present, missing, or mismatched and downloads nothing. A mismatch is never permission
+to replace a raw file.
 
 The optional `make fetch-topo TOPO=--tier1` downloads only the legacy corridor subset
 (91 sheets, 1.0 GB in the current index). It is not the default project scope. The

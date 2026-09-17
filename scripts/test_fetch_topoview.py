@@ -358,3 +358,210 @@ def test_downloaded_raw_rasters_are_readable():
         with rasterio.open(path) as dataset:
             assert dataset.crs
             assert dataset.count > 0 and dataset.width > 0 and dataset.height > 0
+
+
+def second_row(row):
+    other = dict(row)
+    other.update(
+        topo_id="CA_Test_2_1962_24000",
+        map_name="Other",
+        date_on_map="1962",
+        geotiff_url="https://example.test/other.tif",
+    )
+    return other
+
+
+def invoke_selection(tmp_path, rows, monkeypatch, body, requested, extra=()):
+    path = tmp_path / "index.csv"
+    write_index(path, rows)
+
+    def response(request, *args, **kwargs):
+        requested.append(request.full_url)
+        stream = io.BytesIO(body)
+        stream.headers = {"Content-Length": str(len(body))}
+        stream.geturl = lambda: request.full_url
+        return stream
+
+    monkeypatch.setattr(topo.urllib.request, "urlopen", response)
+    return CliRunner().invoke(
+        topo.cli,
+        [
+            "download",
+            "--index",
+            str(path),
+            "--dest",
+            str(tmp_path / "raw" / "topo"),
+            "--receipts",
+            str(tmp_path / "receipts.jsonl"),
+            *extra,
+        ],
+    )
+
+
+def write_selection(tmp_path, topo_ids, **overrides):
+    payload = {"version": 1, "topo_ids": topo_ids}
+    payload.update(overrides)
+    path = tmp_path / "selection.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_selection_requests_only_the_named_editions(tmp_path, row, monkeypatch, tiff_bytes):
+    other = second_row(row)
+    third = dict(row, topo_id="CA_Test_3_1975_24000", geotiff_url="https://example.test/3.tif")
+    for record in (row, other, third):
+        record["size_bytes"] = str(len(tiff_bytes))
+    requested = []
+    selection = write_selection(tmp_path, [row["topo_id"], other["topo_id"]])
+    result = invoke_selection(
+        tmp_path,
+        [row, other, third],
+        monkeypatch,
+        tiff_bytes,
+        requested,
+        extra=("--selection", str(selection)),
+    )
+    assert result.exit_code == 0, result.output
+    assert sorted(requested) == sorted([row["geotiff_url"], other["geotiff_url"]])
+    assert len(topo.archive.load_receipts(tmp_path / "receipts.jsonl")) == 2
+
+
+def test_unknown_selection_id_blocks_every_download(tmp_path, row, monkeypatch, tiff_bytes):
+    other = second_row(row)
+    requested = []
+    selection = write_selection(
+        tmp_path, [row["topo_id"], other["topo_id"], "CA_Missing_9_1999_24000"]
+    )
+    result = invoke_selection(
+        tmp_path,
+        [row, other],
+        monkeypatch,
+        tiff_bytes,
+        requested,
+        extra=("--selection", str(selection)),
+    )
+    assert result.exit_code != 0
+    assert "absent from the index" in result.output
+    assert requested == []
+    assert not (tmp_path / "receipts.jsonl").exists()
+    assert not (tmp_path / "raw" / "topo").exists()
+
+
+@pytest.mark.parametrize(
+    "payload,message",
+    [
+        ({"version": 1, "topo_ids": []}, "non-empty list"),
+        ({"version": 1, "topo_ids": ["CA_Test_1_1953_24000"] * 2}, "Duplicate"),
+        ({"version": 1, "topo_ids": [""]}, "non-empty strings"),
+        ({"version": 1, "topo_ids": [7]}, "non-empty strings"),
+        ({"version": 2, "topo_ids": ["CA_Test_1_1953_24000"]}, "version must be 1"),
+        (
+            {"version": 1, "topo_ids": ["CA_Test_1_1953_24000"], "scale": "24000"},
+            "Unknown selection keys",
+        ),
+    ],
+)
+def test_malformed_selection_fails(tmp_path, row, monkeypatch, payload, message):
+    path = tmp_path / "selection.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    requested = []
+    result = invoke_selection(
+        tmp_path, [row], monkeypatch, b"", requested, extra=("--selection", str(path))
+    )
+    assert result.exit_code != 0
+    assert message in result.output
+    assert requested == []
+    assert not (tmp_path / "raw" / "topo").exists()
+
+
+@pytest.mark.parametrize("conflict", [("--tier1",), ("--scale", "24000")])
+def test_selection_rejects_conflicting_filters(tmp_path, row, monkeypatch, conflict):
+    selection = write_selection(tmp_path, [row["topo_id"]])
+    requested = []
+    result = invoke_selection(
+        tmp_path,
+        [row],
+        monkeypatch,
+        b"",
+        requested,
+        extra=("--selection", str(selection), *conflict),
+    )
+    assert result.exit_code != 0
+    assert "cannot be combined" in result.output
+    assert requested == []
+
+
+def test_selection_dry_run_plans_without_network_or_writes(
+    tmp_path, row, monkeypatch, tiff_bytes
+):
+    other = second_row(row)
+    row["size_bytes"] = str(len(tiff_bytes))
+    other["size_bytes"] = str(len(tiff_bytes))
+    requested = []
+    selection = write_selection(tmp_path, [row["topo_id"], other["topo_id"]])
+    result = invoke_selection(
+        tmp_path,
+        [row, other],
+        monkeypatch,
+        tiff_bytes,
+        requested,
+        extra=("--selection", str(selection), "--dry-run"),
+    )
+    assert result.exit_code == 0, result.output
+    assert requested == []
+    assert not (tmp_path / "raw" / "topo").exists()
+    assert not (tmp_path / "receipts.jsonl").exists()
+    for record in (row, other):
+        assert (
+            f"{record['topo_id']}: missing (expects {len(tiff_bytes)} bytes)" in result.output
+        )
+
+
+def test_selection_rerun_reuses_the_raw_file(tmp_path, row, monkeypatch, tiff_bytes):
+    row["size_bytes"] = str(len(tiff_bytes))
+    selection = write_selection(tmp_path, [row["topo_id"]])
+    extra = ("--selection", str(selection))
+    requested = []
+    assert (
+        invoke_selection(tmp_path, [row], monkeypatch, tiff_bytes, requested, extra).exit_code
+        == 0
+    )
+    target = topo.archive.object_path(
+        tmp_path / "raw" / "topo", hashlib.sha256(tiff_bytes).hexdigest()
+    )
+    before = target.stat().st_mtime_ns
+    ledger = (tmp_path / "receipts.jsonl").read_bytes()
+    result = invoke_selection(
+        tmp_path, [row], monkeypatch, b"must not be fetched", requested, extra
+    )
+    assert result.exit_code == 0, result.output
+    assert "1 already present" in result.output
+    assert requested == [row["geotiff_url"]]
+    assert target.stat().st_mtime_ns == before
+    assert target.read_bytes() == tiff_bytes
+    assert (tmp_path / "receipts.jsonl").read_bytes() == ledger
+
+    plan = invoke_selection(tmp_path, [row], monkeypatch, b"", requested, (*extra, "--dry-run"))
+    assert plan.exit_code == 0, plan.output
+    assert f"{row['topo_id']}: present" in plan.output
+
+
+def test_selection_dry_run_reports_a_mismatch_without_replacing(tmp_path, row, monkeypatch):
+    raw = tmp_path / "raw" / "topo"
+    raw.mkdir(parents=True)
+    target = raw / f"{row['topo_id']}_geo.tif"
+    target.write_bytes(b"original")
+    selection = write_selection(tmp_path, [row["topo_id"]])
+    requested = []
+    result = invoke_selection(
+        tmp_path,
+        [row],
+        monkeypatch,
+        b"",
+        requested,
+        extra=("--selection", str(selection), "--dry-run"),
+    )
+    assert result.exit_code != 0
+    assert f"{row['topo_id']}: mismatch" in result.output
+    assert requested == []
+    assert target.read_bytes() == b"original"

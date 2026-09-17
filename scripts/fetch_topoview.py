@@ -282,6 +282,68 @@ def read_index(path: Path) -> dict[str, dict]:
         return rows
 
 
+def read_selection(path: Path, rows: dict[str, dict]) -> list[str]:
+    """Validate an explicit edition selection in full before anything is fetched.
+
+    A partially valid selection is rejected outright: a typo must not quietly
+    download the sheets that happened to resolve.
+    """
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise click.ClickException(f"Cannot read selection {path}: {exc}") from None
+    except json.JSONDecodeError as exc:
+        raise click.ClickException(f"Selection {path} is not valid JSON: {exc}") from None
+
+    if not isinstance(payload, dict):
+        raise click.ClickException(f"Selection {path} must be a JSON object.")
+    unknown = sorted(set(payload) - {"version", "topo_ids"})
+    if unknown:
+        raise click.ClickException(f"Unknown selection keys: {', '.join(unknown)}")
+    if payload.get("version") != 1:
+        raise click.ClickException("Selection version must be 1.")
+    topo_ids = payload.get("topo_ids")
+    if not isinstance(topo_ids, list) or not topo_ids:
+        raise click.ClickException("Selection topo_ids must be a non-empty list.")
+    if any(not isinstance(value, str) or not value.strip() for value in topo_ids):
+        raise click.ClickException("Selection topo_ids must be non-empty strings.")
+    seen = sorted({value for value in topo_ids if topo_ids.count(value) > 1})
+    if seen:
+        raise click.ClickException(f"Duplicate topo_ids in selection: {', '.join(seen)}")
+    missing = [value for value in topo_ids if value not in rows]
+    if missing:
+        raise click.ClickException(
+            f"Selection names {len(missing)} id(s) absent from the index: "
+            f"{', '.join(missing)}. Nothing downloaded."
+        )
+    return topo_ids
+
+
+def plan_status(row: dict, dest: Path, raw_root: Path, known: dict[str, dict]) -> str:
+    """Classify one selected sheet for the dry-run plan. Reads only; never repairs."""
+    expected = int(row["size_bytes"]) if str(row["size_bytes"]).isdigit() else None
+    want = f" (expects {expected} bytes)" if expected is not None else ""
+    record = known.get(row["topo_id"])
+    target = dest / f"{row['topo_id']}_geo.tif"
+    if record:
+        target = archive.resolve_raw(raw_root, record["raw_path"])
+        if not (target.exists() or target.is_symlink()):
+            return f"missing — receipted file absent: {target}{want}"
+        try:
+            archive.check_record(record, raw_root)
+        except click.ClickException as exc:
+            return f"mismatch — {exc.format_message()}"
+        return f"present — verified against its receipt: {target}"
+    if target.exists() or target.is_symlink():
+        if target.is_symlink() or not target.is_file() or target.stat().st_size == 0:
+            return f"mismatch — existing target needs review: {target}"
+        size = target.stat().st_size
+        if expected is not None and abs(size - expected) > SIZE_TOLERANCE:
+            return f"mismatch — existing file is {size} bytes, index says {expected}: {target}"
+        return f"present — unreceipted file within tolerance: {target}"
+    return f"missing{want}"
+
+
 def sort_key(row: dict) -> tuple:
     return (int(row["scale"]), row["map_name"], row["date_on_map"], row["topo_id"])
 
@@ -444,6 +506,12 @@ def index_cmd(timeout: int, refresh: bool, workers: int, out: Path) -> None:
     help="Only sheets covering the legacy corridor work area.",
 )
 @click.option("--scale", multiple=True, help="Restrict to these scales, e.g. --scale 24000.")
+@click.option(
+    "--selection",
+    "selection_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help='JSON {"version":1,"topo_ids":[…]} naming the exact editions to fetch.',
+)
 @click.option("--dry-run", is_flag=True, help="Report what would be fetched, download nothing.")
 @click.option(
     "--workers",
@@ -468,6 +536,7 @@ def index_cmd(timeout: int, refresh: bool, workers: int, out: Path) -> None:
 def download(
     tier1_only: bool,
     scale: tuple[str, ...],
+    selection_path: Path | None,
     dry_run: bool,
     workers: int,
     timeout: int,
@@ -476,7 +545,8 @@ def download(
     receipts: Path,
 ) -> None:
     """Download indexed GeoTIFFs into data/raw/topo/ (append-only, never overwritten)."""
-    rows = list(read_index(index_path).values())
+    indexed = read_index(index_path)
+    rows = list(indexed.values())
     if not rows:
         click.echo(
             f"fetch-topo download: {index_path} is empty or missing. "
@@ -484,6 +554,16 @@ def download(
             err=True,
         )
         sys.exit(1)
+
+    selected: list[str] = []
+    if selection_path is not None:
+        if tier1_only or scale:
+            raise click.ClickException(
+                "--selection cannot be combined with --tier1 or --scale; "
+                "name the editions you want in the selection file instead."
+            )
+        selected = read_selection(selection_path, indexed)
+        rows = [indexed[topo_id] for topo_id in selected]
 
     if tier1_only:
         rows = [r for r in rows if r["in_tier1"] == "true"]
@@ -495,6 +575,11 @@ def download(
         raise click.ClickException("The --dest directory must be named topo within a raw root.")
     raw_root = dest.parent
     known = {record["topo_id"]: record for record in archive.load_receipts(receipts)}
+
+    if selected and dry_run:
+        click.echo(f"fetch-topo plan: {len(selected)} selected edition(s) from {index_path}")
+        for topo_id in selected:
+            click.echo(f"  {topo_id}: {plan_status(indexed[topo_id], dest, raw_root, known)}")
 
     pending, have = [], 0
     for row in rows:

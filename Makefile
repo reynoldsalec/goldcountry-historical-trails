@@ -10,6 +10,7 @@ export TRAIL_ARCHIVE_ROOT
 .DEFAULT_GOAL := all
 .PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
         dev fmt lint clean test-topo test-validation test-coverage topo-docs topo-plan \
+        fetch-topo-selected \
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup
 
@@ -54,8 +55,17 @@ fetch-topo:
 topo-docs:
 	$(RUN) python scripts/fetch_topoview.py docs
 
+# SELECTION names a JSON file {"version":1,"topo_ids":[...]} of exact editions to pull
+# from the committed index; the index itself is never refreshed by these targets.
+SELECTION ?=
 topo-plan:
-	$(RUN) python scripts/fetch_topoview.py download --dry-run $(TOPO)
+	$(RUN) python scripts/fetch_topoview.py download --dry-run $(TOPO) \
+	  $(if $(SELECTION),--selection "$(SELECTION)")
+
+fetch-topo-selected:
+	@test -n "$(SELECTION)" || { \
+	  echo 'fetch-topo-selected: set SELECTION=path/to/selection.json'; exit 1; }
+	$(RUN) python scripts/fetch_topoview.py download --selection "$(SELECTION)"
 
 test-topo:
 	$(RUN) pytest -q scripts/test_fetch_topoview.py scripts/test_source_archive.py
