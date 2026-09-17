@@ -75,9 +75,10 @@ but does not establish presence after 1950 or require a separate earlier-era vie
 
 The former Tier 1/2/3 scope system is superseded. `aoi_tier1.geojson` remains an optional
 Bear River Canal work-area reference derived from a dated OSM snapshot. It does not
-limit digitizing. The schema's `tier` and local `corridor` values, the topo index's
-`in_tier1` column, and the `--tier1` download option still exist. They describe the
-earlier implementation, not countywide priorities. Schema and tooling migration work
+limit digitizing. The trail schema no longer carries `tier`, and `corridor` is a free-text
+grouping label rather than a locality enum. The topo index's `in_tier1` column and the
+`--tier1` download option still exist as acquisition filters. They describe the earlier
+implementation, not countywide priorities. Schema and tooling migration work
 is recorded in `docs/open-questions.md`; this document does not imply it is complete.
 
 ---
@@ -93,8 +94,7 @@ Three entities plus a join. Full JSON Schemas live in `schema/`.
 | `trail_id` | string | stable slug; not tied to one locality |
 | `name` | string | |
 | `aka` | string[] | local/colloquial names |
-| `corridor` | enum | Legacy values: `brct` \| `bowman` \| `simpson` \| `combie` \| `sugar-pine` \| `other`; not an inventory of the counties' trails |
-| `tier` | 1 \| 2 \| 3 | Legacy required field pending migration; does not restrict geography, priority, or digitizing |
+| `corridor` | string | required, nonempty; free-text grouping label, `other` when no grouping is established; not a geographic constraint |
 | `current_status` | enum | `secured` \| `unsecured` \| `threatened` \| `lost` \| `unknown` |
 | `notes` | string | human-authored |
 

@@ -7,7 +7,7 @@ RUN := $(UV) run
 
 .DEFAULT_GOAL := all
 .PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
-        dev fmt lint clean test-topo topo-docs topo-plan
+        dev fmt lint clean test-topo test-validation topo-docs topo-plan
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -54,6 +54,9 @@ topo-plan:
 
 test-topo:
 	$(RUN) pytest -q scripts/test_fetch_topoview.py
+
+test-validation:
+	$(RUN) pytest -q scripts/test_validate*.py
 
 ## warp + COG everything with a GCP file, write to build/rasters/
 rasters:
