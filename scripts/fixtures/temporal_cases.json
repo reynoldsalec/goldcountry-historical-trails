@@ -1,0 +1,199 @@
+[
+  {
+    "case_id": "tc-01-positive-in-decade",
+    "decade": 1950,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0001",
+        "date_start": "1954",
+        "date_end": null,
+        "role": "attests_existence"
+      }
+    ],
+    "expected_state": "documented_open",
+    "expected_reason": "documented_evidence"
+  },
+  {
+    "case_id": "tc-02-positive-not-projected-forward",
+    "decade": 1970,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0001",
+        "date_start": "1954",
+        "date_end": null,
+        "role": "attests_existence"
+      }
+    ],
+    "expected_state": "unobserved",
+    "expected_reason": "no_resolving_evidence"
+  },
+  {
+    "case_id": "tc-03-bracketed-by-positives",
+    "decade": 1960,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0001",
+        "date_start": "1954",
+        "date_end": null,
+        "role": "attests_existence"
+      },
+      {
+        "observation_id": "fixture-obs-0002",
+        "date_start": "1978",
+        "date_end": null,
+        "role": "attests_public_use"
+      }
+    ],
+    "expected_state": "inferred_open",
+    "expected_reason": "inferred_between_observations"
+  },
+  {
+    "case_id": "tc-04-closure-inside-decade",
+    "decade": 1960,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0001",
+        "date_start": "1954",
+        "date_end": null,
+        "role": "attests_existence"
+      },
+      {
+        "observation_id": "fixture-obs-0002",
+        "date_start": "1978",
+        "date_end": null,
+        "role": "attests_public_use"
+      },
+      {
+        "observation_id": "fixture-obs-0003",
+        "date_start": "1962",
+        "date_end": null,
+        "role": "attests_closure"
+      }
+    ],
+    "expected_state": "documented_closed",
+    "expected_reason": "documented_evidence"
+  },
+  {
+    "case_id": "tc-05-closure-inside-bracket",
+    "decade": 1960,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0001",
+        "date_start": "1954",
+        "date_end": null,
+        "role": "attests_existence"
+      },
+      {
+        "observation_id": "fixture-obs-0002",
+        "date_start": "1978",
+        "date_end": null,
+        "role": "attests_public_use"
+      },
+      {
+        "observation_id": "fixture-obs-0004",
+        "date_start": "1958",
+        "date_end": null,
+        "role": "attests_closure"
+      }
+    ],
+    "expected_state": "unobserved",
+    "expected_reason": "closure_in_bracket"
+  },
+  {
+    "case_id": "tc-06-closure-not-projected-forward",
+    "decade": 1970,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0003",
+        "date_start": "1962",
+        "date_end": null,
+        "role": "attests_closure"
+      }
+    ],
+    "expected_state": "unobserved",
+    "expected_reason": "no_resolving_evidence"
+  },
+  {
+    "case_id": "tc-07-positive-and-closure-same-decade",
+    "decade": 1960,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0005",
+        "date_start": "1961",
+        "date_end": null,
+        "role": "attests_existence"
+      },
+      {
+        "observation_id": "fixture-obs-0003",
+        "date_start": "1962",
+        "date_end": null,
+        "role": "attests_closure"
+      }
+    ],
+    "expected_state": "unobserved",
+    "expected_reason": "conflicting_evidence"
+  },
+  {
+    "case_id": "tc-08-alignment-role-only",
+    "decade": 1960,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0006",
+        "date_start": "1963",
+        "date_end": null,
+        "role": "attests_alignment"
+      }
+    ],
+    "expected_state": "unobserved",
+    "expected_reason": "no_resolving_evidence"
+  },
+  {
+    "case_id": "tc-09-range-crosses-decade-boundary",
+    "decade": 1960,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0007",
+        "date_start": "1968",
+        "date_end": "1972",
+        "role": "attests_existence"
+      }
+    ],
+    "expected_state": "unobserved",
+    "expected_reason": "date_range_unresolved"
+  },
+  {
+    "case_id": "tc-10-range-inside-one-decade",
+    "decade": 1960,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0008",
+        "date_start": "1962",
+        "date_end": "1968",
+        "role": "attests_existence"
+      }
+    ],
+    "expected_state": "documented_open",
+    "expected_reason": "documented_evidence"
+  },
+  {
+    "case_id": "tc-11-no-observations",
+    "decade": 1960,
+    "observations": [],
+    "expected_state": "unobserved",
+    "expected_reason": "no_resolving_evidence"
+  },
+  {
+    "case_id": "tc-12-pre-1950-positive-only",
+    "decade": 1950,
+    "observations": [
+      {
+        "observation_id": "fixture-obs-0009",
+        "date_start": "1947",
+        "date_end": null,
+        "role": "attests_existence"
+      }
+    ],
+    "expected_state": "unobserved",
+    "expected_reason": "no_resolving_evidence"
+  }
+]

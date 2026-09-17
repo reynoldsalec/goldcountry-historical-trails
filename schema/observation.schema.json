@@ -108,7 +108,7 @@
           "x-sensitivity": "public"
         },
         "date_end": {
-          "description": "For range evidence like 'used 1958–present'.",
+          "description": "End of the evidence date range; null means a dated event. By itself it never authorizes presence across the intervening decades (README §3).",
           "type": ["string", "null"],
           "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$",
           "x-sensitivity": "public"
