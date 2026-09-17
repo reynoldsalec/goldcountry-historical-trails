@@ -10,6 +10,10 @@
       candidates whose footprint and explicit dates reach that cell. An attached
       reference is a lead to examine, never a review, an observation or evidence.
 
+  coverage validate -> exit status
+      Cross-reference integrity for the inventory, and with --release-ready the M1
+      batch and aerial-frame gate. An explicit gap passes; an unsupported claim fails.
+
 The grid comes from the AOI alone, never from an index of sheets we happen to hold —
 deriving it from source availability would hide the quadrangles nobody has searched,
 which is the one thing the coverage inventory exists to show. Cells are reference
@@ -26,11 +30,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import click
+import yaml
 from fetch_topoview import read_index
 from jsonschema import Draft202012Validator
 from shapely.geometry import box, shape
 from shapely.ops import unary_union
-from validate import ALLOWED_CRS_NAMES
+from validate import ALLOWED_CRS_NAMES, Failure, as_bound
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCES_DIR = REPO_ROOT / "data" / "sources"
@@ -216,13 +221,13 @@ def current_decade() -> int:
     return datetime.now(UTC).year // 10 * 10
 
 
-def read_json(path: Path, label: str) -> dict:
+def read_json(path: Path, label: str, on_fail=refresh_fail) -> dict:
     if not path.exists():
-        refresh_fail(f"{label} {path} does not exist")
+        on_fail(f"{label} {path} does not exist")
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        refresh_fail(f"{label} {path} is not valid JSON: {exc}")
+        on_fail(f"{label} {path} is not valid JSON: {exc}")
 
 
 def grid_areas(path: Path) -> dict[str, tuple[float, float, float, float]]:
@@ -557,6 +562,617 @@ def refresh(grid_path: Path, index: Path, out: Path, schema: Path, through_decad
     click.echo(
         f"coverage refresh: wrote {out} — {len(document['cells'])} cells "
         f"({len(areas)} areas x {len(decades)} decades), {linked_cells} with a source reference"
+    )
+
+
+# --------------------------------------------------------------------------------------
+# validate — cross-reference integrity for the inventory (issue #12)
+# --------------------------------------------------------------------------------------
+
+TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+RELEASE_DECADE_SPLIT = 2000
+COUNTY_GEOIDS = ("06057", "06061")
+
+
+def validate_fail(message: str) -> None:
+    click.echo(f"coverage validate: {message}", err=True)
+    sys.exit(1)
+
+
+def report(failures: list[Failure]) -> None:
+    for failure in sorted(failures, key=lambda f: (f.check, f.record, f.message)):
+        click.echo(failure.render(), err=True)
+    click.echo(f"coverage validate: {len(failures)} failure(s)", err=True)
+    sys.exit(1)
+
+
+def schema_failures(document, schema_path: Path, label: str) -> list[Failure]:
+    schema = read_json(schema_path, "schema", validate_fail)
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(document), key=lambda e: list(e.absolute_path)
+    )
+    failures = []
+    for error in errors:
+        location = "/".join(str(part) for part in error.absolute_path) or "<root>"
+        failures.append(Failure("schema", f"{label} {location}", error.message))
+    return failures
+
+
+def read_source_ids(path: Path) -> set[str]:
+    """sources.yml ids. A collection_id naming nothing here cites no collection."""
+    if not path.exists():
+        validate_fail(f"source manifest {path} does not exist")
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        validate_fail(f"source manifest {path} is not valid YAML: {exc}")
+    entries = document.get("sources")
+    if not isinstance(entries, list):
+        validate_fail(f"source manifest {path} has no sources list")
+    return {entry["id"] for entry in entries if isinstance(entry, dict) and entry.get("id")}
+
+
+def read_grid(path: Path, schema_path: Path) -> dict[str, dict]:
+    """area_id -> bounds and counties. The grid is the only per-cell county source."""
+    document = read_json(path, "grid", validate_fail)
+    failures = schema_failures(document, schema_path, "coverage_grid.geojson")
+    if failures:
+        report(failures)
+    areas: dict[str, dict] = {}
+    for feature in document["features"]:
+        properties = feature["properties"]
+        area_id = properties["area_id"]
+        if area_id in areas:
+            validate_fail(f"grid names area {area_id} twice")
+        geom = shape(feature["geometry"])
+        areas[area_id] = {
+            "bounds": geom.bounds,
+            "county_geoids": list(properties["county_geoids"]),
+        }
+    if not areas:
+        validate_fail(f"grid {path} carries no features")
+    return areas
+
+
+def index_bounds(row: dict) -> tuple[float, ...] | None:
+    """Bounds of an index row, or None when absent or unreadable."""
+    values = []
+    for field in BOUND_FIELDS:
+        text = (row.get(field) or "").strip()
+        if not text:
+            return None
+        try:
+            values.append(float(text))
+        except ValueError:
+            return None
+    west, south, east, north = values
+    if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
+        return None
+    return west, south, east, north
+
+
+def check_ids(document: dict) -> list[Failure]:
+    failures = []
+    for bucket, key in (
+        ("candidates", "candidate_id"),
+        ("searches", "search_id"),
+        ("reviews", "review_id"),
+        ("batches", "batch_id"),
+    ):
+        seen = set()
+        for item in document[bucket]:
+            if item[key] in seen:
+                failures.append(
+                    Failure("unique", f"{bucket} {item[key]}", f"{key} appears twice")
+                )
+            seen.add(item[key])
+    seen_cells = set()
+    for cell in document["cells"]:
+        key = (cell["area_id"], cell["decade"])
+        if key in seen_cells:
+            failures.append(
+                Failure("unique", f"cell {key[0]}/{key[1]}", "area_id + decade appears twice")
+            )
+        seen_cells.add(key)
+    return failures
+
+
+def check_cell_grid(document: dict, areas: dict, decades: list[int]) -> list[Failure]:
+    """Every grid area x decade exactly once; a missing cell would hide a gap."""
+    failures = []
+    present = {(cell["area_id"], cell["decade"]) for cell in document["cells"]}
+    for area_id in sorted(areas):
+        for decade in decades:
+            if (area_id, decade) not in present:
+                failures.append(
+                    Failure(
+                        "cells", f"cell {area_id}/{decade}", "the inventory has no such cell"
+                    )
+                )
+    for cell in document["cells"]:
+        label = f"cell {cell['area_id']}/{cell['decade']}"
+        if cell["area_id"] not in areas:
+            failures.append(Failure("cells", label, "area_id is absent from the grid"))
+        if cell["decade"] not in decades:
+            failures.append(Failure("cells", label, f"decade is outside 1950..{decades[-1]}"))
+    return failures
+
+
+def check_dates(document: dict) -> list[Failure]:
+    """Real calendar dates, ordered candidate ranges, observed UTC timestamps."""
+    failures = []
+    for item in document["candidates"]:
+        label = f"candidate {item['candidate_id']}"
+        start, end = item["date_start"], item["date_end"]
+        for field, value in (("date_start", start), ("date_end", end)):
+            if value is not None and as_bound(value, upper=False) is None:
+                failures.append(
+                    Failure("dates", label, f"{field} {value!r} is not a real calendar date")
+                )
+        if start and end:
+            lo, hi = as_bound(start, upper=False), as_bound(end, upper=True)
+            if lo is not None and hi is not None and hi < lo:
+                failures.append(
+                    Failure("dates", label, f"date_end {end} precedes date_start {start}")
+                )
+        if end and not start:
+            failures.append(Failure("dates", label, "date_end without a date_start"))
+        bounds = [item[field] for field in BOUND_FIELDS]
+        if all(value is not None for value in bounds):
+            west, south, east, north = (float(value) for value in bounds)
+            if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
+                failures.append(
+                    Failure("dates", label, f"bounds {bounds} are not an ordered lon/lat box")
+                )
+        elif any(value is not None for value in bounds):
+            failures.append(Failure("dates", label, "bounds are partly known; use all or none"))
+    for bucket, key, field in (
+        ("searches", "search_id", "searched_at"),
+        ("reviews", "review_id", "reviewed_at"),
+    ):
+        for item in document[bucket]:
+            try:
+                datetime.strptime(item[field], TIMESTAMP_FORMAT).replace(tzinfo=UTC)
+            except ValueError:
+                failures.append(
+                    Failure(
+                        "dates",
+                        f"{bucket[:-1]} {item[key]}",
+                        f"{field} {item[field]!r} is not a valid UTC instant",
+                    )
+                )
+    return failures
+
+
+def check_reference_targets(
+    document: dict, areas: dict, decades: list[int], topo_ids: set[str], source_ids: set[str]
+) -> list[Failure]:
+    failures = []
+    candidate_ids = {item["candidate_id"] for item in document["candidates"]}
+    record_ids = {
+        "search": {item["search_id"] for item in document["searches"]},
+        "review": {item["review_id"] for item in document["reviews"]},
+        "batch": {item["batch_id"] for item in document["batches"]},
+    }
+
+    def check_refs(refs, label):
+        for ref in refs:
+            kind, _, value = ref.partition(":")
+            if kind == "topo" and value not in topo_ids:
+                failures.append(
+                    Failure("references", label, f"{ref} is absent from topo_index.csv")
+                )
+            if kind == "candidate" and value not in candidate_ids:
+                failures.append(
+                    Failure("references", label, f"{ref} is absent from candidates")
+                )
+
+    def check_area(area_id, label):
+        if area_id not in areas:
+            failures.append(
+                Failure("references", label, f"area {area_id} is absent from the grid")
+            )
+
+    def check_decade(decade, label):
+        if decade not in decades:
+            failures.append(
+                Failure("references", label, f"decade {decade} is outside the inventory")
+            )
+
+    def check_collection(collection_id, label):
+        if collection_id not in source_ids:
+            failures.append(
+                Failure(
+                    "references",
+                    label,
+                    f"collection {collection_id} is absent from sources.yml",
+                )
+            )
+
+    for item in document["candidates"]:
+        check_collection(item["collection_id"], f"candidate {item['candidate_id']}")
+
+    for item in document["searches"]:
+        label = f"search {item['search_id']}"
+        check_collection(item["collection_id"], label)
+        for area_id in item["area_ids"]:
+            check_area(area_id, label)
+        for decade in item["decades"]:
+            check_decade(decade, label)
+        check_refs(item["source_refs"], label)
+
+    for item in document["reviews"]:
+        label = f"review {item['review_id']}"
+        check_area(item["area_id"], label)
+        check_decade(item["decade"], label)
+        check_refs([item["source_ref"]], label)
+        counties = areas.get(item["area_id"], {}).get("county_geoids", [])
+        if counties and item["county_geoid"] not in counties:
+            failures.append(
+                Failure(
+                    "references",
+                    label,
+                    f"county {item['county_geoid']} does not meet area {item['area_id']}",
+                )
+            )
+
+    for item in document["batches"]:
+        label = f"batch {item['batch_id']}"
+        for area_id in item["area_ids"]:
+            check_area(area_id, label)
+        check_decade(item["decade"], label)
+        check_refs(item["source_refs"], label)
+        for review_id in item["review_ids"]:
+            if review_id not in record_ids["review"]:
+                failures.append(
+                    Failure("references", label, f"review {review_id} does not exist")
+                )
+
+    for cell in document["cells"]:
+        label = f"cell {cell['area_id']}/{cell['decade']}"
+        check_refs(cell["source_refs"], label)
+        for key, kind in (
+            ("search_ids", "search"),
+            ("review_ids", "review"),
+            ("batch_ids", "batch"),
+        ):
+            for value in cell[key]:
+                if value not in record_ids[kind]:
+                    failures.append(
+                        Failure("references", label, f"{kind} {value} does not exist")
+                    )
+    return failures
+
+
+def check_cell_records(document: dict, areas: dict, rows: dict) -> list[Failure]:
+    """A record linked to a cell must be about that cell, and a gap flag needs support."""
+    failures = []
+    searches = {item["search_id"]: item for item in document["searches"]}
+    reviews = {item["review_id"]: item for item in document["reviews"]}
+    batches = {item["batch_id"]: item for item in document["batches"]}
+    candidates = {item["candidate_id"]: item for item in document["candidates"]}
+
+    for cell in document["cells"]:
+        label = f"cell {cell['area_id']}/{cell['decade']}"
+        linked_searches = [searches[s] for s in cell["search_ids"] if s in searches]
+
+        for search in linked_searches:
+            covers = (
+                cell["area_id"] in search["area_ids"] and cell["decade"] in search["decades"]
+            )
+            if not covers:
+                failures.append(
+                    Failure(
+                        "records",
+                        label,
+                        f"search {search['search_id']} covers another area or decade",
+                    )
+                )
+        for review_id in cell["review_ids"]:
+            review = reviews.get(review_id)
+            if review is None:
+                continue
+            if review["area_id"] != cell["area_id"] or review["decade"] != cell["decade"]:
+                failures.append(
+                    Failure(
+                        "records",
+                        label,
+                        f"review {review_id} examined "
+                        f"{review['area_id']}/{review['decade']}, not this cell",
+                    )
+                )
+        for batch_id in cell["batch_ids"]:
+            batch = batches.get(batch_id)
+            if batch is None:
+                continue
+            if cell["area_id"] not in batch["area_ids"] or batch["decade"] != cell["decade"]:
+                failures.append(
+                    Failure("records", label, f"batch {batch_id} does not cover this cell")
+                )
+
+        outcomes = {search["outcome"] for search in linked_searches}
+        for code, outcome in (
+            ("no_source_located", "no_match"),
+            ("access_blocked", "access_blocked"),
+        ):
+            if code in cell["gap_codes"] and outcome not in outcomes:
+                failures.append(
+                    Failure(
+                        "gaps",
+                        label,
+                        f"gap {code} needs a linked search with outcome {outcome}",
+                    )
+                )
+        if "not_digitized" not in cell["gap_codes"]:
+            digitized = [
+                batch_id
+                for batch_id in cell["batch_ids"]
+                if batches.get(batch_id, {}).get("status") == "digitized"
+            ]
+            if not digitized:
+                failures.append(
+                    Failure(
+                        "gaps",
+                        label,
+                        "not_digitized was cleared without a digitized batch on this cell",
+                    )
+                )
+
+        area = areas.get(cell["area_id"])
+        if area is None:
+            continue
+        for ref in cell["source_refs"]:
+            kind, _, value = ref.partition(":")
+            bounds = None
+            if kind == "candidate" and value in candidates:
+                item = candidates[value]
+                if all(item[field] is not None for field in BOUND_FIELDS):
+                    bounds = candidate_bounds(item)
+            elif kind == "topo" and value in rows:
+                bounds = index_bounds(rows[value])
+            if bounds is not None and not overlaps(area["bounds"], bounds):
+                failures.append(
+                    Failure("records", label, f"{ref} does not reach this area's footprint")
+                )
+    return failures
+
+
+def ready_batch_failures(batch: dict, document: dict, areas: dict) -> list[Failure]:
+    """What a status: ready batch must carry before anyone digitizes against it."""
+    failures = []
+    label = f"batch {batch['batch_id']}"
+    reviews = {item["review_id"]: item for item in document["reviews"]}
+    if not batch["tasks"]:
+        failures.append(Failure("batches", label, "status ready with no review tasks"))
+    if not batch["source_refs"]:
+        failures.append(Failure("batches", label, "status ready with no source_refs"))
+    in_county = [
+        area_id
+        for area_id in batch["area_ids"]
+        if batch["county_geoid"] in areas.get(area_id, {}).get("county_geoids", [])
+    ]
+    if not in_county:
+        failures.append(
+            Failure("batches", label, f"no listed area meets county {batch['county_geoid']}")
+        )
+    supporting = [
+        review_id
+        for review_id in batch["review_ids"]
+        if (review := reviews.get(review_id))
+        and review["dating"] == "resolved"
+        and review["foot_trail_evidence"] == "yes"
+        and review["evidence_locator"]
+        and review["county_geoid"] == batch["county_geoid"]
+        and review["decade"] == batch["decade"]
+        and review["area_id"] in batch["area_ids"]
+    ]
+    if not supporting:
+        failures.append(
+            Failure(
+                "batches",
+                label,
+                "status ready without a dated, located foot-trail review for its county, "
+                "decade and areas",
+            )
+        )
+    return failures
+
+
+def check_batches(document: dict, areas: dict) -> tuple[list[Failure], list[dict]]:
+    failures = []
+    qualifying = []
+    for batch in document["batches"]:
+        label = f"batch {batch['batch_id']}"
+        if batch["status"] == "digitized":
+            failures.append(
+                Failure(
+                    "batches",
+                    label,
+                    "status digitized is rejected until M3 links sources to observations",
+                )
+            )
+        if batch["alignment_ids"]:
+            failures.append(
+                Failure(
+                    "batches",
+                    label,
+                    "alignment_ids stays empty until M3 validates it against alignments",
+                )
+            )
+        if batch["status"] != "ready":
+            continue
+        batch_failures = ready_batch_failures(batch, document, areas)
+        failures.extend(batch_failures)
+        if not batch_failures:
+            qualifying.append(batch)
+    return failures, qualifying
+
+
+def release_aerial_failures(document: dict, aoi) -> list[Failure]:
+    """The M1 gate needs one obtainable dated aerial frame (README §7)."""
+    reasons = []
+    for item in document["candidates"]:
+        if item["kind"] != "aerial_frame":
+            continue
+        problems = []
+        if item["verification"] != "verified":
+            problems.append("verification is not verified")
+        if not item["source_identifier"]:
+            problems.append("no publisher source_identifier")
+        if item["access"] != "available":
+            problems.append(f"access is {item['access']}")
+        if item["rights"] == "unknown":
+            problems.append("rights unknown is not a redistribution permission")
+        if any(item[field] is None for field in BOUND_FIELDS):
+            problems.append("bounds are not fully known")
+        elif box(*candidate_bounds(item)).intersection(aoi).area <= 0:
+            problems.append("bounds do not reach the county AOI")
+        start, end = item["date_start"], item["date_end"]
+        start_year = int(start[:4]) if start else None
+        end_year = int(end[:4]) if end else None
+        if start_year is None:
+            problems.append("no date_start")
+        elif start_year < FIRST_DECADE and end_year is not None and end_year >= FIRST_DECADE:
+            problems.append("date range straddles 1950; resolve the dating first")
+        elif start_year < FIRST_DECADE:
+            problems.append(f"date_start {start} precedes {FIRST_DECADE}")
+        if not problems:
+            return []
+        reasons.append(
+            Failure("release", f"candidate {item['candidate_id']}", "; ".join(problems))
+        )
+    if not reasons:
+        reasons.append(
+            Failure(
+                "release",
+                "candidates",
+                "no verified, available, dated aerial_frame candidate inside the county AOI",
+            )
+        )
+    return reasons
+
+
+def release_batch_failures(qualifying: list[dict]) -> list[Failure]:
+    """Planned batches never count here; only what a reviewer has declared ready."""
+    failures = []
+    for county in COUNTY_GEOIDS:
+        decades = sorted({b["decade"] for b in qualifying if b["county_geoid"] == county})
+        label = f"county {county}"
+        if len(decades) < 2:
+            failures.append(
+                Failure(
+                    "release",
+                    label,
+                    f"needs two decades of status ready batches, has {decades or 'none'}",
+                )
+            )
+        if not any(decade < RELEASE_DECADE_SPLIT for decade in decades):
+            failures.append(
+                Failure("release", label, "no status ready batch in a decade before 2000")
+            )
+        if not any(decade >= RELEASE_DECADE_SPLIT for decade in decades):
+            failures.append(
+                Failure("release", label, "no status ready batch in a decade from 2000 onward")
+            )
+    return failures
+
+
+@cli.command("validate")
+@click.option(
+    "--data",
+    "data_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=SOURCES_DIR / "coverage.json",
+    show_default=True,
+)
+@click.option(
+    "--grid",
+    "grid_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=SOURCES_DIR / "coverage_grid.geojson",
+    show_default=True,
+)
+@click.option(
+    "--index",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=SOURCES_DIR / "topo_index.csv",
+    show_default=True,
+)
+@click.option(
+    "--sources",
+    "sources_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=SOURCES_DIR / "sources.yml",
+    show_default=True,
+)
+@click.option(
+    "--aoi",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=SOURCES_DIR / "aoi_counties.geojson",
+    show_default=True,
+)
+@click.option(
+    "--schema",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=REPO_ROOT / "schema" / "coverage.schema.json",
+    show_default=True,
+)
+@click.option(
+    "--grid-schema",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=REPO_ROOT / "schema" / "coverage_grid.schema.json",
+    show_default=True,
+)
+@click.option(
+    "--release-ready",
+    is_flag=True,
+    help="Also check the M1 gate: four ready county/decade batches and an aerial frame.",
+)
+def validate_inventory(
+    data_path: Path,
+    grid_path: Path,
+    index: Path,
+    sources_path: Path,
+    aoi: Path,
+    schema: Path,
+    grid_schema: Path,
+    release_ready: bool,
+) -> None:
+    """Check inventory references, cell coverage and batch readiness.
+
+    An explicit gap passes: an unsearched cell is recorded bookkeeping, not an error.
+    What fails is a claim with no record behind it.
+    """
+    document = read_json(data_path, "inventory", validate_fail)
+    schema_problems = schema_failures(document, schema, "coverage.json")
+    if schema_problems:
+        report(schema_problems)
+
+    areas = read_grid(grid_path, grid_schema)
+    decades = list(range(FIRST_DECADE, document["through_decade"] + 1, 10))
+    rows = read_index(index)
+    source_ids = read_source_ids(sources_path)
+
+    failures = check_ids(document)
+    failures += check_cell_grid(document, areas, decades)
+    failures += check_dates(document)
+    failures += check_reference_targets(document, areas, decades, set(rows), source_ids)
+    failures += check_cell_records(document, areas, rows)
+    batch_failures, qualifying = check_batches(document, areas)
+    failures += batch_failures
+
+    if release_ready:
+        aoi_geom = unary_union([geom for _, geom in load_geometries(aoi, "AOI")])
+        failures += release_batch_failures(qualifying)
+        failures += release_aerial_failures(document, aoi_geom)
+
+    if failures:
+        report(failures)
+    scope = "release-ready" if release_ready else "inventory"
+    click.echo(
+        f"coverage validate: {scope} OK — {len(document['cells'])} cells, "
+        f"{len(document['candidates'])} candidates, {len(document['searches'])} searches, "
+        f"{len(document['reviews'])} reviews, {len(document['batches'])} batches"
     )
 
 

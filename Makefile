@@ -10,7 +10,8 @@ export TRAIL_ARCHIVE_ROOT
 .DEFAULT_GOAL := all
 .PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
         dev fmt lint clean test-topo test-validation test-coverage topo-docs topo-plan \
-        fetch-topo-selected coverage-grid coverage-refresh \
+        fetch-topo-selected coverage-grid coverage-refresh validate-coverage \
+        coverage-ready \
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup
 
@@ -92,7 +93,7 @@ test-validation:
 
 test-coverage:
 	$(RUN) pytest -q scripts/test_coverage_schema.py scripts/test_coverage_grid.py \
-	  scripts/test_coverage_refresh.py
+	  scripts/test_coverage_refresh.py scripts/test_coverage_validate.py
 
 ## 7.5-minute reference grid over the county AOI -> data/sources/coverage_grid.geojson
 coverage-grid:
@@ -104,6 +105,14 @@ THROUGH_DECADE ?=
 coverage-refresh:
 	$(RUN) python scripts/coverage.py refresh \
 	  $(if $(THROUGH_DECADE),--through-decade $(THROUGH_DECADE))
+
+## inventory cross-references, cell coverage and batch readiness
+validate-coverage:
+	$(RUN) python scripts/coverage.py validate
+
+## the M1 release gate: four ready county/decade batches and one obtainable aerial frame
+coverage-ready:
+	$(RUN) python scripts/coverage.py validate --release-ready
 
 ## warp + COG everything with a GCP file, write to build/rasters/
 rasters:
