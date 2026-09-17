@@ -55,8 +55,10 @@ topo-plan:
 test-topo:
 	$(RUN) pytest -q scripts/test_fetch_topoview.py
 
+# Files are listed explicitly so a deleted or renamed regression module fails loudly
+# instead of silently shrinking the glob.
 test-validation:
-	$(RUN) pytest -q scripts/test_validate*.py
+	$(RUN) pytest -q scripts/test_validate.py scripts/test_validate_dates.py scripts/test_validate_leaks.py
 
 ## warp + COG everything with a GCP file, write to build/rasters/
 rasters:

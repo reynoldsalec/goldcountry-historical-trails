@@ -25,3 +25,9 @@ jobs:
 
       - name: Validate authoritative data
         run: make validate
+
+      - name: Acquisition regression tests
+        run: make test-topo
+
+      - name: Validator regression tests
+        run: make test-validation
