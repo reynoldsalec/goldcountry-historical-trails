@@ -7,7 +7,7 @@ RUN := $(UV) run
 
 .DEFAULT_GOAL := all
 .PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
-        dev fmt lint clean test-topo test-validation topo-docs topo-plan
+        dev fmt lint clean test-topo test-validation test-coverage topo-docs topo-plan
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -59,6 +59,9 @@ test-topo:
 # instead of silently shrinking the glob.
 test-validation:
 	$(RUN) pytest -q scripts/test_validate.py scripts/test_validate_dates.py scripts/test_validate_leaks.py
+
+test-coverage:
+	$(RUN) pytest -q scripts/test_coverage_schema.py
 
 ## warp + COG everything with a GCP file, write to build/rasters/
 rasters:

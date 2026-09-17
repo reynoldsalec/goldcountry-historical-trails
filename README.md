@@ -259,6 +259,7 @@ Key choices and why:
 │   ├── sources/                # COMMITTED
 │   │   ├── sources.yml         # source manifest: id, url, rights, sensitivity
 │   │   ├── topo_index.csv      # per-sheet USGS topo index with lineage dates
+│   │   ├── coverage.json       # research bookkeeping: area/decade coverage inventory
 │   │   ├── aoi_counties.geojson  # both counties: acquisition + digitizing boundary
 │   │   ├── aoi_tier1.geojson     # optional legacy Bear River Canal work area (OSM)
 │   │   └── gcp/                # *.points files from QGIS Georeferencer
@@ -271,7 +272,9 @@ Key choices and why:
 │   ├── trail.schema.json
 │   ├── alignment.schema.json
 │   ├── observation.schema.json
-│   └── support.schema.json
+│   ├── support.schema.json
+│   ├── coverage.schema.json      # coverage.json
+│   └── coverage_grid.schema.json # coverage_grid.geojson (built in a later M1 issue)
 ├── scripts/
 │   ├── fetch_aoi.py            # TIGERweb + OSM → the two AOI files
 │   ├── fetch_topoview.py       # TNM Access API → data/raw/topo/
@@ -304,6 +307,7 @@ Key choices and why:
 | `make topo-docs` | regenerate the countywide edition report from the current index |
 | `make test-topo` | run offline acquisition regression tests and source-index integrity checks |
 | `make test-validation` | run the offline validator regression suite (schema, provenance, temporal, leak) |
+| `make test-coverage` | run the coverage inventory schema contract tests |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |

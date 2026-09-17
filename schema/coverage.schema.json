@@ -1,0 +1,368 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "coverage.schema.json",
+  "title": "Coverage inventory",
+  "description": "Research bookkeeping for data/sources/coverage.json (issue #9, docs/data-model.md §Coverage inventory). Records which area/decade cells have a located source, which sources were examined, and which gaps remain. It is not evidence: nothing here supports a trail alignment, which still needs an observation and a support row. Real-calendar validity and cross-reference integrity are checked by the M1.4 validator, not by this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "through_decade", "cells", "candidates", "searches", "reviews", "batches"],
+  "properties": {
+    "version": {
+      "description": "Document format version. Bumped only by a breaking schema change.",
+      "const": 1
+    },
+    "through_decade": {
+      "description": "Latest decade the inventory accounts for. Cells beyond it are simply absent, which asserts nothing.",
+      "type": "integer",
+      "multipleOf": 10,
+      "minimum": 1950
+    },
+    "cells": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/cell" }
+    },
+    "candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "searches": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/search" }
+    },
+    "reviews": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/review" }
+    },
+    "batches": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/batch" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "description": "Stable local slug.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "id_list": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "area_id": {
+      "description": "FK → coverage_grid.geojson properties.area_id.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^q7p5-[0-9]+-[0-9]+$"
+    },
+    "decade": {
+      "type": "integer",
+      "multipleOf": 10,
+      "minimum": 1950
+    },
+    "county_geoid": {
+      "description": "Census county GEOID: Nevada or Placer.",
+      "type": "string",
+      "enum": ["06057", "06061"]
+    },
+    "source_ref": {
+      "description": "topo:<topo_id> for a topo_index.csv row, or candidate:<candidate_id>.",
+      "type": "string",
+      "pattern": "^(topo:[A-Za-z0-9][A-Za-z0-9_.-]*|candidate:[a-z0-9]+(-[a-z0-9]+)*)$"
+    },
+    "source_ref_list": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/source_ref" }
+    },
+    "date": {
+      "description": "YYYY or YYYY-MM-DD. Calendar validity is checked by the validator.",
+      "type": "string",
+      "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$"
+    },
+    "timestamp": {
+      "description": "Observed UTC instant, never inferred from a file mtime.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "note": {
+      "description": "Human-authored research bookkeeping. Never generated trail history.",
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "cell": {
+      "description": "One area/decade unit of the inventory. Unique on area_id + decade, enforced by the validator.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "area_id",
+        "decade",
+        "source_refs",
+        "search_ids",
+        "review_ids",
+        "batch_ids",
+        "gap_codes",
+        "gap_note"
+      ],
+      "properties": {
+        "area_id": { "$ref": "#/$defs/area_id" },
+        "decade": { "$ref": "#/$defs/decade" },
+        "source_refs": { "$ref": "#/$defs/source_ref_list" },
+        "search_ids": { "$ref": "#/$defs/id_list" },
+        "review_ids": { "$ref": "#/$defs/id_list" },
+        "batch_ids": { "$ref": "#/$defs/id_list" },
+        "gap_codes": {
+          "description": "An empty list asserts nothing about historical coverage.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "unsearched",
+              "no_source_located",
+              "access_blocked",
+              "dating_unresolved",
+              "not_examined",
+              "partially_examined",
+              "not_digitized"
+            ]
+          }
+        },
+        "gap_note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "candidate": {
+      "description": "A source located but not yet entered as an observation. Metadata only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "kind",
+        "collection_id",
+        "title",
+        "url",
+        "date_start",
+        "date_end",
+        "west",
+        "south",
+        "east",
+        "north",
+        "rights",
+        "sensitivity",
+        "attribution",
+        "verification",
+        "source_identifier",
+        "access"
+      ],
+      "properties": {
+        "candidate_id": { "$ref": "#/$defs/id" },
+        "kind": {
+          "type": "string",
+          "enum": ["topo_sheet", "aerial_frame", "agency_record", "modern_map"]
+        },
+        "collection_id": {
+          "description": "FK → data/sources/sources.yml id.",
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "description": "As printed or as the publisher lists it. Never invented.",
+          "type": "string",
+          "minLength": 1
+        },
+        "url": { "type": ["string", "null"], "minLength": 1 },
+        "date_start": { "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }] },
+        "date_end": {
+          "description": "Dates the source, not continuous trail use.",
+          "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }]
+        },
+        "west": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
+        "south": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+        "east": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
+        "north": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+        "rights": {
+          "description": "unknown is the absence of a permission, not a permission.",
+          "type": "string",
+          "enum": ["public_domain", "cc_by_nc_sa", "odbl", "restricted", "unknown"]
+        },
+        "sensitivity": { "type": "string", "enum": ["public", "restricted"] },
+        "attribution": { "type": ["string", "null"], "minLength": 1 },
+        "verification": { "type": "string", "enum": ["unverified", "verified"] },
+        "source_identifier": {
+          "description": "The publisher's own identifier, e.g. a frame ID. Never fabricated.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "access": { "type": "string", "enum": ["unknown", "available", "blocked"] }
+      },
+      "allOf": [
+        {
+          "description": "Bounds are all four present or all four null.",
+          "oneOf": [
+            {
+              "properties": {
+                "west": { "type": "number" },
+                "south": { "type": "number" },
+                "east": { "type": "number" },
+                "north": { "type": "number" }
+              }
+            },
+            {
+              "properties": {
+                "west": { "type": "null" },
+                "south": { "type": "null" },
+                "east": { "type": "null" },
+                "north": { "type": "null" }
+              }
+            }
+          ]
+        },
+        {
+          "description": "A date_end without a date_start would not describe a range.",
+          "if": {
+            "properties": { "date_end": { "type": "string" } },
+            "required": ["date_end"]
+          },
+          "then": {
+            "properties": { "date_start": { "type": "string" } },
+            "required": ["date_start"]
+          }
+        }
+      ]
+    },
+    "search": {
+      "description": "One recorded attempt to locate sources. no_match means this query found nothing, never that no trail existed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "search_id",
+        "searched_at",
+        "collection_id",
+        "area_ids",
+        "decades",
+        "query",
+        "outcome",
+        "source_refs",
+        "note"
+      ],
+      "properties": {
+        "search_id": { "$ref": "#/$defs/id" },
+        "searched_at": { "$ref": "#/$defs/timestamp" },
+        "collection_id": {
+          "description": "FK → data/sources/sources.yml id.",
+          "$ref": "#/$defs/id"
+        },
+        "area_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/area_id" }
+        },
+        "decades": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/decade" }
+        },
+        "query": {
+          "description": "The query as actually issued, so the search can be repeated.",
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["located", "no_match", "access_blocked", "unresolved"]
+        },
+        "source_refs": { "$ref": "#/$defs/source_ref_list" },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "review": {
+      "description": "One human examination of one source for one area and decade. Records what was looked at, not what it proves about a trail.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "review_id",
+        "source_ref",
+        "area_id",
+        "county_geoid",
+        "decade",
+        "reviewed_at",
+        "reviewer_id",
+        "scope",
+        "foot_trail_evidence",
+        "dating",
+        "evidence_locator",
+        "note"
+      ],
+      "properties": {
+        "review_id": { "$ref": "#/$defs/id" },
+        "source_ref": { "$ref": "#/$defs/source_ref" },
+        "area_id": { "$ref": "#/$defs/area_id" },
+        "county_geoid": { "$ref": "#/$defs/county_geoid" },
+        "decade": { "$ref": "#/$defs/decade" },
+        "reviewed_at": { "$ref": "#/$defs/timestamp" },
+        "reviewer_id": {
+          "description": "The person who actually performed the review.",
+          "$ref": "#/$defs/id"
+        },
+        "scope": { "type": "string", "enum": ["partial", "whole_source_footprint"] },
+        "foot_trail_evidence": { "type": "string", "enum": ["yes", "no", "uncertain"] },
+        "dating": { "type": "string", "enum": ["resolved", "unresolved"] },
+        "evidence_locator": {
+          "description": "Where on the source the evidence sits, so a second reviewer can find it.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "note": { "$ref": "#/$defs/note" }
+      },
+      "if": {
+        "properties": { "foot_trail_evidence": { "const": "yes" } },
+        "required": ["foot_trail_evidence"]
+      },
+      "then": {
+        "properties": { "evidence_locator": { "type": "string" } },
+        "required": ["evidence_locator"]
+      }
+    },
+    "batch": {
+      "description": "A planned unit of digitizing work. status: digitized records that work happened, not that coverage is complete.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batch_id",
+        "county_geoid",
+        "area_ids",
+        "decade",
+        "source_refs",
+        "review_ids",
+        "tasks",
+        "gap_note",
+        "status",
+        "alignment_ids"
+      ],
+      "properties": {
+        "batch_id": { "$ref": "#/$defs/id" },
+        "county_geoid": { "$ref": "#/$defs/county_geoid" },
+        "area_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/area_id" }
+        },
+        "decade": { "$ref": "#/$defs/decade" },
+        "source_refs": { "$ref": "#/$defs/source_ref_list" },
+        "review_ids": { "$ref": "#/$defs/id_list" },
+        "tasks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "gap_note": { "$ref": "#/$defs/note" },
+        "status": { "type": "string", "enum": ["planned", "ready", "digitized"] },
+        "alignment_ids": {
+          "description": "FK → alignments.geojson alignment_id.",
+          "$ref": "#/$defs/id_list"
+        }
+      }
+    }
+  }
+}
