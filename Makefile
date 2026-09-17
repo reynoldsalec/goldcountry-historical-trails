@@ -10,7 +10,7 @@ export TRAIL_ARCHIVE_ROOT
 .DEFAULT_GOAL := all
 .PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
         dev fmt lint clean test-topo test-validation test-coverage topo-docs topo-plan \
-        fetch-topo-selected \
+        fetch-topo-selected coverage-grid \
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup
 
@@ -91,7 +91,11 @@ test-validation:
 	$(RUN) pytest -q scripts/test_validate.py scripts/test_validate_dates.py scripts/test_validate_leaks.py
 
 test-coverage:
-	$(RUN) pytest -q scripts/test_coverage_schema.py
+	$(RUN) pytest -q scripts/test_coverage_schema.py scripts/test_coverage_grid.py
+
+## 7.5-minute reference grid over the county AOI -> data/sources/coverage_grid.geojson
+coverage-grid:
+	$(RUN) python scripts/coverage.py grid
 
 ## warp + COG everything with a GCP file, write to build/rasters/
 rasters:
