@@ -10,7 +10,6 @@
     "name",
     "aka",
     "corridor",
-    "tier",
     "current_status",
     "notes"
   ],
@@ -34,13 +33,9 @@
       "x-sensitivity": "public"
     },
     "corridor": {
+      "description": "Free-text grouping label; \"other\" when no grouping is established. Not a geographic constraint.",
       "type": "string",
-      "enum": ["brct", "bowman", "simpson", "combie", "sugar-pine", "other"],
-      "x-sensitivity": "public"
-    },
-    "tier": {
-      "type": "integer",
-      "enum": [1, 2, 3],
+      "minLength": 1,
       "x-sensitivity": "public"
     },
     "current_status": {

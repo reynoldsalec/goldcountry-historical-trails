@@ -75,9 +75,10 @@ but does not establish presence after 1950 or require a separate earlier-era vie
 
 The former Tier 1/2/3 scope system is superseded. `aoi_tier1.geojson` remains an optional
 Bear River Canal work-area reference derived from a dated OSM snapshot. It does not
-limit digitizing. The schema's `tier` and local `corridor` values, the topo index's
-`in_tier1` column, and the `--tier1` download option still exist. They describe the
-earlier implementation, not countywide priorities. Schema and tooling migration work
+limit digitizing. The trail schema no longer carries `tier`, and `corridor` is a free-text
+grouping label rather than a locality enum. The topo index's `in_tier1` column and the
+`--tier1` download option still exist as acquisition filters. They describe the earlier
+implementation, not countywide priorities. Schema and tooling migration work
 is recorded in `docs/open-questions.md`; this document does not imply it is complete.
 
 ---
@@ -93,8 +94,7 @@ Three entities plus a join. Full JSON Schemas live in `schema/`.
 | `trail_id` | string | stable slug; not tied to one locality |
 | `name` | string | |
 | `aka` | string[] | local/colloquial names |
-| `corridor` | enum | Legacy values: `brct` \| `bowman` \| `simpson` \| `combie` \| `sugar-pine` \| `other`; not an inventory of the counties' trails |
-| `tier` | 1 \| 2 \| 3 | Legacy required field pending migration; does not restrict geography, priority, or digitizing |
+| `corridor` | string | required, nonempty; free-text grouping label, `other` when no grouping is established; not a geographic constraint |
 | `current_status` | enum | `secured` \| `unsecured` \| `threatened` \| `lost` \| `unknown` |
 | `notes` | string | human-authored |
 
@@ -123,7 +123,7 @@ Any temporal field may be null. Null means unobserved, not absent. See `AGENTS.m
 | `observation_id` | string | public | |
 | `obs_type` | enum | public | `topo_sheet` \| `aerial_frame` \| `county_plan` \| `recorded_map` \| `declaration` \| `photograph` \| `oral_account` \| `deed` |
 | `date_start` | date | public | |
-| `date_end` | date \| null | public | for range evidence like "used 1958–present" |
+| `date_end` | date \| null | public | end of the evidence date range; never on its own authorizes presence across the intervening decades |
 | `source_citation` | string | public | human-readable |
 | `source_url` | string \| null | public | |
 | `rights` | enum | public | `public_domain` \| `cc_by_nc_sa` \| `restricted` \| `unknown` |
@@ -143,17 +143,59 @@ Every alignment needs ≥1 support row. Enforced by `make validate`.
 
 ### Decade rendering logic
 
-For decade `D` (e.g. 1970 = 1970-01-01 … 1979-12-31), an alignment renders as:
+For decade `D` (e.g. 1970 = 1970-01-01 … 1979-12-31), an alignment renders in one of
+four states. Nothing projects indefinitely: an observation dates the moment it records,
+not every decade after it.
 
-| State | Condition |
-| --- | --- |
-| `documented_open` | any known-open date falls in or before `D`, and no known-closed date before `D` |
-| `inferred_open` | known open before `D` and known open after `D`, but no observation within `D` |
-| `documented_closed` | a known-closed date falls in or before `D` |
-| `unobserved` | no supporting observation resolves to `D` or bracketing it |
+**Evidence roles.** Positive evidence is a support row with role `attests_existence` or
+`attests_public_use`. Closure evidence is `attests_closure`. `attests_alignment`
+supports geometry only and never sets a decade state.
+
+**Dates.** `date_end` null means a dated event, not an ongoing interval. A bare `YYYY`
+is uncertain within that year. An observation resolves to decade `D` when its whole date
+range falls inside `D`. A range that crosses a decade boundary is unresolved for every
+decade it touches until a reviewer supplies more precise evidence; it neither documents
+nor brackets a decade.
+
+| State | Condition for decade `D` | Reason |
+| --- | --- | --- |
+| `documented_closed` | closure evidence resolves to `D` and no positive evidence resolves to `D` | `documented_evidence` |
+| `documented_open` | positive evidence resolves to `D` and no closure evidence resolves to `D` | `documented_evidence` |
+| `unobserved` | both positive and closure evidence resolve to `D`; both citations are retained | `conflicting_evidence` |
+| `inferred_open` | no evidence resolves to `D`, the same alignment has positive evidence before `D` and after `D`, and no closure or unresolved range lies between those bracketing observations | `inferred_between_observations` |
+| `unobserved` | bracketing positives exist but a closure lies between them | `closure_in_bracket` |
+| `unobserved` | the only candidate evidence is a date range crossing a decade boundary | `date_range_unresolved` |
+| `unobserved` | anything else, including no observations at all | `no_resolving_evidence` |
+
+**Rule precedence.** Evidence inside `D` outranks inference across `D`. Within `D`,
+conflict outranks both documented states. Inference is evaluated only when nothing
+resolves to `D`; a blocking closure or unresolved range inside the bracket defeats it.
 
 `inferred_open` renders dashed. `unobserved` does not render but is listed in the panel.
 Do not promote `inferred_open` to `documented_open` in exports.
+
+#### Worked examples
+
+`scripts/fixtures/temporal_cases.json` holds these same cases in machine-readable form
+with fixture-only IDs and synthetic dates. They are documentation examples, not data.
+
+| # | Observations | Decade | State | Reason |
+| --- | --- | --- | --- | --- |
+| 1 | 1954 positive | 1950 | `documented_open` | `documented_evidence` |
+| 2 | 1954 positive | 1970 | `unobserved` | `no_resolving_evidence` |
+| 3 | 1954 positive, 1978 positive | 1960 | `inferred_open` | `inferred_between_observations` |
+| 4 | 1954 positive, 1978 positive, 1962 closure | 1960 | `documented_closed` | `documented_evidence` |
+| 5 | 1954 positive, 1978 positive, 1958 closure | 1960 | `unobserved` | `closure_in_bracket` |
+| 6 | 1962 closure | 1970 | `unobserved` | `no_resolving_evidence` |
+| 7 | 1961 positive, 1962 closure | 1960 | `unobserved` | `conflicting_evidence` |
+| 8 | 1963 `attests_alignment` only | 1960 | `unobserved` | `no_resolving_evidence` |
+| 9 | 1968–1972 positive range | 1960 | `unobserved` | `date_range_unresolved` |
+| 10 | 1962–1968 positive range | 1960 | `documented_open` | `documented_evidence` |
+| 11 | none | 1960 | `unobserved` | `no_resolving_evidence` |
+| 12 | 1947 positive | 1950 | `unobserved` | `no_resolving_evidence` |
+
+The four temporal fields on an alignment are bounds. They never manufacture a decade
+observation on their own. See `docs/data-model.md` for the longer discussion.
 
 ---
 
@@ -210,7 +252,7 @@ Key choices and why:
 ├── pyproject.toml
 ├── .github/
 │   └── workflows/
-│       └── validate.yml    # runs `make validate` on push and PR
+│       └── validate.yml    # runs lint, validate and the tests on push and PR
 ├── data/
 │   ├── raw/                    # gitignored, immutable
 │   ├── working/                # gitignored intermediates
@@ -218,6 +260,7 @@ Key choices and why:
 │   │   ├── sources.yml         # source manifest: id, url, rights, sensitivity
 │   │   ├── topo_index.csv      # per-sheet USGS topo index with lineage dates
 │   │   ├── retrievals.jsonl    # source bytes: SHA-256, storage path, retrieval time
+│   │   ├── coverage.json       # research bookkeeping: area/decade coverage inventory
 │   │   ├── aoi_counties.geojson  # both counties: acquisition + digitizing boundary
 │   │   ├── aoi_tier1.geojson     # optional legacy Bear River Canal work area (OSM)
 │   │   └── gcp/                # *.points files from QGIS Georeferencer
@@ -231,7 +274,9 @@ Key choices and why:
 │   ├── alignment.schema.json
 │   ├── observation.schema.json
 │   ├── retrieval.schema.json   # public USGS download receipts
-│   └── support.schema.json
+│   ├── support.schema.json
+│   ├── coverage.schema.json      # coverage.json
+│   └── coverage_grid.schema.json # coverage_grid.geojson (built in a later M1 issue)
 ├── scripts/
 │   ├── fetch_aoi.py            # TIGERweb + OSM → the two AOI files
 │   ├── fetch_topoview.py       # TNM Access API → data/raw/topo/
@@ -270,6 +315,8 @@ Key choices and why:
 | `make backup-sources` | copy verified raw TIFFs and a receipt snapshot to the separate archive |
 | `make verify-backup` | verify archived TIFFs against the receipt ledger |
 | `make restore-sources` | restore exact source bytes from the archive without overwriting existing files |
+| `make test-validation` | run the offline validator regression suite (schema, provenance, temporal, leak) |
+| `make test-coverage` | run the coverage inventory schema contract tests |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |

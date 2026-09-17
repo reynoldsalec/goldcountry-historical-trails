@@ -4,7 +4,6 @@
     "name": "FIXTURE Alpha Corridor",
     "aka": ["FIXTURE Alpha Ditch Path"],
     "corridor": "brct",
-    "tier": 1,
     "current_status": "unsecured",
     "notes": "SYNTHETIC FIXTURE RECORD. Not evidence. Exists only so make validate has something to chew on (README §7, M0). Delete when real Tier 1 data lands in M3."
   },
@@ -13,7 +12,6 @@
     "name": "FIXTURE Beta Feeder",
     "aka": [],
     "corridor": "bowman",
-    "tier": 1,
     "current_status": "lost",
     "notes": "SYNTHETIC FIXTURE RECORD. Not evidence. Exercises the documented-closed path of the temporal model."
   }

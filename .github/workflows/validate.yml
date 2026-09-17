@@ -28,3 +28,6 @@ jobs:
 
       - name: Test acquisition and archive integrity
         run: make test-topo
+
+      - name: Validator regression tests
+        run: make test-validation

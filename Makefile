@@ -9,7 +9,8 @@ export TRAIL_ARCHIVE_ROOT
 
 .DEFAULT_GOAL := all
 .PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
-        dev fmt lint clean test-topo topo-docs topo-plan catalog-sources verify-sources \
+        dev fmt lint clean test-topo test-validation test-coverage topo-docs topo-plan \
+        catalog-sources verify-sources \
         backup-sources restore-sources verify-backup
 
 ## validate build-public (AGENTS.md §4.3)
@@ -73,6 +74,14 @@ restore-sources:
 
 verify-backup:
 	$(RUN) python scripts/source_archive.py verify-backup
+
+# Files are listed explicitly so a deleted or renamed regression module fails loudly
+# instead of silently shrinking the glob.
+test-validation:
+	$(RUN) pytest -q scripts/test_validate.py scripts/test_validate_dates.py scripts/test_validate_leaks.py
+
+test-coverage:
+	$(RUN) pytest -q scripts/test_coverage_schema.py
 
 ## warp + COG everything with a GCP file, write to build/rasters/
 rasters:

@@ -336,3 +336,33 @@ observed UTC retrieval times and URLs. Backup and restore use the receipt hashes
 **To resolve.** Locate contemporaneous download logs before adding any historical
 retrieval-date attestation. The present checksum inventory proves the bytes held when
 inventoried, not when those files were originally downloaded.
+
+---
+
+## 2026-09-16 — Decade states are decided; date ranges and feature dating are not
+
+**Decided.** Decade rendering now follows one table in README §3 and `docs/data-model.md`.
+An observation dates the evidence only: nothing projects indefinitely, forward or
+backward. Positive evidence in a decade gives `documented_open`, closure evidence gives
+`documented_closed`, both together give `unobserved` with reason `conflicting_evidence`
+and both citations retained, and `inferred_open` needs positive evidence on both sides
+with no closure or unresolved range between them. `attests_alignment` supports geometry
+only. `date_end` ends the evidence date range and by itself never authorizes presence
+across the intervening decades; the schema description was corrected to drop the
+"used 1958–present" continuous-use example. The twelve worked examples are mirrored in
+`scripts/fixtures/temporal_cases.json`, which holds fixture-only IDs and synthetic dates
+and never enters `data/authoritative/`.
+
+**What this leaves open.** The 2026-08-29 entry "Temporal coherence: which comparisons
+are in scope?" and the 2026-08-29 entry "A bare `YYYY` on the 'latest' side is widened to
+31 December" both still stand. This decision assumes the second one's reading, that a
+bare year means the whole year, and it does not settle the reopening question raised by
+the first. The schema still cannot distinguish an uncertain date range from
+continuous-use testimony, so a cross-decade range stays unresolved rather than being
+guessed.
+
+**To resolve.** A reviewer must supply more precise dates for any cross-decade range
+before those decades can render, and must enter each further decade a source explicitly
+supports as its own justified observation. Feature-level dating on revised sheets stays
+in the research inventory (see the 2026-08-30 entry on which topo date dates an
+observation). No real observation, feature date, or alignment was created here.
