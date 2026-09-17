@@ -14,6 +14,11 @@
       Cross-reference integrity for the inventory, and with --release-ready the M1
       batch and aerial-frame gate. An explicit gap passes; an unsupported claim fails.
 
+  coverage report   -> docs/coverage.md
+      Per county and decade: how many cells have a located source, how many were
+      examined, how many were digitized, and how many nobody has looked at yet.
+      A count is bookkeeping about the research, never a finding about the ground.
+
 The grid comes from the AOI alone, never from an index of sheets we happen to hold —
 deriving it from source availability would hide the quadrangles nobody has searched,
 which is the one thing the coverage inventory exists to show. Cells are reference
@@ -1174,6 +1179,277 @@ def validate_inventory(
         f"{len(document['candidates'])} candidates, {len(document['searches'])} searches, "
         f"{len(document['reviews'])} reviews, {len(document['batches'])} batches"
     )
+
+
+# --------------------------------------------------------------------------------------
+# report — docs/coverage.md from the grid and the inventory (issue #13)
+# --------------------------------------------------------------------------------------
+
+DOCS_DIR = REPO_ROOT / "docs"
+COVERAGE_DOC = DOCS_DIR / "coverage.md"
+COUNTY_NAMES = {"06057": "Nevada County", "06061": "Placer County"}
+GAP_CODES = (
+    "unsearched",
+    "no_source_located",
+    "access_blocked",
+    "dating_unresolved",
+    "not_examined",
+    "partially_examined",
+    "not_digitized",
+)
+
+
+def report_fail(message: str) -> None:
+    click.echo(f"coverage report: {message}", err=True)
+    sys.exit(1)
+
+
+def empty_counts() -> dict:
+    counts = {
+        "cells": 0,
+        "located": 0,
+        "examined_whole": 0,
+        "examined_partial": 0,
+        "unexamined": 0,
+        "ready": 0,
+        "digitized": 0,
+    }
+    counts.update({code: 0 for code in GAP_CODES})
+    return counts
+
+
+def summarise(document: dict, areas: dict, decades: list[int]) -> dict:
+    """county -> decade -> counts. A shared-border cell is counted in each county."""
+    reviews = {item["review_id"]: item for item in document["reviews"]}
+    tally = {
+        geoid: {decade: empty_counts() for decade in decades} for geoid in sorted(COUNTY_NAMES)
+    }
+
+    for cell in document["cells"]:
+        area = areas.get(cell["area_id"])
+        if area is None:
+            report_fail(f"cell {cell['area_id']}/{cell['decade']} names no grid area")
+        if cell["decade"] not in decades:
+            report_fail(f"cell {cell['area_id']}/{cell['decade']} lies outside through_decade")
+        scopes = set()
+        for review_id in cell["review_ids"]:
+            review = reviews.get(review_id)
+            if review is None:
+                report_fail(
+                    f"cell {cell['area_id']}/{cell['decade']} references review "
+                    f"{review_id}, which does not exist"
+                )
+            scopes.add(review["scope"])
+        for geoid in area["county_geoids"]:
+            counts = tally[geoid][cell["decade"]]
+            counts["cells"] += 1
+            if cell["source_refs"]:
+                counts["located"] += 1
+            if "whole_source_footprint" in scopes:
+                counts["examined_whole"] += 1
+            elif scopes:
+                counts["examined_partial"] += 1
+            else:
+                counts["unexamined"] += 1
+            for code in cell["gap_codes"]:
+                counts[code] += 1
+
+    for batch in document["batches"]:
+        if batch["status"] == "planned":
+            continue
+        if batch["decade"] not in decades:
+            report_fail(f"batch {batch['batch_id']} names a decade outside the inventory")
+        tally[batch["county_geoid"]][batch["decade"]][batch["status"]] += 1
+
+    return tally
+
+
+def totals(rows: dict) -> dict:
+    """Sum the decade rows of one county. Two decades never share a cell, so this is exact."""
+    summed = empty_counts()
+    for counts in rows.values():
+        for key, value in counts.items():
+            summed[key] += value
+    return summed
+
+
+def county_area_counts(areas: dict) -> tuple[dict[str, int], int]:
+    per_county = {geoid: 0 for geoid in sorted(COUNTY_NAMES)}
+    shared = 0
+    for area in areas.values():
+        geoids = area["county_geoids"]
+        if len(geoids) > 1:
+            shared += 1
+        for geoid in geoids:
+            per_county[geoid] += 1
+    return per_county, shared
+
+
+def state_row(label: str, counts: dict) -> str:
+    return (
+        f"| {label} | {counts['cells']} | {counts['located']} | "
+        f"{counts['examined_partial']} | {counts['examined_whole']} | "
+        f"{counts['unexamined']} | {counts['ready']} | {counts['digitized']} |"
+    )
+
+
+def gap_row(label: str, counts: dict) -> str:
+    cells = " | ".join(str(counts[code]) for code in GAP_CODES)
+    return f"| {label} | {cells} |"
+
+
+def repo_relative(path: Path) -> str:
+    """Repo-relative so the doc is identical wherever the checkout lives."""
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return resolved.name
+
+
+def render(document: dict, areas: dict, data_path: Path, grid_path: Path) -> str:
+    decades = list(range(FIRST_DECADE, document["through_decade"] + 1, 10))
+    tally = summarise(document, areas, decades)
+    per_county, shared = county_area_counts(areas)
+
+    lines = [
+        "# Coverage inventory report",
+        "",
+        "<!-- Generated by `scripts/coverage.py report`. Do not edit by hand; edit",
+        "     `data/sources/coverage.json` or the script and regenerate with",
+        "     `make coverage-report`. -->",
+        "",
+        "Research bookkeeping for both counties, 1950 onward: which area/decade cells have",
+        "a located source, which have been examined, and which nobody has looked at yet.",
+        f"The machine-readable form is `{repo_relative(data_path)}`, keyed on the reference",
+        f"cells in `{repo_relative(grid_path)}`. This is an internal research output. It is",
+        "not the public viewer and it carries no trail geometry.",
+        "",
+        "## Reading the counts",
+        "",
+        "Four states are distinct and are never merged:",
+        "",
+        "- **Located** — a source footprint and an explicit date reach the cell. A lead to",
+        "  examine, not a review and not evidence.",
+        "- **Examined** — a person reviewed a located source for that cell and recorded the",
+        "  review. `partial` covered part of the source footprint; `whole source footprint`",
+        "  covered all of it.",
+        "- **Digitized** — a batch recorded as digitized. Zero throughout M1: digitizing",
+        "  starts in M3.",
+        "- **Unexamined** — no review is recorded for the cell. Nobody has looked yet.",
+        "",
+        "A zero, a `no_source_located` gap or a `no_match` search outcome says that this",
+        "research has not found a source, or has not looked. None of them states that a",
+        "trail was absent, closed or lost. Absence from a map sheet is evidence of nothing",
+        "on its own (AGENTS.md §2.3).",
+        "",
+        "## Grid areas",
+        "",
+        f"The grid holds {len(areas)} reference cells over both counties. {shared} of them",
+        "cross the county boundary and are counted once in each county they intersect, so",
+        "**the county columns below overlap and must not be summed as a unique total**.",
+        "",
+        "| County | Grid areas | Decades | Area/decade cells |",
+        "| --- | --- | --- | --- |",
+    ]
+    for geoid in sorted(COUNTY_NAMES):
+        lines.append(
+            f"| {COUNTY_NAMES[geoid]} ({geoid}) | {per_county[geoid]} | {len(decades)} | "
+            f"{totals(tally[geoid])['cells']} |"
+        )
+    lines += [
+        f"| unique across both | {len(areas)} | {len(decades)} | {len(areas) * len(decades)} |",
+        "",
+    ]
+
+    for geoid in sorted(COUNTY_NAMES):
+        rows = tally[geoid]
+        lines += [
+            f"## {COUNTY_NAMES[geoid]} ({geoid})",
+            "",
+            "| Decade | Cells | Located | Examined (partial) | Examined (whole source "
+            "footprint) | Unexamined | Ready batches | Digitized batches |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        ]
+        for decade in decades:
+            lines.append(state_row(f"{decade}s", rows[decade]))
+        lines += [
+            state_row("**all decades**", totals(rows)),
+            "",
+            "Recorded gaps for the same cells. A cell can carry more than one code, so the",
+            "codes do not sum to the cell count.",
+            "",
+            "| Decade | " + " | ".join(f"`{code}`" for code in GAP_CODES) + " |",
+            "| --- | " + " | ".join("---" for _ in GAP_CODES) + " |",
+        ]
+        for decade in decades:
+            lines.append(gap_row(f"{decade}s", rows[decade]))
+        lines += [gap_row("**all decades**", totals(rows)), ""]
+
+    lines += [
+        "## What the report does not say",
+        "",
+        "Nothing here supports a trail alignment. An alignment still needs an observation",
+        "and a support row in `data/authoritative/` (AGENTS.md §2.4). Uneven counts across",
+        "the counties record uneven source availability and uneven research effort.",
+        "",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+@cli.command("report")
+@click.option(
+    "--data",
+    "data_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=SOURCES_DIR / "coverage.json",
+    show_default=True,
+)
+@click.option(
+    "--grid",
+    "grid_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=SOURCES_DIR / "coverage_grid.geojson",
+    show_default=True,
+)
+@click.option(
+    "--out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=COVERAGE_DOC,
+    show_default=True,
+)
+@click.option(
+    "--schema",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=REPO_ROOT / "schema" / "coverage.schema.json",
+    show_default=True,
+)
+@click.option(
+    "--grid-schema",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=REPO_ROOT / "schema" / "coverage_grid.schema.json",
+    show_default=True,
+)
+def report_cmd(data_path: Path, grid_path: Path, out: Path, schema: Path, grid_schema: Path):
+    """Regenerate docs/coverage.md from the grid and the inventory.
+
+    The output carries no timestamp and is ordered by county, decade and gap code, so a
+    re-run over unchanged inputs is byte-identical.
+    """
+    document = read_json(data_path, "inventory", report_fail)
+    problems = schema_failures(document, schema, "coverage.json")
+    if problems:
+        for failure in sorted(problems, key=lambda f: (f.check, f.record, f.message)):
+            click.echo(failure.render(), err=True)
+        report_fail(f"{len(problems)} schema failure(s); run 'make validate-coverage'")
+    areas = read_grid(grid_path, grid_schema)
+
+    text = render(document, areas, data_path, grid_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    staged = out.with_name(out.name + ".staged")
+    staged.write_text(text, encoding="utf-8")
+    os.replace(staged, out)
+    click.echo(f"coverage report: wrote {out} — {len(document['cells'])} cells")
 
 
 if __name__ == "__main__":

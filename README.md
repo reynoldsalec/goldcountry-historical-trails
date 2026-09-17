@@ -296,6 +296,7 @@ Key choices and why:
     ├── data-model.md
     ├── sources.md
     ├── topo-editions.md        # generated from topo_index.csv
+    ├── coverage.md             # generated from coverage.json + coverage_grid.geojson
     ├── georeferencing.md
     ├── implementation-plan.md # M0/M1 architecture and worker issue index
     └── open-questions.md
@@ -324,9 +325,10 @@ Key choices and why:
 | `make coverage-refresh` | rebuild the area/decade cells in `data/sources/coverage.json` and attach candidate source references |
 | `make validate-coverage` | check inventory cross-references, cell coverage and batch readiness |
 | `make coverage-ready` | check the M1 release gate: four ready county/decade batches and an aerial frame |
-| `make test-coverage` | run the coverage inventory schema, grid builder and validator tests |
+| `make coverage-report` | regenerate `docs/coverage.md` from the grid and the inventory |
+| `make test-coverage` | run the coverage inventory schema, grid builder, validator and report tests |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
-| `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
+| `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test, then `validate-coverage` |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |
 | `make build-public` | assemble `build/public/` (restricted fields stripped) |
 | `make build-restricted` | assemble `build/restricted/` |
@@ -376,6 +378,19 @@ county-intersecting area and a dated, located foot-trail review for that county 
 decade. `status: digitized` and any `alignment_ids` are rejected for M1; M3 adds the
 source-to-observation linkage that can check them. Clearing `not_digitized` needs a
 digitized batch, so it stays set until then.
+
+`make coverage-report` regenerates `docs/coverage.md` from the same two files: per county
+and decade, how many cells have a located source, how many were examined (`partial` or
+`whole_source_footprint`), how many ready and digitized batches exist, and how many cells
+carry each gap code. Digitized stays 0 until M3. A cell that crosses the county boundary
+is counted in both counties, so the county columns overlap and are never summed as a
+unique total. The report carries no timestamp and is ordered by county, decade and gap
+code, so regenerating it over unchanged inputs produces the same bytes; `make
+test-coverage` fails if the committed doc is stale. A zero count or a `no_match` search
+records what this research has found so far, never that a trail was absent.
+
+`make validate` runs `validate-coverage` after the authoritative-data checks, so an
+inventory reference pointing at nothing fails CI. A documented gap passes.
 
 `make coverage-ready` adds the M1 gate and reports every unmet criterion at once: two
 decades of `status: ready` batches in each county, one before 2000 and one from 2000
