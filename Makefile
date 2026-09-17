@@ -11,7 +11,7 @@ export TRAIL_ARCHIVE_ROOT
 .PHONY: all setup fetch-aoi fetch-topo rasters validate tiles build-public build-restricted \
         dev fmt lint clean test-topo test-validation test-coverage topo-docs topo-plan \
         fetch-topo-selected coverage-grid coverage-refresh validate-coverage \
-        coverage-ready \
+        coverage-ready coverage-report \
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup
 
@@ -37,6 +37,7 @@ setup:
 validate:
 	$(RUN) python scripts/validate.py
 	$(RUN) python scripts/source_archive.py verify --available
+	$(MAKE) validate-coverage
 
 ## rebuild both AOIs from online sources (Census TIGERweb + OpenStreetMap)
 fetch-aoi:
@@ -93,7 +94,8 @@ test-validation:
 
 test-coverage:
 	$(RUN) pytest -q scripts/test_coverage_schema.py scripts/test_coverage_grid.py \
-	  scripts/test_coverage_refresh.py scripts/test_coverage_validate.py
+	  scripts/test_coverage_refresh.py scripts/test_coverage_validate.py \
+	  scripts/test_coverage_report.py
 
 ## 7.5-minute reference grid over the county AOI -> data/sources/coverage_grid.geojson
 coverage-grid:
@@ -109,6 +111,10 @@ coverage-refresh:
 ## inventory cross-references, cell coverage and batch readiness
 validate-coverage:
 	$(RUN) python scripts/coverage.py validate
+
+## county/decade coverage counts -> docs/coverage.md
+coverage-report:
+	$(RUN) python scripts/coverage.py report
 
 ## the M1 release gate: four ready county/decade batches and one obtainable aerial frame
 coverage-ready:

@@ -31,3 +31,6 @@ jobs:
 
       - name: Validator regression tests
         run: make test-validation
+
+      - name: Coverage inventory tests
+        run: make test-coverage
