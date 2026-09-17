@@ -5,6 +5,7 @@ from the committed AOI into a tmp path and comparing bytes, so the file in git c
 never drift from `make coverage-grid`.
 """
 
+import inspect
 import json
 import shutil
 from pathlib import Path
@@ -179,8 +180,10 @@ def test_rerunning_the_same_input_is_byte_identical(tmp_path):
 
 
 def test_the_grid_never_reads_the_topo_index():
-    source = Path(coverage.__file__).read_text()
-    assert "topo_index" not in source
+    """The refresh command reads the index (issue #11); the grid must not."""
+    for function in (coverage.grid.callback, coverage.build_cells, coverage.load_geometries):
+        assert "topo_index" not in inspect.getsource(function)
+        assert "read_index" not in inspect.getsource(function)
 
 
 @pytest.fixture(scope="module")

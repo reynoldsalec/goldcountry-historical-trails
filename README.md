@@ -281,7 +281,7 @@ Key choices and why:
 │   └── coverage_grid.schema.json # coverage_grid.geojson, built by make coverage-grid
 ├── scripts/
 │   ├── fetch_aoi.py            # TIGERweb + OSM → the AOI files
-│   ├── coverage.py             # county AOI → coverage_grid.geojson
+│   ├── coverage.py             # AOI → coverage_grid.geojson; grid + index → coverage.json
 │   ├── fetch_topoview.py       # TNM Access API → data/raw/topo/
 │   ├── source_archive.py       # receipt catalog, checksum verification, backup/restore
 │   ├── warp_raster.py          # GCPs + GDAL → COG
@@ -321,6 +321,7 @@ Key choices and why:
 | `make restore-sources` | restore exact source bytes from the archive without overwriting existing files |
 | `make test-validation` | run the offline validator regression suite (schema, provenance, temporal, leak) |
 | `make coverage-grid` | rebuild `data/sources/coverage_grid.geojson` from the committed county AOI |
+| `make coverage-refresh` | rebuild the area/decade cells in `data/sources/coverage.json` and attach candidate source references |
 | `make test-coverage` | run the coverage inventory schema and grid builder tests |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
@@ -343,6 +344,24 @@ to replace a raw file.
 (-180,-90) and keeps every cell with a positive-area intersection, independent of which
 sheets have been found. The cells are reference units with synthetic `q7p5-<i>-<j>` ids,
 not official USGS quadrangle footprints or names.
+
+`make coverage-refresh` writes one cell per grid area per decade from 1950 through the
+current UTC decade, whether or not a source reaches it; `THROUGH_DECADE=2020` pins the
+horizon for a reproducible run. A topo edition attaches to a cell when its footprint
+overlaps the cell by positive area and one of its explicit lineage dates (`date_on_map`,
+`aerial_photo_year`, `photo_revision_year`, `field_check_year`, `edit_year`,
+`photo_inspection_year`, `survey_year`) falls in that decade and is 1950 or later.
+`imprint_year` is a printing date and `content_year` is a sort field, so neither dates a
+feature, and decades between two dated editions stay unclaimed. A verified candidate
+with all four bounds and a start date attaches the same way; anything unverified, undated
+or unbounded stays in `candidates` with no cell link.
+
+An attached reference is a lead to examine. It is not a review, an observation, or
+evidence of a trail: generated cells carry `unsearched`, `not_examined` and
+`not_digitized`, and the refresh never writes a search, a review or a batch. Searches,
+reviews, batches, notes and manual cell state are preserved across runs; a preserved
+record pointing at an area, decade, source or record that no longer exists stops the run
+for reconciliation and leaves the committed inventory untouched.
 
 The optional `make fetch-topo TOPO=--tier1` downloads only the legacy corridor subset
 (91 sheets, 1.0 GB in the current index). It is not the default project scope. The

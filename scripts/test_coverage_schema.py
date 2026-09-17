@@ -152,12 +152,17 @@ def test_empty_document_is_accepted(coverage):
     assert errors(coverage, empty) == []
 
 
-def test_committed_initial_inventory_validates_and_is_empty(coverage):
+def test_committed_inventory_validates_and_records_no_research(coverage):
+    """Cells are generated bookkeeping (issue #11); research records are human-entered."""
     data = json.loads(COVERAGE_JSON.read_text())
     assert errors(coverage, data) == []
     assert data["version"] == 1
-    for key in ("cells", "candidates", "searches", "reviews", "batches"):
+    for key in ("candidates", "searches", "reviews", "batches"):
         assert data[key] == [], f"{key} must hold no invented records"
+    for record in data["cells"]:
+        assert record["search_ids"] == []
+        assert record["review_ids"] == []
+        assert record["batch_ids"] == []
 
 
 @pytest.mark.parametrize("key", ["version", "through_decade", "cells", "batches"])
