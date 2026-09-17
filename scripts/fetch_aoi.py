@@ -4,6 +4,8 @@
   fetch-aoi counties  -> data/sources/aoi_counties.geojson
       Placer + Nevada County, dissolved. The acquisition envelope: it bounds
       `make fetch-topo` and `make rasters`. Census TIGERweb, Census 2020 vintage.
+      Also writes data/sources/aoi_county_parts.geojson: the same two counties
+      undissolved, so the coverage grid can attribute a cell to a county.
 
   fetch-aoi tier1     -> data/sources/aoi_tier1.geojson
       Bear River Canal corridor, Crother Rd to Placer Hills Rd, plus the Bowman
@@ -123,6 +125,48 @@ def write_if_changed(out: Path, geometry: dict, properties: dict) -> bool:
     return True
 
 
+def write_county_parts(out: Path, features: list[dict]) -> None:
+    """Write one Feature per county, undissolved.
+
+    The dissolved AOI cannot say which county a coverage grid cell falls in, so the
+    grid builder (scripts/coverage.py) reads this file instead. Internal bookkeeping:
+    it is not a viewer layer and carries no retrieval stamp, so re-runs stay
+    byte-identical.
+    """
+    parts = []
+    for feature in sorted(features, key=lambda f: f["properties"].get("GEOID", "")):
+        geometry = round_coords(mapping(shape(feature["geometry"])))
+        if not shape(geometry).is_valid:
+            click.echo(
+                f"fetch-aoi counties: county {feature['properties'].get('GEOID')} "
+                f"geometry invalid after truncation to {COORD_DECIMALS} dp",
+                err=True,
+            )
+            sys.exit(1)
+        parts.append(
+            {
+                "type": "Feature",
+                "geometry": geometry,
+                "properties": {
+                    "GEOID": feature["properties"].get("GEOID"),
+                    "BASENAME": feature["properties"].get("BASENAME"),
+                },
+            }
+        )
+    document = {
+        "type": "FeatureCollection",
+        "source": "US Census Bureau TIGERweb",
+        "source_url": f"{TIGERWEB}/{COUNTIES_LAYER}",
+        "vintage": VINTAGE,
+        "rights": "public_domain",
+        "attribution": "County boundaries: US Census Bureau TIGER/Line",
+        "features": parts,
+    }
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    click.echo(f"  wrote {out.relative_to(REPO_ROOT)} — {len(parts)} county parts")
+
+
 def finish(geom_projected, to_wgs84, out: Path, properties: dict, label: str) -> None:
     geometry = round_coords(mapping(transform(to_wgs84, geom_projected)))
     if not shape(geometry).is_valid:
@@ -151,7 +195,12 @@ def cli() -> None:
     type=click.Path(dir_okay=False, path_type=Path),
     default=SOURCES_DIR / "aoi_counties.geojson",
 )
-def counties(timeout: int, out: Path) -> None:
+@click.option(
+    "--parts-out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=SOURCES_DIR / "aoi_county_parts.geojson",
+)
+def counties(timeout: int, out: Path, parts_out: Path) -> None:
     """Placer + Nevada County, dissolved — the acquisition envelope."""
     from pyproj import Transformer
 
@@ -201,6 +250,7 @@ def counties(timeout: int, out: Path) -> None:
         },
         "fetch-aoi counties",
     )
+    write_county_parts(parts_out, features)
 
 
 def overpass_ways(query_body: str, timeout: int) -> list[dict]:

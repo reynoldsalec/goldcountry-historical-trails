@@ -261,7 +261,9 @@ Key choices and why:
 │   │   ├── topo_index.csv      # per-sheet USGS topo index with lineage dates
 │   │   ├── retrievals.jsonl    # source bytes: SHA-256, storage path, retrieval time
 │   │   ├── coverage.json       # research bookkeeping: area/decade coverage inventory
+│   │   ├── coverage_grid.geojson # 7.5-minute reference cells the inventory is keyed on
 │   │   ├── aoi_counties.geojson  # both counties: acquisition + digitizing boundary
+│   │   ├── aoi_county_parts.geojson # the same counties undissolved, for cell attribution
 │   │   ├── aoi_tier1.geojson     # optional legacy Bear River Canal work area (OSM)
 │   │   └── gcp/                # *.points files from QGIS Georeferencer
 │   └── authoritative/          # COMMITTED — source of truth
@@ -276,9 +278,10 @@ Key choices and why:
 │   ├── retrieval.schema.json   # public USGS download receipts
 │   ├── support.schema.json
 │   ├── coverage.schema.json      # coverage.json
-│   └── coverage_grid.schema.json # coverage_grid.geojson (built in a later M1 issue)
+│   └── coverage_grid.schema.json # coverage_grid.geojson, built by make coverage-grid
 ├── scripts/
-│   ├── fetch_aoi.py            # TIGERweb + OSM → the two AOI files
+│   ├── fetch_aoi.py            # TIGERweb + OSM → the AOI files
+│   ├── coverage.py             # county AOI → coverage_grid.geojson
 │   ├── fetch_topoview.py       # TNM Access API → data/raw/topo/
 │   ├── source_archive.py       # receipt catalog, checksum verification, backup/restore
 │   ├── warp_raster.py          # GCPs + GDAL → COG
@@ -317,7 +320,8 @@ Key choices and why:
 | `make verify-backup` | verify archived TIFFs against the receipt ledger |
 | `make restore-sources` | restore exact source bytes from the archive without overwriting existing files |
 | `make test-validation` | run the offline validator regression suite (schema, provenance, temporal, leak) |
-| `make test-coverage` | run the coverage inventory schema contract tests |
+| `make coverage-grid` | rebuild `data/sources/coverage_grid.geojson` from the committed county AOI |
+| `make test-coverage` | run the coverage inventory schema and grid builder tests |
 | `make rasters` | warp + COG everything with a GCP file, write to `build/rasters/` |
 | `make validate` | schemas, referential integrity, temporal coherence, geometry, leak test |
 | `make tiles` | tippecanoe → `build/tiles/alignments.pmtiles` |
@@ -334,6 +338,11 @@ empty list, or a `--tier1`/`--scale` filter alongside a selection stops the run 
 any sheet is fetched. `make topo-plan SELECTION=...` reports each named edition as
 present, missing, or mismatched and downloads nothing. A mismatch is never permission
 to replace a raw file.
+
+`make coverage-grid` tiles the county AOI into 0.125° cells from the global origin
+(-180,-90) and keeps every cell with a positive-area intersection, independent of which
+sheets have been found. The cells are reference units with synthetic `q7p5-<i>-<j>` ids,
+not official USGS quadrangle footprints or names.
 
 The optional `make fetch-topo TOPO=--tier1` downloads only the legacy corridor subset
 (91 sheets, 1.0 GB in the current index). It is not the default project scope. The
