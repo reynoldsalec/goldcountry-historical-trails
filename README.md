@@ -249,6 +249,7 @@ Key choices and why:
     ├── sources.md
     ├── topo-editions.md        # generated from topo_index.csv
     ├── georeferencing.md
+    ├── implementation-plan.md # M0/M1 architecture and worker issue index
     └── open-questions.md
 ```
 
@@ -325,82 +326,196 @@ retrieval date.
 
 ## 7. Milestones
 
-Each milestone is a stopping point with a verifiable acceptance test. Complete them in
-order. Do not start the next until the current one's acceptance test passes.
+The MVP is one published atlas with a verified initial dataset from both counties,
+a decade viewer spanning 1950 to the present, visible evidence gaps, and enforced
+public/restricted separation. Exhaustive countywide digitizing continues after release.
 
-### M0 — Scaffold and contracts
+Each milestone has a completion gate. Complete them in order; do not start the next
+until the current gate passes. Close a milestone only with links to its deliverables
+and recorded acceptance results. Existing code or downloaded files alone do not prove
+completion. Do not assign a delivery date until the remaining source-review and manual
+GIS work has been estimated.
 
-Repo skeleton, `pyproject.toml`, `Makefile`, four JSON Schemas, `scripts/validate.py`,
-GitHub Actions running `make validate` on push, `.gitignore`, `docs/open-questions.md`.
-Seed `data/authoritative/` with 2–3 hand-written fixture records so validation has
-something to chew on.
+**Planning baseline, 2026-09-16:** schemas, validation, CI, county boundaries, topo
+acquisition, and source-archive tooling exist. The refined M0 gate still needs
+verification and countywide schema migration. M1 is partial: the countywide coverage
+inventory and later-period/aerial research remain open. Authoritative trail records
+are synthetic fixtures; raster processing, the viewer, and build assembly remain
+unimplemented. These are implementation observations, not acceptance-test results.
 
-**Accept when:** `make validate` passes on the fixtures and fails loudly if you delete a
-`support.csv` row, null a required field, or put a restricted value in a public field.
+M0 and M1 are decomposed into bounded worker tasks in
+[the implementation handoff](docs/implementation-plan.md). Each child issue specifies
+its dependencies, owned files, contract, and acceptance checks. Coding tasks are
+separate from source research, GIS review, and milestone acceptance.
 
-### M1 — Source manifest and raster acquisition
+### M0 — Countywide data contracts and validation
 
-Inventory sources throughout both counties for 1950 to the present: historical USGS
-quad editions, modern maps, candidate aerial flights, and local or agency records.
-`scripts/fetch_topoview.py` pulls historical GeoTIFFs via the TNM Access API. Its
-historical collection alone does not cover the full period through the present.
+Tracking issue: [#1](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/1).
 
-**Accept when:** a coverage inventory accounts for every quadrangle intersecting the
-countywide AOI and every decade from the 1950s onward, identifying available sources
-and explicit gaps. Selected available topo editions are downloaded reproducibly, with
-dates, scales, rights, and URLs recorded. A gap may remain unresolved, but cannot be
-silently excluded or treated as evidence of no trails.
+**Outcome:** the data model can represent supported foot trails anywhere in either
+county, and automated checks reject invalid evidence records before publication.
 
-A sheet's printed date does not resolve each feature's observation date — 149 of the 615
-indexed sheets have later lineage dates, by up to 28 years — so `fetch_topoview.py` harvests each
-sheet's FGDC lineage dates into `data/sources/topo_index.csv`. See `docs/sources.md` and
-`docs/topo-editions.md`. Countywide aerial coverage and later decades remain unresolved;
-see `docs/open-questions.md`.
+Build on the existing scaffold, schemas, validator, and CI. Remove the required legacy
+geographic tiers and replace locality-specific constraints where needed, preserving
+stable IDs and provenance. Update schema consumers and the data-model documentation
+together. Preserve all four temporal fields and the distinction between an observation
+gap and documented closure.
 
-### M2 — Raster pipeline
+**Completion gate:**
 
-`scripts/warp_raster.py`: already-georeferenced topos get reproject + COG; scans with a
-committed `.points` file get warped. Raster PMTiles or COG output, wired into the
-viewer's layer picker with per-layer attribution.
+- Countywide records can be represented without an obsolete tier assignment. README
+  field tables, schemas, consumers, and `docs/data-model.md` agree.
+- Document observation-dating and decade-state rules, including revised map sheets,
+  bracketing observations, overlapping open/closed evidence, and unresolved dates.
+  Rules must not assign every feature a sheet's latest lineage date or carry a single
+  observation forward indefinitely as documented presence. Unresolved source dates
+  remain explicit gaps requiring source inspection.
+- `make validate` passes on the valid dataset. A Make target runs isolated regression
+  cases that reject an orphan alignment, broken reference, invalid required field,
+  invalid geometry, reversed temporal bounds, and a restricted value planted in a
+  temporary public output. Fixtures must not alter raw evidence.
+- CI runs validation and those regression cases. A leak test against a temporary
+  output proves the scanner works; an absent `build/public/` is not a publication check.
+- Synthetic records are clearly marked and cannot be mistaken for evidence. Their
+  removal from authoritative data is a required M3 deliverable.
 
-**Accept when:** `make rasters` produces valid COGs for the selected topo editions from
-both counties and at least one manually georeferenced aerial frame, and RMS error per
-GCP set is logged. Selection follows the coverage inventory rather than a fixed corridor.
+### M1 — Countywide coverage inventory and source acquisition
 
-### M3 — Seed the vector dataset
+Tracking issue: [#2](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/2).
 
-Digitize supported foot-trail segments in work batches across both counties and the
-study period. Use modern tracks only as dated modern observations. Local spreadsheets,
-including OTCA's Meadow Vista inventory, can supply candidates; each alignment still
-requires supporting evidence. Declarations are dated observations with declarant names
-in restricted fields. Do not infer their geometry beyond what the account supports.
+**Outcome:** we know what evidence is available, what has been examined, and which
+source-backed batches will supply the initial release.
 
-**Accept when:** initial batches include supported alignments from both counties and
-multiple decades, every alignment has at least one support row, and `make validate`
-passes. Replace synthetic fixtures before publishing real data. Record remaining
-coverage gaps; completing the seed dataset does not complete countywide mapping.
+Inventory historical USGS editions, modern maps, candidate aerials, and local or agency
+records across both counties. Extend the existing acquisition and archive scripts;
+USGS historical topo downloads alone do not cover the full period through the present.
 
-### M4 — Viewer
+**Completion gate:**
 
-MapLibre GL JS + `pmtiles`, opening to the full extent of both counties. Decade stepper
-from the 1950s through the present. Distinguish documented observations, inferred
-continuity, closures, and unknown periods. Click a line for supporting observations,
-dates, and links. Encode confidence in line style. Include coverage gaps and a raster
-overlay picker with opacity + swipe. Any change totals must identify their evidence
-and coverage limits; an unobserved trail is not a lost trail.
+- A committed, machine-readable inventory accounts for every quadrangle intersecting
+  `aoi_counties.geojson` and every decade from the 1950s through the current decade.
+  Each cell identifies verified source IDs or an explicit gap. Distinguish sources
+  located, sources examined, trails digitized, and unexamined coverage. A located
+  source does not mean its trails have been inspected.
+- Search records include search date, collection, geographic/temporal extent, result,
+  and unresolved access or evidence gaps. Modern maps, aerials, and local/agency
+  records are represented by verified candidates or documented search gaps.
+- Selected topo editions from both counties are acquired reproducibly. Record source
+  IDs, dates and lineage dates, scale, rights, URLs, and retrieval receipts. New TIFFs
+  use content-addressed paths; existing raw files remain unchanged.
+- `make test-topo`, `make validate`, `make verify-sources`, `make backup-sources`, and
+  `make verify-backup` pass for the receipted acquisition set. Record the receipt
+  snapshot and verification results; do not commit raw rasters.
+- Select at least four county/decade work batches: at least two distinct decades in
+  each county, including one before 2000 and one from 2000 onward in each county.
+  Each batch lists its footprint, source IDs, examined foot-trail evidence, review
+  tasks, and remaining gaps. Select batches by evidence and coverage benefit, without
+  making any locality a prerequisite. Do not invent alignments to meet the minimum.
+- Identify at least one obtainable, dated aerial frame for M2, with verified frame ID,
+  footprint, rights, and access method. If no suitable frame is obtainable, record the
+  blocker; M1 remains incomplete unless the milestone requirement is explicitly revised.
 
-**Accept when:** `make build-public && make dev` serves a working viewer; every rendered
-line resolves to at least one citation in the panel; both counties and all study decades
-are reachable; coverage gaps are distinguishable from documented closures; no network
-calls beyond the static origin and the basemap.
+A sheet's printed date does not resolve each feature's observation date. The current
+index contains 615 sheets, including pre-1950 material; 149 have later lineage dates,
+by up to 28 years. `fetch_topoview.py` preserves those dates in `topo_index.csv`.
+See `docs/sources.md`, `docs/topo-editions.md`, and `docs/open-questions.md`.
 
-### M5 — Split builds and deploy
+### M2 — Reproducible raster pipeline
 
-`build-public` strips all restricted fields; `build-restricted` retains them behind
-basic auth at the host. Leak test in CI.
+**Outcome:** the selected evidence can be inspected in GIS and supplied to the viewer
+with traceable processing and correct attribution.
 
-**Accept when:** CI fails if a restricted value appears anywhere under `build/public/`,
-and the public build deploys to Cloudflare Pages from `main`.
+Implement `scripts/warp_raster.py` through `make rasters`. Already-georeferenced USGS
+topos need reprojection and COG conversion only. Raw aerial scans require committed
+manual GCPs. Viewer controls are delivered in M4, not required to complete this gate.
+
+**Completion gate:**
+
+- `make rasters` reproducibly produces valid COGs for selected topo editions from both
+  counties and at least one manually georeferenced aerial frame from the M1 inventory.
+- Commit GCP files and processing parameters. Log RMS error for each GCP set and
+  record a visual alignment review and fitness decision before using the frame.
+- Verify output CRS, bounds, internal overviews, and resampling: nearest for scanned
+  maps, cubic for aerials. Re-running the target leaves raw sources unchanged.
+- A raster manifest links outputs to source IDs, processing records, rights, and
+  attribution. Imagery with unknown or restricted redistribution rights is excluded
+  from public layer inputs; it may still support permitted internal inspection.
+
+### M3 — Reviewed initial vector dataset
+
+**Outcome:** real, source-supported trail geometry replaces the synthetic dataset.
+
+Complete the M1-selected batches using the M0 dating rules and M2 source rasters.
+Modern tracks support dated modern observations only. Local inventories can identify
+candidates; declarations require supported geometry and restricted declarant fields.
+
+**Completion gate:**
+
+- At least four county/decade batches meet the M1 distribution requirement, with at
+  least one reviewed, supported foot-trail alignment in each. Record examined sources,
+  digitized extent, and unresolved or unexamined coverage for every batch.
+- Every alignment has supporting observations and support rows. Record a human source
+  review of geometry, feature identity, observation dates, confidence, and provenance.
+  Roads and canals do not become trails without cited foot-trail evidence.
+- Remove all synthetic records from authoritative data; retain test fixtures separately
+  if needed. `make validate` and the M0 regression checks pass on the resulting setup.
+- All four temporal fields are preserved. Unsupported dates remain null, and ambiguous
+  evidence is recorded explicitly. Narrative fields remain human-authored.
+
+Completing these batches does not establish complete coverage of either county or any
+whole decade. The inventory must expose that limitation in M4.
+
+### M4 — Viewer and public build
+
+**Outcome:** a user can explore the initial dataset and trace every rendered line to
+its dated evidence in a working local static build.
+
+Implement the vanilla TypeScript MapLibre viewer, vector PMTiles, and public build
+assembly. `make build-public` belongs here because viewer acceptance depends on it;
+M5 adds restricted build assembly and verifies hosted release behavior.
+
+**Completion gate:**
+
+- `make tiles` and `make build-public` produce the static viewer and its data;
+  `make dev` serves it. The initial map shows both counties, and the decade stepper
+  reaches every decade from the 1950s through the present.
+- Every rendered line opens its supporting citations, source dates, and available
+  links in one click. Confidence and the M0 temporal states have distinct styles;
+  gaps in observation cannot be presented as documented closures.
+- The countywide inventory is inspectable by area and decade, including unexamined
+  areas. Raster layers have attribution, opacity, and swipe comparison controls.
+- The public build excludes restricted observations, fields, unpublished document
+  links, and alignments without public supporting evidence. Derived dates and
+  attributes cannot expose restricted-only evidence. Validate the assembled output.
+- Exercise the temporal states with isolated test fixtures, even when the real seed
+  dataset lacks a closure or reroute. Keep those fixtures out of release artifacts.
+- Record browser checks for citations, decade changes, coverage states, and raster
+  controls. Confirm no network calls beyond the static origin and basemap, no browser
+  storage, and no analytics. Any change totals state their evidence and coverage limits.
+
+### M5 — Restricted build and verified deployment
+
+**Outcome:** the MVP is published, reproducible, and safe to access in each audience.
+
+Implement `make build-restricted` from the same authoritative dataset. Deploy the public
+site to Cloudflare Pages from `main`; protect the restricted site and all its artifacts
+with host-level authentication.
+
+**Completion gate:**
+
+- A clean checkout with restored or retrieved sources can reproduce both builds
+  through Make targets. Bare `make` succeeds; CI builds public output before running
+  the public leak check, so the check scans actual release artifacts.
+- CI fails when a restricted value is deliberately introduced into public output.
+  Verify that restricted observations and their dependent data cannot leak through
+  GeoJSON, PMTiles, manifests, citations, or other published assets.
+- The deployed public viewer passes the M4 browser checks. Verify static asset and
+  PMTiles range requests at the host, and record the deployed revision and URL.
+- Unauthenticated requests cannot retrieve the restricted site or its data artifacts;
+  authenticated access works. Public assets cannot link around that protection.
+- Record the release's covered batches, known evidence gaps, source-license review,
+  and recovery procedure. User-facing legal framing remains subject to the separate
+  `copy:` commit requirement in AGENTS §2.6.
 
 ### Backlog (not scheduled)
 
