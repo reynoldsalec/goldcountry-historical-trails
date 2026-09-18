@@ -1,0 +1,31 @@
+{
+  "success": true,
+  "data": {
+    "web": [
+      {
+        "url": "https://www.placer.ca.gov/9724/Parks-and-Trails-Master-Plan",
+        "title": "Parks and Trails Master Plan | Placer County, CA",
+        "description": "Placer Parks & Trails Plan \u2013 Appendix D (PDF) Trail Atlas includes detailed trail maps of the County, organized by community and specific plans ... Site Map.",
+        "category": null
+      },
+      {
+        "url": "https://www.placer.ca.gov/8041/Parks-and-Trails-Master-Plan",
+        "title": "Parks and Trails Master Plan | Placer County, CA",
+        "description": "8. [Parks and Trails Master Plan](https://www.placer.ca.gov/8041/Parks-and-Trails-Master-Plan)\n\n###### Placer County\nStripeM-Inner",
+        "category": null
+      },
+      {
+        "url": "https://www.placer.ca.gov/5711/Parks",
+        "title": "Placer County Parks",
+        "description": "# Placer County Parks\nChat | Polimorphic\n\n###### Placer County\nStripeM-Inner\n\n## Loading\n|  |  |\n|-|-|\n|  |  |",
+        "category": null
+      },
+      {
+        "url": "https://www.placer.ca.gov/6180/Trails",
+        "title": "Placer County Trails",
+        "description": "Right now, there are 112 miles of county-owned or managed trails, including paved Class I bike paths that are ADA-accessible and unpaved multi-use trails. ...",
+        "category": null
+      }
+    ]
+  }
+}

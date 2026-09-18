@@ -1,0 +1,58 @@
+Skip to main content
+Skip to navigation
+UCSB Library Home Page
+Aerial Photography Information Geospatial Collection Contact Us
+Imagery Report: Flight PAI-Tahoe-50
+Digital
+View Index
+
+
+Country:	United States
+State(s):
+California, Nevada
+
+Counties:	California:
+
+El Dorado, Placer
+Nevada:
+
+Carson City, Douglas, Washoe
+
+Filed by (catalog):	PAI-Tahoe-50
+Filed by  (collection):	PAI-22, PAI-23
+Imagery Location:	Room 2552
+
+Index type:	line
+Index scale:	1:100,000
+Size:	frames 9 x 9 inches
+Height:	9
+Width:	9
+
+Begin date:
+1950-09-23
+
+End date:
+1950-09-23
+
+Scale:	1:4,800
+Overlap:	60%
+Sidelap:	20%
+Directional  orientation:	various
+Altitude:	4,800
+Lens focal length:	12 inches
+Camera:	K-17
+Spectral range:	400-700 nm
+Generation held:	1st generation
+
+Note:
+Lake Tahoe shoreline. Frame numbers have prefix C-112. Frames C-112-1 to C-112-179 are on roll PAI-22. Frames C-112-180 to C-112-308 are on roll PAI-23.
+
+Physical Details:	black and white; negative transparencies; digital copy; film roll; vertical view;
+Copyright:	Pacific Air Industries?
+Flown by:	Pacific Air Industries
+Contractor/requestor:	California State Lands Commission
+Acquired from:	Teledyne. Inc.
+Est. frame count:	324
+Library Home
+
+Copyright © 2012 The Regents of the University of California, All Rights Reserved.
