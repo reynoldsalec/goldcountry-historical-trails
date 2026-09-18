@@ -1,0 +1,49 @@
+Skip to main content
+Skip to navigation
+UCSB Library Home Page
+Aerial Photography Information Geospatial Collection Contact Us
+Imagery Report: Flight CAS-4042
+Digital
+View Index
+
+
+Country:	United States
+State(s):
+California
+
+Counties:	California:
+
+Nevada
+
+Filed by (catalog):	CAS-4042
+Filed by  (collection):	CAS-4042
+Imagery Location:	Map Room--Utility Shelves
+
+Index type:	SmartIndex
+Index scale:	1:40,000
+Size:	frames 9 x 9 inches
+Height:	9
+Width:	9
+
+Begin date:
+1974-03-14
+
+End date:
+1974-03-14
+
+Scale:	1:16,000
+Overlap:	0%
+Spectral range:	400-700 nm
+Generation held:	2nd generation
+
+Note:
+Grass Valley. Scale stamped on the actual frame is incorrect. UCSB owns only 1 photograph in this flight.
+
+Physical Details:	black and white; paper prints; digital copy; vertical view;
+Copyright:	Cartwright Aerial Surveys
+Flown by:	Cartwright Aerial Surveys
+Acquired from:	California State Library
+Est. frame count:	1
+Library Home
+
+Copyright © 2012 The Regents of the University of California, All Rights Reserved.

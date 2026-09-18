@@ -1,0 +1,8 @@
+{
+  "offline_checks": "PASS: issue coverage, Makefile targets, local markdown links, fences, JSON parsing, file limits, private-path/token patterns and quote retention",
+  "citation_and_git_checks": {
+    "output": "info: stats: 178 prose sentence(s), 9 with declared provenance (5%) \u2014 9 cited, 0 marked [unverified] (a sentence may be both); 13 distinct source(s) cited, 28 in ledger (13 with evidence quotes)\nwarn: registered in the ledger but not cited in this draft: [1], [2], [4], [5], [7], [8], [9], [10], [13], [14], [15], [24], [25], [27], [28]\ncitations OK\n?? docs/m1-human-runbook.md\n?? docs/m1-research-assessment.md\n?? docs/m1-research-evidence/",
+    "exit_code": 0,
+    "error": null
+  }
+}

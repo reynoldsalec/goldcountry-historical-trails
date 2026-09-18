@@ -1,0 +1,40 @@
+{
+  "base_commit": "3f67c0e10a9977bc10abd40a287ce32b0a399197",
+  "grid_areas": 63,
+  "cells": 504,
+  "through_decade": 2020,
+  "county_area_counts": {
+    "06061": 44,
+    "06057": 32
+  },
+  "counts": {
+    "candidates": 0,
+    "searches": 0,
+    "reviews": 0,
+    "batches": 0
+  },
+  "selection_exists": false,
+  "aoi_properties": [
+    {
+      "aoi_id": "acquisition-placer-nevada",
+      "role": "acquisition envelope for fetch-topo and rasters; not a digitizing bound",
+      "counties": [
+        "Nevada",
+        "Placer"
+      ],
+      "geoids": [
+        "06057",
+        "06061"
+      ],
+      "source": "US Census Bureau TIGERweb",
+      "source_url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/55",
+      "vintage": "Census 2020",
+      "rights": "public_domain",
+      "retrieved": "2026-08-29"
+    }
+  ],
+  "dissolved_equals_parts_union": false,
+  "symmetric_difference_square_degrees": 5.1999998326998494e-11,
+  "receipt_sha256": "3bfbcbf64f9e60a5ef3836a2d4d5239959280fe222392f47ad243b91ebb4fe20",
+  "receipt_count": 91
+}

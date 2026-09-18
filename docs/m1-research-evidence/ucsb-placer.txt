@@ -1,0 +1,180 @@
+Skip to main content
+Skip to navigation
+UCSB Library Home Page
+Aerial Photography Information Geospatial Collection Contact Us
+
+All Flights for Placer County
+76 flights found
+
+Return to list of counties
+
+
+
+
+Begin Date	Flight ID
+View flight record	Scale	Index	Digital Frames Available
+2002-08-08	02-960-05700
+	1:130,000	View Index	Ask MIL staff
+2002-01-01	HM-2002-USA
+	1:10,800	View Index	Frames partially digital
+2001-12-14	02-902-05650
+	1:65,000	View Index	Ask MIL staff
+2001-04-16	01-123-05634
+	1:65,000
+1:45,000
+1:35,000	View Index	Ask MIL staff
+2000-01-01	HM-2000-USA
+	1:10,800	View Index	Frames partially digital
+1999-10-29	HM-1999-USA
+	1:10,800	View Index	Frames partially digital
+1997-01-01	NAPP-3C
+	1:40,000	View Index	Frames partially digital
+1996-04-04	WAC-96CA
+	1:24,000	View Index	Frames partially digital
+1992-08-20	92-146-04436
+	1:65,000	View Index	Ask MIL staff
+1992-07-05	GS-VFNF
+	1:40,000	View Index	Frames partially digital
+1992-03-17	WAC-92CA
+	1:31,680	View Index	Frames partially digital
+1992-01-01	NAPP-2C
+	1:40,000	View Index	Frames partially digital
+1991-08-26	91-155-04287
+	1:65,000	View Index	Ask MIL staff
+1990-08-09	90-127-04093
+	1:130,000	View Index	Ask MIL staff
+1990-05-16	90-081
+	1:32,500	View Index	Ask MIL staff
+1988-03-28	WAC-88CA
+	1:31,680	View Index	Frames partially digital
+1987-01-01	NAPP
+	1:40,000	View Index	Frames partially digital
+1986-08-07	86-186-03581
+	1:130,000	View Index	Ask MIL staff
+1985-03-14	WAC-85CA
+	1:31,680	View Index	Frames partially digital
+1984-06-28	CH2M-1984-CAN13-Tahoe-I-and-I
+	1:36,000
+1:19,200	View Index	Frames partially digital
+1984-03-17	WAC-84C
+	1:31,680	View Index	Frames partially digital
+1983-01-01	NHAP-84
+	1:58,000	View Index	Frames partially digital
+1982-02-24	CAS-82043
+	1:6,660
+1:19,920	View Index	Frames partially digital
+1982-01-01	NHAP-83
+	1:58,000
+1:80,000	View Index	Frames partially digital
+1981-01-01	NHAP-82
+	1:58,000
+1:80,000	View Index	Frames partially digital
+1980-09-30	80-159-02953
+	1:32,500	View Index	Ask MIL staff
+1980-09-09	80-148-02945
+	1:32,500	View Index	Frames partially digital
+1980-08-18	80-116
+	1:32,500	View Index	Ask MIL staff
+1980-01-01	NHAP-81
+	1:58,000	View Index	Frames partially digital
+1979-09-19	79-143-02828
+	1:32,500	View Index	Frames partially digital
+1979-09-17	79-140-02827
+	1:32,500	View Index	Frames partially digital
+1979-06-27	79-083-02778
+	1:130,000	View Index	Ask MIL staff
+1979-06-27	79-083-02777
+	1:130,000	View Index	Ask MIL staff
+1978-10-03	78-140-02685
+	1:32,500	View Index	Frames partially digital
+1978-09-19	78-131-02679
+	1:32,500	View Index	Frames partially digital
+1978-07-24	78-102-02645
+	1:32,500	View Index	Frames partially digital
+1978-06-05	78-074-02611
+	1:130,000	View Index	Ask MIL staff
+1978-03-27	78-037-02589
+	1:32,500	View Index	Ask MIL staff
+1977-07-27	77-112-02520
+	1:130,000	View Index	Ask MIL staff
+1977-05-16	77-057-02484
+	1:130,000	View Index	Ask MIL staff
+1976-10-26	CAS-6231
+	1:16,800	Ask MIL staff	All frames digital
+1976-05-20	76-079-02320
+	1:130,000	View Index	Ask MIL staff
+1976-04-01	CAS-6060
+	1:12,000	View Index	Frames partially digital
+1975-11-13	75-196-02285
+	1:90,000	View Index	Ask MIL staff
+1975-11-13	75-196-02286
+	1:22,500	View Index	Ask MIL staff
+1975-09-11	75-157-02219
+	1:65,000	View Index	Ask MIL staff
+1973-10-17	73-176-01503
+	1:32,500	View Index	Frames partially digital
+1973-07-25	CAS-3596
+	1:4,800	View Index	Frames partially digital
+1973-06-11	73-093A-01237
+	1:32,500	View Index	Frames partially digital
+1973-05-21	73-078-01182
+	1:130,000	View Index	Ask MIL staff
+1973-05-21	73-078-01185
+	1:32,500	View Index	Frames partially digital
+1969-09-24	CAS-2687
+	1:24,000	View Index	Ask MIL staff
+1969-04-19	TG-2601
+	1:6,000	View Index	Ask MIL staff
+1968-09-06	USAF-374
+	1:141,000	View Index	Frames partially digital
+1968-07-17	USAF-059
+	1:140,000	View Index	Frames partially digital
+1968-07-07	USAF-018
+	1:112,000	View Index	Ask MIL staff
+1965-11-20	CH2M-1965-CAN6-S3000-60
+	1:6,000	Ask MIL staff	Ask MIL staff
+1965-11-20	CH2M-1965-CAN6-F1289-01
+	1:3,000	Ask MIL staff	Ask MIL staff
+1965-10-13	CH2M-1965-CAN5-S3000-60
+	1:12,000	Ask MIL staff	Ask MIL staff
+1965-10-13	CH2M-1965-CAN5-M230-00
+	1:12,000	Ask MIL staff	Ask MIL staff
+1964-10-01	C-24868
+	1:90,000	View Index	Frames partially digital
+1962-07-29	CAS-ED
+	1:15,840
+1:20,000	View Index	Frames partially digital
+1962-07-28	CAS-PLA
+	1:20,000
+1:15,840	View Index	Frames partially digital
+1961-01-01	CAS-SAC
+	1:20,000	View Index	All frames digital
+1958-08-20	ABM-1958
+	1:20,000	View Index	Frames partially digital
+1957-01-01	CAS-1957
+	1:24,000
+1:12,000	View Index	All frames digital
+1956-04-18	PAI-Rose-56A
+	1:3,000
+1:10,000	View Index	All frames digital
+1956-02-04	PAI-Rose-56
+	1:3,000	View Index	All frames digital
+1952-07-18	ABM-1952
+	1:20,000	View Index	Frames partially digital
+1952-01-01	DSC-1952
+	1:20,000	View Index	Frames partially digital
+1950-09-23	PAI-Tahoe-50
+	1:4,800	View Index	All frames digital
+1949-01-01	C-13570
+	1:20,000	View Index	Frames partially digital
+1948-08-25	C-10800
+	1:60,000	View Index	Ask MIL staff
+1946-11-24	C-10825
+	1:18,000	View Index	Ask MIL staff
+1946-06-04	C-10449
+	1:3,600	View Index	Ask MIL staff
+1940-08-29	C-6600
+	1:18,000	View Index	Frames partially digital
+Library Home
+
+Copyright © 2012 The Regents of the University of California, All Rights Reserved.
