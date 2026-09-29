@@ -1,8 +1,9 @@
-"""Reproject a georeferenced source scan onto the shared EPSG:3857 demo grid as a COG.
+"""Reproject a georeferenced source scan onto the shared EPSG:3857 demo grid, then tile it.
 
 GDAL is reached only through rasterio's bundled library, because no gdalwarp/gdalinfo
-binary exists in this checkout or in CI (issue #40). The datum operation is pinned with
-pyproj and passed to GDAL, because the two carry different PROJ builds and would
+binary exists in this checkout or in CI (issue #40); gdal2tiles is unavailable for the
+same reason, so the XYZ pyramid is cut here (issue #41). The datum operation is pinned
+with pyproj and passed to GDAL, because the two carry different PROJ builds and would
 otherwise be free to disagree; see docs/demo-processing.md.
 """
 
@@ -24,13 +25,17 @@ from pyproj.aoi import AreaOfInterest
 from pyproj.transformer import TransformerGroup
 from rasterio.enums import ColorInterp, Resampling
 from rasterio.features import rasterize
+from rasterio.io import MemoryFile
 from rasterio.transform import Affine
 from rasterio.warp import calculate_default_transform, reproject
+from rasterio.windows import Window
 from shapely.geometry import mapping, shape
 from shapely.ops import transform as shapely_transform
 
 # Bumped when a change to this module invalidates every existing COG.
 PROCESSING_VERSION = 1
+# Bumped when a change to the tile cutter invalidates every existing pyramid.
+TILING_VERSION = 1
 
 TILE_CRS_EPSG = 3857
 TILE_SIZE = 256
@@ -44,6 +49,19 @@ OVERVIEW_RESAMPLING = {"nearest": "NEAREST", "cubic": "CUBIC"}
 # answer and a densified pyproj answer differ by a fraction of a pixel, not by a datum.
 PIPELINE_AGREEMENT_METRES = 5.0
 OUTLINE_SAMPLES = 128
+
+# The tile pyramid is XYZ: y counts down from the north edge of the world, the opposite of
+# TMS. gdal2tiles would default to TMS without --xyz; nothing here has a TMS mode at all.
+TILE_SCHEME = "xyz"
+TILE_FORMAT = "png"
+# Tiles are small, so the slowest deflate level costs little and keeps the pyramid compact.
+PNG_OPTIONS = {"ZLEVEL": 9}
+# Alpha is decimated with nearest at every zoom so it stays two-valued; an interpolated
+# alpha would put semi-transparent pixels along every crop edge.
+ALPHA_RESAMPLING = "nearest"
+# Dark pixels counted per zoom as a proxy for how much drawn line survives decimation. It is
+# a count, not a verdict: whether a zoom is legible is a human judgement (issue #38).
+INK_THRESHOLD = 128
 
 COG_OPTIONS = {
     "BLOCKSIZE": TILE_SIZE,
@@ -101,6 +119,15 @@ def require_gdal() -> dict:
             raise WarpError(
                 f"rasterio's bundled GDAL {versions['gdal']} cannot write a COG: {exc}. "
                 "Install a GDAL 3.1+ build (the COG driver) before running make demo-cogs."
+            ) from exc
+        try:
+            write_png(
+                Path(directory) / "probe.png", np.zeros((2, TILE_SIZE, TILE_SIZE), "uint8")
+            )
+        except Exception as exc:
+            raise WarpError(
+                f"rasterio's bundled GDAL {versions['gdal']} cannot write a PNG tile: {exc}. "
+                "Install a GDAL build with the PNG driver before running make demo-rasters."
             ) from exc
     return versions
 
@@ -385,6 +412,258 @@ def write_cog(
         for leftover in staged.glob("*"):
             leftover.unlink()
         staged.rmdir()
+
+
+BAND_COLOURS = {
+    2: [ColorInterp.gray, ColorInterp.alpha],
+    4: [ColorInterp.red, ColorInterp.green, ColorInterp.blue, ColorInterp.alpha],
+}
+
+
+def tile_xy(lon: float, lat: float, zoom: int) -> tuple[int, int]:
+    """The XYZ tile a coordinate falls in: y counts down from the north, not up as in TMS."""
+    origin = _mercator_origin()
+    x_metres, y_metres = Transformer.from_crs(4326, TILE_CRS_EPSG, always_xy=True).transform(
+        lon, lat
+    )
+    span = 2 * origin / 2**zoom
+    return int(math.floor((x_metres + origin) / span)), int(
+        math.floor((origin - y_metres) / span)
+    )
+
+
+def tile_pixel(lon: float, lat: float, zoom: int) -> dict:
+    """Which XYZ tile a coordinate lands in, and which pixel of that tile."""
+    origin = _mercator_origin()
+    x_metres, y_metres = Transformer.from_crs(4326, TILE_CRS_EPSG, always_xy=True).transform(
+        lon, lat
+    )
+    span = 2 * origin / 2**zoom
+    x, y = tile_xy(lon, lat, zoom)
+    pixel = span / TILE_SIZE
+    return {
+        "zoom": zoom,
+        "x": x,
+        "y": y,
+        "column": int(math.floor(((x_metres + origin) - x * span) / pixel)),
+        "row": int(math.floor(((origin - y_metres) - y * span) / pixel)),
+        "x_3857": x_metres,
+        "y_3857": y_metres,
+    }
+
+
+def verify_tile_samples(
+    cog_path: Path, tile_root: Path, grid: dict, zoom: int, samples: dict
+) -> list[dict]:
+    """Prove named coordinates land on the tile the XYZ formula names, holding the COG's pixels.
+
+    A pyramid written with TMS y, with a shifted window, or cut from another edition's COG
+    fails here: at `zoom` a tile is a block copy, so the two readings must be equal exactly.
+    """
+    results = []
+    with rasterio.open(cog_path) as dataset:
+        for name, (lon, lat) in samples.items():
+            located = tile_pixel(lon, lat, zoom)
+            path = tile_root / str(zoom) / str(located["x"]) / f"{located['y']}.{TILE_FORMAT}"
+            if not path.is_file():
+                raise WarpError(
+                    f"The {name} sample point ({lon}, {lat}) falls in tile "
+                    f"{zoom}/{located['x']}/{located['y']}, which is missing from "
+                    f"{tile_root.name}."
+                )
+            row, column = dataset.index(located["x_3857"], located["y_3857"])
+            expected = dataset.read(window=Window(column, row, 1, 1)).reshape(-1)
+            with rasterio.open(path) as tile:
+                found = tile.read(
+                    window=Window(located["column"], located["row"], 1, 1)
+                ).reshape(-1)
+            if found.tolist() != expected.tolist():
+                raise WarpError(
+                    f"Tile {zoom}/{located['x']}/{located['y']} reads {found.tolist()} at the "
+                    f"{name} sample point but {cog_path.name} reads {expected.tolist()} there: "
+                    "the pyramid does not match the COG it was cut from."
+                )
+            results.append(
+                {
+                    "name": name,
+                    "lon": lon,
+                    "lat": lat,
+                    "tile": f"{zoom}/{located['x']}/{located['y']}",
+                    "pixel": [located["column"], located["row"]],
+                    "values": found.tolist(),
+                    "opaque": bool(found[-1] > 0),
+                }
+            )
+    return results
+
+
+def tile_indices(grid: dict, zoom: int) -> dict:
+    """The tile range at `zoom` that covers the shared grid, and no more than that."""
+    if zoom > grid["zoom"]:
+        raise WarpError(
+            f"Zoom {zoom} is finer than the grid the COGs were warped onto (zoom "
+            f"{grid['zoom']}); the pyramid is not upsampled past its source grid."
+        )
+    if zoom < 0:
+        raise WarpError(f"Zoom {zoom} is negative.")
+    step = 2 ** (grid["zoom"] - zoom)
+    extent = grid["tile_range"]
+    return {
+        "x_min": extent["x_min"] // step,
+        "x_max": extent["x_max"] // step,
+        "y_min": extent["y_min"] // step,
+        "y_max": extent["y_max"] // step,
+    }
+
+
+def tile_window(grid: dict, zoom: int, x: int, y: int) -> Window:
+    """The part of the shared grid one tile covers, in whole grid pixels.
+
+    The grid's own origin is a tile corner at `grid["zoom"]`, so every offset and size here
+    is an exact integer and a coarser zoom is a whole-block decimation, never a resample
+    against a shifted grid.
+    """
+    step = 2 ** (grid["zoom"] - zoom)
+    extent = grid["tile_range"]
+    size = TILE_SIZE * step
+    return Window(
+        (x * step - extent["x_min"]) * TILE_SIZE,
+        (y * step - extent["y_min"]) * TILE_SIZE,
+        size,
+        size,
+    )
+
+
+def write_png(path: Path, data: np.ndarray) -> None:
+    """Write one RGBA or grey+alpha tile. GDAL's PNG driver only copies, so this stages it."""
+    bands, height, width = data.shape
+    colours = BAND_COLOURS.get(bands)
+    if colours is None:
+        raise WarpError(f"A {bands}-band tile is neither grey+alpha nor RGBA.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # PAM would drop a .aux.xml beside every tile and make the pyramid's file set unstable.
+    with rasterio.Env(GDAL_PAM_ENABLED="NO"), MemoryFile() as memory:
+        with memory.open(
+            driver="GTiff", width=width, height=height, count=bands, dtype="uint8"
+        ) as staged:
+            staged.write(data)
+            staged.colorinterp = colours
+        with memory.open() as staged:
+            rasterio.shutil.copy(staged, path, driver="PNG", **PNG_OPTIONS)
+
+
+def pyramid_digest(root: Path) -> tuple[str, int, int]:
+    """Content identity of a pyramid on disk: every tile's relative path and bytes."""
+    strays = [
+        path
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and path.suffix != f".{TILE_FORMAT}"
+    ]
+    if strays:
+        raise WarpError(
+            f"{root} holds {len(strays)} file(s) that are not tiles, starting with "
+            f"{strays[0].name}; remove them or run make clean."
+        )
+    lines, byte_count = [], 0
+    for path in sorted(root.rglob(f"*.{TILE_FORMAT}")):
+        digest, size = sha256_file(path)
+        lines.append(f"{path.relative_to(root).as_posix()} {digest}")
+        byte_count += size
+    return (
+        hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest(),
+        len(lines),
+        byte_count,
+    )
+
+
+def cut_pyramid(
+    cog_path: Path, grid: dict, zooms: list[int], resampling: str, out_root: Path
+) -> dict:
+    """Cut one bounded XYZ PNG pyramid from a COG on the shared grid.
+
+    At `grid["zoom"]` a tile is a block copy of the COG, so the published imagery is the
+    warp D2a recorded and not a second resampling of it. Tiles wholly outside the crop are
+    still written, fully transparent, so a blank area in the viewer is distinguishable from
+    a tile that failed to load.
+    """
+    try:
+        enum = Resampling[resampling]
+    except KeyError as exc:  # pragma: no cover - resampling_for guards the caller
+        raise WarpError(f"Unknown resampling {resampling!r}") from exc
+    if not zooms:
+        raise WarpError("No zoom levels were requested.")
+    levels = []
+    with rasterio.open(cog_path) as dataset:
+        alpha_index = dataset.count
+        colour_indexes = list(range(1, alpha_index))
+        if (dataset.width, dataset.height) != (grid["width"], grid["height"]):
+            raise WarpError(
+                f"{cog_path.name} is {dataset.width}x{dataset.height}, not the shared grid's "
+                f"{grid['width']}x{grid['height']}."
+            )
+        for zoom in sorted(zooms):
+            extent = tile_indices(grid, zoom)
+            count = transparent = 0
+            opaque_px = ink_px = 0
+            for x in range(extent["x_min"], extent["x_max"] + 1):
+                for y in range(extent["y_min"], extent["y_max"] + 1):
+                    window = tile_window(grid, zoom, x, y)
+                    alpha = dataset.read(
+                        alpha_index,
+                        window=window,
+                        out_shape=(TILE_SIZE, TILE_SIZE),
+                        resampling=Resampling[ALPHA_RESAMPLING],
+                        boundless=True,
+                        fill_value=0,
+                    )
+                    opaque = alpha > 0
+                    if opaque.any():
+                        pixels = dataset.read(
+                            colour_indexes,
+                            window=window,
+                            out_shape=(len(colour_indexes), TILE_SIZE, TILE_SIZE),
+                            resampling=enum,
+                            boundless=True,
+                            fill_value=0,
+                        )
+                        # Resampling a coarse zoom can pull colour across the crop edge.
+                        pixels[:, ~opaque] = 0
+                    else:
+                        transparent += 1
+                        pixels = np.zeros((len(colour_indexes), TILE_SIZE, TILE_SIZE), "uint8")
+                    opaque_px += int(opaque.sum())
+                    ink_px += int((opaque & (pixels.min(axis=0) < INK_THRESHOLD)).sum())
+                    write_png(
+                        out_root / str(zoom) / str(x) / f"{y}.{TILE_FORMAT}",
+                        np.concatenate([pixels, alpha[np.newaxis]]),
+                    )
+                    count += 1
+            levels.append(
+                {
+                    "zoom": zoom,
+                    "tile_range": extent,
+                    "tiles": count,
+                    "transparent_tiles": transparent,
+                    "opaque_px": opaque_px,
+                    "ink_px": ink_px,
+                }
+            )
+    digest, tiles, byte_count = pyramid_digest(out_root)
+    expected = sum(level["tiles"] for level in levels)
+    if tiles != expected:
+        raise WarpError(f"{out_root} holds {tiles} tiles, not the {expected} that were cut.")
+    for level in levels:
+        level["bytes"] = sum(
+            path.stat().st_size
+            for path in (out_root / str(level["zoom"])).rglob(f"*.{TILE_FORMAT}")
+        )
+    return {
+        "levels": levels,
+        "tiles": tiles,
+        "bytes": byte_count,
+        "digest": digest,
+        "transparent_tiles": sum(level["transparent_tiles"] for level in levels),
+    }
 
 
 def sha256_file(path: Path) -> tuple[str, int]:

@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 from datetime import date
 from pathlib import Path
 
@@ -25,7 +26,7 @@ from pyproj.aoi import AreaOfInterest
 from pyproj.transformer import TransformerGroup
 from rasterio.transform import rowcol
 from rasterio.windows import Window
-from shapely.geometry import Polygon, shape
+from shapely.geometry import LineString, Polygon, shape
 from source_archive import check_record, load_receipts
 from warp_raster import WarpError
 
@@ -38,8 +39,16 @@ SOURCES_PATH = REPO_ROOT / "data/sources/sources.yml"
 RAW_ROOT = REPO_ROOT / "data/raw"
 BUILD_ROOT = REPO_ROOT / "build"
 RASTER_DIRNAME = "rasters"
+TILE_DIRNAME = "tiles"
+TILE_SUBDIR = "demo"
 PROCESSING_FILENAME = "demo-processing.json"
 INCOMING_DIRNAME = ".incoming"
+
+# The viewer asks for this, relative to the published site root (D3/D4 own the site).
+TILE_TEMPLATE = "tiles/{edition_id}/{z}/{x}/{y}.png"
+# Sample points sit this fraction of the footprint's height in from its north and south ends,
+# far enough inside the crop that an opaque reading is not a boundary coincidence.
+SAMPLE_INSET_FRACTION = 0.02
 
 # Steps that only reorder lon/lat and so say nothing about which datum shift ran.
 AXIS_ORDER_STEP = "axis order change (2D)"
@@ -973,8 +982,248 @@ def run_cogs(
         "editions": entries,
         "registration_notes": registration_notes(entries),
     }
+    # `rasters` owns the tiles section; carrying it through means a COG-only run does not
+    # make a still-valid pyramid look stale. A rewarped COG changes the tile fingerprint.
+    if "tiles" in previous:
+        payload["tiles"] = previous["tiles"]
     write_record(record_path, payload)
     return {"record": payload, "record_path": record_path, "reused": reused}
+
+
+def common_footprint(manifest: dict) -> Polygon:
+    """The shared mapped footprint: the intersection of the four committed crops."""
+    footprint = shape(manifest["editions"][0]["crop_wgs84"])
+    for edition in manifest["editions"][1:]:
+        footprint = footprint.intersection(shape(edition["crop_wgs84"]))
+    if footprint.is_empty or not footprint.is_valid:
+        fail("The four crops do not share a footprint.")
+    return footprint
+
+
+def sample_points(footprint: Polygon) -> dict:
+    """One north and one south point inside the footprint, on its central meridian.
+
+    Derived from the committed crops, not named from a gazetteer: no surveyed landmark is
+    committed to this repository, so nothing here claims one (see docs/demo-processing.md).
+    """
+    west, south, east, north = footprint.bounds
+    meridian = (west + east) / 2
+    crossing = footprint.intersection(
+        LineString([(meridian, south - 1.0), (meridian, north + 1.0)])
+    )
+    if crossing.is_empty:
+        fail("The footprint's central meridian does not cross it.")
+    low, high = crossing.bounds[1], crossing.bounds[3]
+    inset = SAMPLE_INSET_FRACTION * (high - low)
+    return {
+        "north": (q6(meridian), q6(high - inset)),
+        "south": (q6(meridian), q6(low + inset)),
+    }
+
+
+def tile_plan(entry: dict, grid: dict, zooms: list[int], versions: dict) -> dict:
+    """Everything a pyramid's bytes depend on. Its digest decides whether to cut again."""
+    return {
+        "tiling_version": warp_raster.TILING_VERSION,
+        "cog": {
+            "sha256": entry["output"]["sha256"],
+            "byte_count": entry["output"]["byte_count"],
+        },
+        "grid": grid,
+        "zooms": zooms,
+        "scheme": warp_raster.TILE_SCHEME,
+        "format": warp_raster.TILE_FORMAT,
+        "tile_size": warp_raster.TILE_SIZE,
+        "png_options": warp_raster.PNG_OPTIONS,
+        "resampling": entry["resampling"],
+        "alpha_resampling": warp_raster.ALPHA_RESAMPLING,
+        "tool_versions": versions,
+    }
+
+
+def reusable_pyramid(entry: dict | None, plan_digest: str, root: Path) -> dict | None:
+    """A pyramid is reused only when its inputs, its file set and its own bytes all match."""
+    if entry is None or entry.get("fingerprint") != plan_digest or not root.is_dir():
+        return None
+    digest, tiles, byte_count = warp_raster.pyramid_digest(root)
+    if (digest, tiles, byte_count) != (entry["digest"], entry["tiles"], entry["bytes"]):
+        return None
+    return entry
+
+
+def process_pyramid(
+    entry: dict,
+    cog_path: Path,
+    grid: dict,
+    zooms: list[int],
+    samples: dict,
+    fingerprint: str,
+    destination: Path,
+) -> dict:
+    """Cut one edition's pyramid and check it against the COG at the sample points."""
+    cut = warp_raster.cut_pyramid(cog_path, grid, zooms, entry["resampling"], destination)
+    checked = warp_raster.verify_tile_samples(cog_path, destination, grid, max(zooms), samples)
+    for sample in checked:
+        if not sample["opaque"]:
+            raise WarpError(
+                f"The {sample['name']} sample point is transparent in tile {sample['tile']}; "
+                "a point inside the shared footprint must be covered."
+            )
+    return {
+        "id": entry["id"],
+        "source_id": entry["source"]["source_id"],
+        "cog_sha256": entry["output"]["sha256"],
+        "resampling": entry["resampling"],
+        "alpha_resampling": warp_raster.ALPHA_RESAMPLING,
+        "path": f"{TILE_DIRNAME}/{TILE_SUBDIR}/{entry['id']}",
+        "template": TILE_TEMPLATE.format(edition_id=entry["id"], z="{z}", x="{x}", y="{y}"),
+        "sample_points": checked,
+        "fingerprint": fingerprint,
+        **cut,
+    }
+
+
+def tiling_notes() -> dict:
+    """What the pyramid is, in the terms a reviewer would otherwise have to infer."""
+    return {
+        "inspection": "automated only; no human map review is asserted here",
+        "human_acceptance": "deferred to the acceptance tracker (issue #38)",
+        "tiler": (
+            "scripts/warp_raster.cut_pyramid, on the GDAL inside the rasterio wheel; "
+            "gdal2tiles and the GDAL command line are not installed here or in CI"
+        ),
+        "y_orientation": (
+            "XYZ: y increases southwards from the north edge of the world. TMS y is never "
+            "written, and no tiler flag selects it"
+        ),
+        "empty_areas": (
+            "tiles outside the crop are written fully transparent, so a blank area is not a "
+            "failed request"
+        ),
+        "top_zoom_is_a_block_copy": (
+            "at the grid zoom a tile is copied from the COG without resampling; coarser "
+            "zooms decimate whole blocks of the same grid"
+        ),
+        "sample_points": (
+            "derived from the committed crops; no surveyed landmark or modern reference "
+            "layer is committed to this repository"
+        ),
+    }
+
+
+def run_rasters(
+    manifest_path: Path,
+    schema_path: Path,
+    index_path: Path,
+    receipts_path: Path,
+    sources_path: Path,
+    raw_root: Path,
+    build_root: Path,
+    zoom: int | None = None,
+) -> dict:
+    """Preflight, warp the four sources onto one grid, then cut one XYZ PNG pyramid each."""
+    tile_root = build_root / TILE_DIRNAME / TILE_SUBDIR
+    record_path = build_root / RASTER_DIRNAME / PROCESSING_FILENAME
+    known = {}
+    if record_path.is_file():
+        known = {
+            entry["id"]: entry
+            for entry in read_json(record_path).get("tiles", {}).get("editions", [])
+        }
+
+    prepared = run_cogs(
+        manifest_path,
+        schema_path,
+        index_path,
+        receipts_path,
+        sources_path,
+        raw_root,
+        build_root,
+        zoom,
+    )
+    record = prepared["record"]
+    grid = record["grid"]
+    # The top zoom is the grid the COGs are on, never finer: upsampling past the source grid
+    # would publish detail no source has.
+    zoom_min, zoom_max = record["tile_zoom"]["min"], grid["zoom"]
+    zooms = list(range(zoom_min, zoom_max + 1))
+    manifest = read_json(manifest_path)
+    samples = sample_points(common_footprint(manifest))
+
+    incoming = build_root / TILE_DIRNAME / INCOMING_DIRNAME
+    if incoming.exists():
+        shutil.rmtree(incoming)
+    incoming.mkdir(parents=True)
+    entries, reused = [], []
+    try:
+        for entry in record["editions"]:
+            eid = entry["id"]
+            cog_path = build_root / RASTER_DIRNAME / f"{eid}.tif"
+            try:
+                fingerprint = warp_raster.fingerprint(
+                    tile_plan(entry, grid, zooms, record["tool_versions"])
+                )
+                published = reusable_pyramid(known.get(eid), fingerprint, tile_root / eid)
+                if published is not None:
+                    entries.append(published)
+                    reused.append(eid)
+                    continue
+                entries.append(
+                    process_pyramid(
+                        entry, cog_path, grid, zooms, samples, fingerprint, incoming / eid
+                    )
+                )
+            except WarpError as exc:
+                fail(f"{eid}: {exc}")
+        # Nothing reaches build/tiles/demo/ until every edition has been cut and checked,
+        # so a retry cannot leave a partial pyramid looking complete.
+        tile_root.mkdir(parents=True, exist_ok=True)
+        for entry in entries:
+            staged = incoming / entry["id"]
+            if staged.is_dir():
+                shutil.rmtree(tile_root / entry["id"], ignore_errors=True)
+                os.replace(staged, tile_root / entry["id"])
+    finally:
+        shutil.rmtree(incoming, ignore_errors=True)
+
+    unexpected = sorted(
+        path.name for path in tile_root.iterdir() if path.name not in record["edition_order"]
+    )
+    if unexpected:
+        fail(
+            f"{tile_root} holds unexpected entries {unexpected}; remove them or run make clean."
+        )
+    payload = {
+        **record,
+        "tiles": {
+            "version": 1,
+            "tiling_version": warp_raster.TILING_VERSION,
+            "scheme": warp_raster.TILE_SCHEME,
+            "format": warp_raster.TILE_FORMAT,
+            "tile_size": warp_raster.TILE_SIZE,
+            "png_options": warp_raster.PNG_OPTIONS,
+            "root": f"{TILE_DIRNAME}/{TILE_SUBDIR}",
+            "template": TILE_TEMPLATE,
+            "zoom": {"min": zoom_min, "max": zoom_max},
+            "bounds_3857": grid["bounds"],
+            "bounds_wgs84": list(manifest["view_bounds_wgs84"]),
+            "totals": {
+                "tiles": sum(entry["tiles"] for entry in entries),
+                "bytes": sum(entry["bytes"] for entry in entries),
+            },
+            "editions": entries,
+            "notes": tiling_notes(),
+        },
+    }
+    write_record(record_path, payload)
+    return {
+        "record": payload,
+        "record_path": record_path,
+        "tile_root": tile_root,
+        "reused_cogs": prepared["reused"],
+        "reused": reused,
+        "samples": samples,
+    }
 
 
 @click.group()
@@ -1111,6 +1360,67 @@ def cogs(
         f"{grid['crs']} grid at {grid['resolution_metres']:.6f} m/px (zoom {grid['zoom']}); "
         f"GDAL {versions['gdal']} / PROJ {versions['proj_gdal']}; "
         f"record {result['record_path'].name}"
+    )
+
+
+@cli.command()
+@_common_options
+@click.option(
+    "--build-root",
+    "build_root",
+    type=click.Path(path_type=Path),
+    default=BUILD_ROOT,
+    show_default=False,
+)
+@click.option(
+    "--grid-zoom",
+    "zoom",
+    type=int,
+    default=None,
+    help="Grid zoom to warp onto, and the pyramid's top zoom; defaults to the manifest "
+    "maximum. Lower values are for inspection and tests.",
+)
+def rasters(
+    manifest_path,
+    schema_path,
+    index_path,
+    receipts_path,
+    sources_path,
+    raw_root,
+    build_root,
+    zoom,
+) -> None:
+    """Preflight, warp to COGs, then cut bounded XYZ PNG pyramids under build/tiles/demo/."""
+    started = time.monotonic()
+    result = run_rasters(
+        manifest_path,
+        schema_path,
+        index_path,
+        receipts_path,
+        sources_path,
+        raw_root,
+        build_root,
+        zoom,
+    )
+    tiles = result["record"]["tiles"]
+    for entry in tiles["editions"]:
+        state = "reused" if entry["id"] in result["reused"] else "cut"
+        levels = ", ".join(f"z{level['zoom']}:{level['tiles']}" for level in entry["levels"])
+        click.echo(
+            f"{entry['id']}: {state} {entry['tiles']} tiles ({levels}) "
+            f"{entry['transparent_tiles']} transparent, {entry['bytes']} bytes, "
+            f"digest={entry['digest'][:12]}"
+        )
+    for sample in tiles["editions"][0]["sample_points"]:
+        click.echo(
+            f"sample {sample['name']}: {sample['lon']}, {sample['lat']} -> tile "
+            f"{sample['tile']} pixel {sample['pixel']} (XYZ z/x/y)"
+        )
+    click.echo(
+        f"demo-rasters: {len(tiles['editions'])} pyramids, zoom {tiles['zoom']['min']}-"
+        f"{tiles['zoom']['max']}, {tiles['totals']['tiles']} tiles, "
+        f"{tiles['totals']['bytes']} bytes, {warp_raster.TILE_SCHEME.upper()} scheme; "
+        f"{time.monotonic() - started:.1f} s; record {result['record_path'].name}"
     )
 
 

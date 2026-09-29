@@ -1,18 +1,21 @@
-# Demo raster processing — common-grid COGs
+# Demo raster processing — common-grid COGs and XYZ tiles
 
-Automated record of what `make demo-cogs` does and what it actually produced for the four
-Auburn editions, implementation plan D2a (issue #40). The stage before this one is
-`make demo-check` (D1, `docs/demo-source-review.md`); the stage after it cuts tiles.
+Automated record of what `make demo-cogs` (D2a, issue #40) and `make demo-rasters`
+(D2b, issue #41) do and what they actually produced for the four Auburn editions. The stage
+before both is `make demo-check` (D1, `docs/demo-source-review.md`). Sections 1-8 are the
+COG stage; section 9 is the tile stage. `make demo-rasters` runs the preflight, the COG
+stage and the tile stage in that order, so it is the only command a build needs.
 
 **Inspection method: automated.** Every number below came from a script run, not from a
-person looking at a map. No human source review or registration acceptance is asserted
-here. Human acceptance belongs to issue #38.
+person looking at a map. No human source review, registration acceptance or legibility
+judgement is asserted here. Human acceptance belongs to issue #38.
 
 - Run date: 2026-09-28
-- Commands: `make demo-cogs` (twice), `make demo-test`, `make demo-check`
+- Commands: `make demo-cogs` (twice), `make demo-rasters` (twice), `make demo-test`,
+  `make demo-check`, `make validate`, `make lint`
 - Network: none.
-- Writes: `build/rasters/` only. Nothing was written to `data/raw/` or to
-  `data/sources/retrievals.jsonl`.
+- Writes: `build/rasters/` and `build/tiles/demo/` only. Nothing was written to `data/raw/`
+  or to `data/sources/retrievals.jsonl`.
 
 ---
 
@@ -213,3 +216,180 @@ whose bytes changed, and a changed grid; a failure part way through publishing n
 failed post-warp source re-check leaving the published run and its record intact, a
 corrupt source, a non-raster source, a missing source, and `write_cog` leaving no partial
 file; and that a run changes no raw byte, no receipt and nothing outside the build root.
+
+---
+
+## 9. The XYZ PNG pyramid (D2b, `make demo-rasters`)
+
+### 9.1 The tiler, pinned
+
+`gdal2tiles` is a GDAL command-line script, and no GDAL command line exists here or in CI
+(§1). The pyramid is therefore cut by `warp_raster.cut_pyramid`, through the same GDAL
+inside the rasterio wheel that §1 pins, and `require_gdal()` probes the PNG driver before
+any tile is written. The `gdal2tiles --xyz` flag has no counterpart here because nothing in
+this code can emit TMS: `tile_xy` counts y down from the north edge of the world, and that
+is the only numbering it has.
+
+| Property | Value |
+| --- | --- |
+| Tiler | `scripts/warp_raster.py cut_pyramid` (rasterio 1.4.4 / GDAL 3.10.3) |
+| Scheme | XYZ, `build/tiles/demo/<edition-id>/{z}/{x}/{y}.png` |
+| Zooms | 10-16 (`tile_zoom` in `data/sources/demo-editions.json`) |
+| Tile size | 256 px |
+| Format | PNG, 4 bands uint8 (RGB + alpha), `ZLEVEL=9`, no PAM sidecars |
+| Resampling | `nearest` for the three topo sheets, `cubic` for the 1975 orthophotoquad |
+| Alpha resampling | `nearest` at every zoom, so alpha stays two-valued |
+
+Zoom 16 is the grid the COGs are already on (§3), so a zoom-16 tile is a block copy of the
+COG and the published imagery is the warp D2a recorded, not a second resampling of it.
+Coarser zooms decimate whole 2^n blocks of that same grid. The pyramid is never cut finer
+than the grid: `--grid-zoom` lowers both together, which is what the tests use.
+
+No PMTiles, no tippecanoe, no tile server, no new download: the stage reads the four COGs
+and writes PNG files.
+
+### 9.2 What was produced
+
+One pyramid per edition, 1005 tiles each, 4020 in total:
+
+| Edition | Resampling | Tiles | Bytes | Pyramid digest | COG SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| auburn-1953 | nearest | 1005 | 114,341,115 | `50e0562d0000…` | `8c5f94a071c1…` |
+| auburn-1973 | nearest | 1005 | 111,621,938 | `636760d8b0cb…` | `95b68bb5fa64…` |
+| auburn-1975 | cubic | 1005 | 109,372,894 | `72b3daa79b4a…` | `cdb24a754bb2…` |
+| auburn-1981 | nearest | 1005 | 114,515,125 | `aeaa3ddce2eb…` | `cff62b021c58…` |
+| **total** | | **4020** | **449,851,072** | | |
+
+Per zoom, with the tile range every edition shares and the bytes summed over the four:
+
+| Zoom | Tiles per edition | x range | y range | Bytes (4 editions) |
+| --- | --- | --- | --- | --- |
+| 10 | 1 | 167 | 391 | 135,994 |
+| 11 | 4 | 334-335 | 782-783 | 523,554 |
+| 12 | 9 | 669-671 | 1565-1567 | 2,004,676 |
+| 13 | 20 | 1339-1342 | 3130-3134 | 7,691,902 |
+| 14 | 56 | 2679-2685 | 6261-6268 | 29,039,513 |
+| 15 | 195 | 5358-5370 | 12523-12537 | 101,835,957 |
+| 16 | 720 | 10717-10740 | 25046-25075 | 308,619,476 |
+
+Bounds of the bounded pyramid, from the shared grid and the manifest, not from a file label:
+
+- EPSG:3857: -13484103.285731371, 4703628.972556606, -13469427.376300618, 4721973.859345049
+- EPSG:4326: -121.126028, 38.874881, -121.001023, 38.99988
+
+429 MiB for four editions is a measurement, not a target. PNG on a scanned colour sheet is
+large; whether the published build keeps all seven zooms, or trades format for size, is a
+D3/D4 decision and no change was made here to anticipate it.
+
+### 9.3 Generation time, measured
+
+| Run | Work | Wall clock |
+| --- | --- | --- |
+| Cold | warp four COGs + cut four pyramids | 265.6 s |
+| Tiles only | COGs reused, four pyramids cut | 213.1 s |
+| Rerun | everything reused | 1.6 s |
+
+One machine, one run each. No rate is extrapolated from these.
+
+### 9.4 Transparency, and what the counts say
+
+Alpha comes from the COG's alpha band, which is the source's own valid-data coverage
+intersected with the committed crop (§4). No pixel colour takes part in it at any zoom.
+Measured over every published tile: alpha holds only 0 and 255, and no colour survives
+where alpha is 0.
+
+**No fully transparent tile occurs in this real pyramid**, because the bounded grid is the
+bounding box of the common footprint and every tile in it touches the crop; the corner tiles
+are partly transparent instead. The fully transparent path is exercised by a synthetic
+fixture in `make demo-test`, where a whole tile of the grid falls outside the crop and the
+run writes a transparent PNG for it rather than nothing. Encoding the tile is what keeps a
+blank area distinguishable from a failed request.
+
+Opaque pixel counts per zoom are identical for the three topo editions (43,630,914 at zoom
+16, matching §4) and larger by 91-3,329 px for the 1975 edition at zooms 10-14, because its
+COG's overviews were built with `CUBIC` per AGENTS.md §3 and a nearest read off a cubic
+overview lands on a slightly different sample. The values read are still only 0 and 255.
+
+### 9.5 Line survival per zoom, as a count
+
+Legibility is a human judgement and belongs to issue #38. What is recorded here is a count:
+the share of opaque pixels with at least one channel darker than 128, per zoom. For a scanned
+topo sheet that tracks drawn line and lettering; for the orthophotoquad it tracks dark
+imagery and says nothing about line work.
+
+| Zoom | auburn-1953 | auburn-1973 | auburn-1975 | auburn-1981 |
+| --- | --- | --- | --- | --- |
+| 16 | 38.30 % | 15.60 % | 70.23 % | 14.33 % |
+| 15 | 38.30 % | 15.61 % | 70.59 % | 14.34 % |
+| 14 | 38.27 % | 15.56 % | 71.73 % | 14.28 % |
+| 13 | 38.20 % | 15.54 % | 73.34 % | 14.28 % |
+| 12 | 38.26 % | 15.55 % | 74.85 % | 14.26 % |
+| 11 | 38.23 % | 15.72 % | 76.32 % | 14.46 % |
+| 10 | 40.81 % | 18.14 % | 81.42 % | 16.91 % |
+
+The dark share is flat from zoom 16 to zoom 11 and rises at zoom 10, where one tile covers
+the whole sheet. A flat share means nearest decimation is not thinning the ink away, not
+that a reader can follow a trail at that zoom.
+
+### 9.6 The sample points
+
+D2a found no independent ground control in this repository (§7), and none was added. The two
+sample points are derived from the four committed crops: the north and south ends of the
+footprint's central meridian, inset 2 % of its length. They are not landmarks and are not
+named as any.
+
+Both resolve through the XYZ formula to a tile that exists, and the tile's pixel is compared
+against the COG's pixel at the same coordinate. A pyramid with TMS y, a shifted window, or
+one cut from another edition's COG fails that comparison, and the run publishes nothing.
+
+| Sample | Coordinate | Tile (z/x/y) | Pixel | 1953 RGBA | 1975 RGBA |
+| --- | --- | --- | --- | --- | --- |
+| north | -121.063525, 38.997379 | 16/10729/25047 | 14, 27 | 246, 246, 124, 255 | 33, 23, 23, 255 |
+| south | -121.063525, 38.877381 | 16/10729/25075 | 14, 49 | 250, 222, 113, 255 | 28, 19, 14, 255 |
+
+The north tile's y (25047) is smaller than the south tile's (25075). Under TMS it would be
+larger. All four editions report the same tiles and pixels, opaque in every case; the full
+set is in `build/rasters/demo-processing.json` under `tiles.editions[].sample_points`.
+
+### 9.7 Publishing, reuse and the source bytes
+
+A run cuts into `build/tiles/.incoming/` and moves a pyramid into `build/tiles/demo/` only
+after all four have been cut and both sample points have been checked against their COG. A
+run that fails part way publishes no pyramid and writes no tiles section, so a retry cannot
+make partial output look complete. An unexpected directory under the tile root stops the run
+instead of being published alongside the four editions.
+
+Reuse is by content. Each edition's `fingerprint` is the SHA-256 of the tiling version, the
+COG's hash and byte count, the whole grid, the zoom list, the scheme, the format and its
+options, the tile size, both resampling choices and the tool versions. A published pyramid is
+reused only when that fingerprint matches **and** its own file set and bytes still hash to the
+recorded digest, so a deleted tile, an altered tile or a changed parameter is cut again.
+`make demo-cogs` carries the tiles section through untouched, so a COG-only run does not make
+a valid pyramid look stale.
+
+Observed: the first full cut and a second full cut after deleting `build/tiles/` produced the
+same four digests; the immediate rerun reused all four, left `demo-processing.json`
+byte-identical and left every tile's mtime untouched. The four raw SHA-256 values before and
+after are the ones committed in `data/sources/retrievals.jsonl`
+(`bec9555f90f4…`, `2a4427b0969a…`, `4d35331f4a1f…`, `d5621357235c…`), and
+`data/sources/retrievals.jsonl` itself was not written.
+
+### 9.8 Tests
+
+`make demo-test` covers the tile stage on synthetic rasters only, small enough for CI: the
+XYZ numbering against TMS and a known tile; the tile range per zoom and its halving; a zoom
+finer than the grid; whole-pixel windows; a zoom-16 tile as a block copy of its COG; the
+north half of a COG landing in the northern tile; PNG driver, band count, alpha colour
+interpretation and the absence of PAM sidecars; fully transparent tiles for an empty part of
+the footprint; no tile outside the bounded range; alpha staying two-valued under cubic
+colour resampling; the per-zoom opaque and dark-pixel counts; a COG that is not on the shared
+grid; a stray file in a pyramid; the sample points resolving to the right tile and pixel; a
+mirrored (TMS) pyramid, a pyramid cut from another COG and a missing tile all failing the
+sample check; the sample points falling inside the shared footprint; all four pyramids over
+the manifest zoom range, each naming its own edition, source and COG; the record's scheme,
+totals, per-level numbers and notes; alpha on every published tile; a rerun reusing
+everything and rewriting an identical record; a deleted tile, an altered tile and a changed
+zoom range each forcing a re-cut; the fingerprint responding to every recorded parameter; a
+failure part way through publishing nothing; a later failure leaving the published pyramids
+and the record intact; an unexpected directory under the tile root; a `demo-cogs` run not
+invalidating a valid pyramid; and a tiling run changing no raw byte and no receipt.
