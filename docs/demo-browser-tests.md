@@ -14,7 +14,7 @@ make site-browsers      # npm ci, then playwright install chromium
 Idempotent. It downloads into the shared Playwright cache
 (`~/.cache/ms-playwright` on Linux, `~/Library/Caches/ms-playwright` on macOS), so a second
 run does nothing. `make demo-browser-test` depends on it, so a fresh clone needs no extra
-step; CI runs the same target.
+step. CI does not run this suite yet; wiring it (Node and Playwright in CI) is #46.
 
 **Tested browser: bundled Chromium only** (`@playwright/test` 1.63.0, which pins Chromium
 revision 1243, browser version 153.0.8010.12). Firefox and WebKit are not installed and not
