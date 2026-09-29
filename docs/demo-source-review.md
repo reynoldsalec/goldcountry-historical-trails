@@ -105,15 +105,21 @@ What these sixteen measurements say, stated as measured rather than in general t
 
 - The largest deviation anywhere is **2.61 px (5.3 m)**, on the 1975 orthophotoquad's north
   edge. The three topo sheets stay within 1.79 px (3.6 m).
-- Every residual on the north and south edges is negative, and all but two of the eight
-  east/west residuals are: the drawn line sits a pixel or two outside the graticule the
-  GeoTIFF delivers. The two ends of an edge agree to within 1.02 px in the worst case (the
-  1981 south edge) and within 0.60 px on the other fifteen edges, so what is left is an
-  offset of the whole line, not the tilt the earlier axis-aligned crop showed.
-- The drawn neatline's own ink is 2–3 px wide on all four sheets, so the crop boundary
-  falls within the drawn line, not inside the mapped face. The worst case, the 1975 north
-  edge, trims about 1 px (2 m) of orthophoto tone just inside the line; on the topo sheets
-  the boundary stays inside the ink.
+- The residual is the measured pixel minus the graticule pixel, so a negative value puts
+  the drawn line north of the graticule on the north/south edges and west of it on the
+  east/west edges. Every north and south residual is negative, and all but two of the
+  eight east/west residuals are: the drawn face sits about 1–2.6 px north-west of the
+  georeferencing the GeoTIFF delivers. The two ends of an edge agree to within 1.02 px in
+  the worst case (the 1981 south edge) and within 0.60 px on the other fifteen edges, so
+  what is left is one offset of the whole face, not the tilt the earlier axis-aligned crop
+  showed.
+- That single offset cuts two ways, because the crop follows the graticule. On the north
+  and west edges the crop trims up to about 1 px (2 m) of map tone just inside the drawn
+  line; the worst is the 1975 north edge, where the ink is rows 363–365, the orthophoto
+  tone starts at row 366–367 and the graticule falls at row 366.6. On the south and east
+  edges it keeps up to about 1 px of white collar past the line; the worst is the 1975
+  south edge, where the ink is rows 7155–7157, the collar starts at row 7158 and the
+  graticule falls at row 7158.3. The drawn ink is 2–3 px wide on all four sheets.
 - `demo-check` fails outright, rather than warning, if any residual exceeds 3.0 px. The
   3.0 px limit is set from the 2.61 px measurement above, not chosen in advance.
 

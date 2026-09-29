@@ -777,6 +777,37 @@ def test_axis_aligned_crop_is_rejected(tree, scans):
     assert "off the inspected neatline" in failure(tree, mutate)
 
 
+def write_shifted_scan(source_path, path, shift_px):
+    """A fixture scan whose georeferencing is moved east by `shift_px`.
+
+    The drawn ink stays put, so the labelled graticule lands off the line by that many
+    pixels: the only way to exercise the residual limit itself (PR #47).
+    """
+    with rasterio.open(source_path) as source:
+        data = source.read(1)
+        profile = source.profile
+        profile["transform"] = source.transform @ Affine.translation(shift_px, 0)
+    with rasterio.open(path, "w", **profile) as dataset:
+        dataset.write(data, 1)
+    return path
+
+
+def test_neatline_off_the_graticule_is_rejected(tmp_path, scans):
+    paths, _ = scans
+    shifted = write_shifted_scan(paths["auburn-1953"], tmp_path / "shifted_geo.tif", 4)
+    with pytest.raises(Exception, match=r"over the 3\.0 px limit"):
+        demo.inspect_source(shifted, index_row("CA_Auburn_288101_1953_24000"))
+
+
+def test_neatline_within_the_residual_limit_is_accepted(tmp_path, scans):
+    """Pins the other side of the limit, so the rejection above is not a blanket failure."""
+    paths, _ = scans
+    shifted = write_shifted_scan(paths["auburn-1953"], tmp_path / "near_geo.tif", 2)
+    report = demo.inspect_source(shifted, index_row("CA_Auburn_288101_1953_24000"))
+    residual = report["max_abs_neatline_residual_px"]
+    assert 1.0 < residual <= demo.NEATLINE_TOLERANCE_PX, residual
+
+
 def test_scan_without_a_neatline_cannot_be_verified(tmp_path, scans):
     crs = CRS.from_wkt(POLYCONIC_WKT)
     paths, _ = scans
