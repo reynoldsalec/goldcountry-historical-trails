@@ -114,6 +114,12 @@ preflight requires only the four MVP inputs.
 `make demo-build`, `make demo-dev`, `make demo-accept`. Build output before leak checks;
 fail if artifacts/tests are absent. Do not gate the demo on `coverage-ready`.
 
+`make demo-test` now also runs the Playwright browser suite, through `make demo-browser-test`.
+That suite needs a headless browser installed once per machine: `make site-browsers`
+(bundled Chromium only; Firefox and WebKit are not run). It runs offline against generated
+fixtures, never against `data/sources/` or `build/tiles/`.
+See [the browser test suite](docs/demo-browser-tests.md).
+
 Bare `make`, `rasters`, `tiles`, `build-public`, `build-restricted` and `dev` still contain
 older scaffold behavior/placeholders and milestone messages. They are not working demo
 commands today. D4 aligns public/dev/default targets with the finished demo; vector and
