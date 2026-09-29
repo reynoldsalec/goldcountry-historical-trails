@@ -291,6 +291,18 @@ describe("requested versus displayed state", () => {
     expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
   });
 
+  it("ignores a readiness signal that arrives after the same request failed", () => {
+    const { browser, map } = browserForRealManifest();
+    const generation = browser.select("auburn-1973");
+    browser.failRequest("auburn-1973", generation, "tiles unavailable");
+
+    expect(browser.confirmDisplayed("auburn-1973", generation)).toBe(false);
+    expect(browser.displayedEdition.id).toBe("auburn-1953");
+    expect(browser.state.status).toBe("error");
+    expect(browser.state.errorMessage).toBe("tiles unavailable");
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
+  });
+
   it("ignores a late result from a superseded request", () => {
     const map = buildMap(SYNTHETIC.edition_order.map(layerIdFor));
     const browser = new EditionBrowser({ manifest: SYNTHETIC, map });

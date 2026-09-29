@@ -185,7 +185,25 @@ async function start(): Promise<void> {
     if (browser.state.status !== "loading") {
       return;
     }
-    map.once("idle", () => browser.confirmDisplayed(id, generation));
+
+    function stopWaiting(): void {
+      map.off("idle", onIdle);
+      unwatch();
+    }
+
+    function onIdle(): void {
+      stopWaiting();
+      browser.confirmDisplayed(id, generation);
+    }
+
+    // Once this request fails or is superseded, an idle from a later pan must not confirm
+    // it: that would label a blank map with the edition that never loaded (PR #50).
+    const unwatch = browser.subscribe((state) => {
+      if (state.generation !== generation || state.status !== "loading") {
+        stopWaiting();
+      }
+    });
+    map.on("idle", onIdle);
   }
 
   previous.addEventListener("click", () => awaitReady(browser.previous()));

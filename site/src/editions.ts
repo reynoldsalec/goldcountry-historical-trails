@@ -357,7 +357,9 @@ export class EditionBrowser {
 
   /** Swap layer opacity and card together once the request is ready. */
   confirmDisplayed(id: string, generation: number): boolean {
-    if (!this.owns(id, generation)) {
+    // A failed request keeps its generation, so readiness only counts while still loading:
+    // otherwise a later idle event would reveal the edition that never loaded (PR #50).
+    if (!this.owns(id, generation) || this.current.status !== "loading") {
       return false;
     }
     if (this.current.displayedId !== id) {
