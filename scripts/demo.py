@@ -44,12 +44,35 @@ COORD_DECIMALS = 6
 POSITION_TOLERANCE_DEG = 1.0e-5
 BOUNDS_TOLERANCE_DEG = 2.0e-6
 
-# Neatline search: a window this far either side of the projected graticule corner, and
-# profiles taken away from the corners where tick labels and ties darken the collar.
+# Neatline verification: a window this far either side of the projected graticule, sampled
+# in a band at each end of the edge because meridian convergence tilts the drawn line by
+# several pixels over the sheet height. Bands start INSET_FRACTION in, away from the corner
+# ticks and tie marks that darken the collar.
 SEARCH_METRES = 60.0
 INSET_FRACTION = 0.15
+BAND_FRACTION = 0.15
+# The drawn neatline ink is 2-3 px wide, so a deviation under this still lands on the line.
+# The 1975 orthophotoquad is the worst of the four at 2.61 px; see docs/demo-source-review.md.
+NEATLINE_TOLERANCE_PX = 3.0
 MIN_CONTRAST = 15.0
+GRATICULE_SAMPLES = 129
 EDGE_SAMPLES = 8
+
+# Where `_ring` puts each corner, so a caller can check the corners and not just the edges.
+RING_CORNER_INDEX = {
+    "sw": 0,
+    "se": EDGE_SAMPLES + 1,
+    "ne": 2 * (EDGE_SAMPLES + 1),
+    "nw": 3 * (EDGE_SAMPLES + 1),
+}
+
+# Which end of each edge a verification band sits at, in the order the edge is densified.
+EDGE_ENDS = {
+    "west": ("north", "south"),
+    "east": ("north", "south"),
+    "north": ("west", "east"),
+    "south": ("west", "east"),
+}
 
 # The allowlist. Dates are transcribed from the per-sheet topo_index.csv columns for each
 # source ID; `check` re-derives them from the index and fails on any disagreement.
@@ -409,15 +432,17 @@ def _edge_profile(dataset, window: Window, axis: int) -> np.ndarray:
     return block.mean(axis=axis)
 
 
-def _locate(dataset, window: Window, axis: int, start: int, label: str, path: Path) -> dict:
+def _locate(
+    dataset, window: Window, axis: int, start: int, label: str, end: str, path: Path
+) -> dict:
     profile = _edge_profile(dataset, window, axis)
     index = int(profile.argmin())
     darkest = float(profile[index])
     median = float(np.median(profile))
     if median - darkest < MIN_CONTRAST:
         fail(
-            f"{path.name}: no {label} neatline found; darkest line {darkest:.1f} against "
-            f"collar median {median:.1f}. The crop cannot be verified."
+            f"{path.name}: no {label} neatline found at the {end} end; darkest line "
+            f"{darkest:.1f} against collar median {median:.1f}. The crop cannot be verified."
         )
     return {
         "pixel": start + index,
@@ -426,11 +451,76 @@ def _locate(dataset, window: Window, axis: int, start: int, label: str, path: Pa
     }
 
 
-def inspect_source(path: Path, row: dict) -> dict:
-    """Locate the drawn neatline in a source scan and express it in WGS84.
+def _graticule_edges(dataset, forward: Transformer, seed: tuple) -> dict[str, dict]:
+    """The four labelled graticule edges in pixel space, densified along each edge.
 
-    The graticule corners from the index only seed the search; the accepted locators are
-    the darkest lines actually found in the scan, so a mislabelled corner cannot pass.
+    `along` runs north to south on a meridian and west to east on a parallel, so a band
+    anywhere on the edge can be interpolated instead of assumed straight.
+    """
+    west, south, east, north = seed
+    lats = np.linspace(north, south, GRATICULE_SAMPLES)
+    lons = np.linspace(west, east, GRATICULE_SAMPLES)
+    edges = {}
+    for label, lon in (("west", west), ("east", east)):
+        xs, ys = forward.transform(np.full_like(lats, lon), lats)
+        rows, cols = rowcol(dataset.transform, xs, ys, op=float)
+        edges[label] = {"axis": 0, "along": np.asarray(rows), "across": np.asarray(cols)}
+    for label, lat in (("north", north), ("south", south)):
+        xs, ys = forward.transform(lons, np.full_like(lons, lat))
+        rows, cols = rowcol(dataset.transform, xs, ys, op=float)
+        edges[label] = {"axis": 1, "along": np.asarray(cols), "across": np.asarray(rows)}
+    return edges
+
+
+def _verify_edges(dataset, edges: dict[str, dict], search: int, path: Path) -> dict:
+    """Check the drawn neatline against the projected graticule at both ends of each edge.
+
+    An axis-aligned crop passes a mid-edge check and still cuts metres of map content at
+    the south corners, because the meridians converge (PR #47).
+    """
+    locators = {}
+    for label, edge in edges.items():
+        along, across = edge["along"], edge["across"]
+        start, length = along[0], along[-1] - along[0]
+        found = {}
+        for end, offset in zip(
+            EDGE_ENDS[label],
+            (INSET_FRACTION, 1.0 - INSET_FRACTION - BAND_FRACTION),
+            strict=True,
+        ):
+            band_start = round(start + offset * length)
+            band_span = round(BAND_FRACTION * length)
+            middle = band_start + band_span / 2
+            graticule = float(np.interp(middle, along, across))
+            centre = round(graticule)
+            if edge["axis"] == 0:
+                window = Window(centre - search, band_start, 2 * search + 1, band_span)
+            else:
+                window = Window(band_start, centre - search, band_span, 2 * search + 1)
+            measured = _locate(dataset, window, edge["axis"], centre - search, label, end, path)
+            residual = measured["pixel"] - graticule
+            if abs(residual) > NEATLINE_TOLERANCE_PX:
+                fail(
+                    f"{path.name}: the drawn {label} neatline is {residual:+.2f} px from the "
+                    f"labelled graticule at the {end} end, over the {NEATLINE_TOLERANCE_PX} px "
+                    "limit. The crop cannot be verified."
+                )
+            measured["graticule_px"] = round(graticule, 2)
+            measured["residual_px"] = round(residual, 2)
+            found[f"{end}_end"] = measured
+        found["max_abs_residual_px"] = max(
+            abs(value["residual_px"]) for value in found.values()
+        )
+        locators[label] = found
+    return locators
+
+
+def inspect_source(path: Path, row: dict) -> dict:
+    """Derive the crop from the labelled graticule and verify the drawn neatline against it.
+
+    The crop is the graticule quadrilateral, not a rectangle in the source projection: the
+    east and west neatlines are meridians and they converge. The scan is read to verify
+    that the drawn line really sits on that quadrilateral at both ends of every edge.
     """
     with rasterio.open(path) as dataset:
         if dataset.crs is None:
@@ -446,68 +536,38 @@ def inspect_source(path: Path, row: dict) -> dict:
             float(row["north"]),
         )
         forward = Transformer.from_crs(geodetic, crs, always_xy=True)
-        pixels = {}
-        for name, (lon, lat) in {
-            "nw": (seed[0], seed[3]),
-            "ne": (seed[2], seed[3]),
-            "sw": (seed[0], seed[1]),
-            "se": (seed[2], seed[1]),
-        }.items():
-            x, y = forward.transform(lon, lat)
-            pixels[name] = rowcol(dataset.transform, x, y, op=float)
-        top = round((pixels["nw"][0] + pixels["ne"][0]) / 2)
-        bottom = round((pixels["sw"][0] + pixels["se"][0]) / 2)
-        left = round((pixels["nw"][1] + pixels["sw"][1]) / 2)
-        right = round((pixels["ne"][1] + pixels["se"][1]) / 2)
-        if not (0 < top < bottom < dataset.height and 0 < left < right < dataset.width):
-            fail(f"{path.name}: the graticule corners do not fall inside the scan.")
-
+        edges = _graticule_edges(dataset, forward, seed)
         pixel_size = abs(dataset.transform.a)
         search = max(8, round(SEARCH_METRES / pixel_size))
-        inset_rows = round(INSET_FRACTION * (bottom - top))
-        inset_cols = round(INSET_FRACTION * (right - left))
+        all_rows = np.concatenate(
+            [edge["along" if edge["axis"] == 0 else "across"] for edge in edges.values()]
+        )
+        all_cols = np.concatenate(
+            [edge["across" if edge["axis"] == 0 else "along"] for edge in edges.values()]
+        )
         if (
-            left - search < 0
-            or right + search >= dataset.width
-            or top - search < 0
-            or bottom + search >= dataset.height
+            all_rows.min() - search < 0
+            or all_rows.max() + search >= dataset.height
+            or all_cols.min() - search < 0
+            or all_cols.max() + search >= dataset.width
         ):
-            fail(f"{path.name}: the neatline search window falls outside the scan.")
-
-        locators = {}
-        for label, centre in (("west", left), ("east", right)):
-            window = Window(
-                centre - search,
-                top + inset_rows,
-                2 * search + 1,
-                (bottom - top) - 2 * inset_rows,
+            fail(
+                f"{path.name}: the graticule quadrilateral or its neatline search window "
+                "falls outside the scan."
             )
-            found = _locate(dataset, window, 0, centre - search, label, path)
-            found["offset_from_graticule_px"] = found["pixel"] - centre
-            locators[label] = found
-        for label, centre in (("north", top), ("south", bottom)):
-            window = Window(
-                left + inset_cols,
-                centre - search,
-                (right - left) - 2 * inset_cols,
-                2 * search + 1,
-            )
-            found = _locate(dataset, window, 1, centre - search, label, path)
-            found["offset_from_graticule_px"] = found["pixel"] - centre
-            locators[label] = found
 
-        x_west = dataset.xy(0, locators["west"]["pixel"])[0]
-        x_east = dataset.xy(0, locators["east"]["pixel"])[0]
-        y_north = dataset.xy(locators["north"]["pixel"], 0)[1]
-        y_south = dataset.xy(locators["south"]["pixel"], 0)[1]
+        locators = _verify_edges(dataset, edges, search, path)
 
         inverse = Transformer.from_crs(crs, geodetic, always_xy=True)
         shift, datum_note = datum_transformer(geodetic, seed)
 
+        def geodetic_to_wgs84(points: list[tuple[float, float]]) -> list[list[float]]:
+            lons, lats = shift.transform(*zip(*points, strict=True))
+            return [[q6(lon), q6(lat)] for lon, lat in zip(lons, lats, strict=True)]
+
         def to_wgs84(projected: list[tuple[float, float]]) -> list[list[float]]:
             lons, lats = inverse.transform(*zip(*projected, strict=True))
-            lons, lats = shift.transform(lons, lats)
-            return [[q6(lon), q6(lat)] for lon, lat in zip(lons, lats, strict=True)]
+            return geodetic_to_wgs84(list(zip(lons, lats, strict=True)))
 
         return {
             "path": path.name,
@@ -518,17 +578,22 @@ def inspect_source(path: Path, row: dict) -> dict:
             "datum": geodetic.name,
             "size_px": [dataset.width, dataset.height],
             "pixel_size_metres": round(pixel_size, 4),
-            "graticule_seed_wgs84_labels": list(seed),
+            "graticule_labels_source_datum": list(seed),
             "neatline_locators_px": locators,
+            "max_abs_neatline_residual_px": max(
+                edge["max_abs_residual_px"] for edge in locators.values()
+            ),
             "inspection_method": (
-                "automated: darkest column/row within "
-                f"{SEARCH_METRES:g} m of the projected graticule corner, profiled over the "
-                f"middle {100 - 2 * INSET_FRACTION * 100:g}% of each edge"
+                f"automated: crop = the labelled graticule quadrilateral, {EDGE_SAMPLES + 1} "
+                "points per edge, through the named datum operation; verified against the "
+                f"darkest column/row within {SEARCH_METRES:g} m of that quadrilateral in a "
+                f"{BAND_FRACTION * 100:g}% band at each end of each edge, starting "
+                f"{INSET_FRACTION * 100:g}% in, to a limit of {NEATLINE_TOLERANCE_PX} px"
             ),
             "datum_transformation": datum_note,
             "crop_wgs84": {
                 "type": "Polygon",
-                "coordinates": [to_wgs84(_ring(x_west, y_south, x_east, y_north))],
+                "coordinates": [geodetic_to_wgs84(_ring(*seed))],
             },
             "source_footprint_wgs84": {
                 "type": "Polygon",
@@ -547,7 +612,11 @@ def inspect_source(path: Path, row: dict) -> dict:
 
 
 def _ring(west: float, south: float, east: float, north: float) -> list[tuple[float, float]]:
-    """Counterclockwise rectangle, densified so projection curvature is not lost."""
+    """Counterclockwise quadrilateral, densified so edge curvature is not lost.
+
+    Used on lon/lat graticule bounds and on projected bounds alike; a straight edge in one
+    frame is a curve in the other, and the crop has to carry the curve.
+    """
 
     def span(a: float, b: float) -> list[float]:
         step = (b - a) / (EDGE_SAMPLES + 1)

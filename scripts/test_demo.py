@@ -14,6 +14,7 @@ import yaml
 from affine import Affine
 from click.testing import CliRunner
 from pyproj import CRS, Transformer
+from rasterio.transform import rowcol
 from shapely.geometry import shape
 
 # The graticule corners of the Auburn 7.5-minute quadrangle, as labelled in the index.
@@ -143,11 +144,16 @@ def index_row(topo_id):
     return row
 
 
-def write_fixture_scan(path, wkt, *, pixel_size=10.0, margin_px=120):
-    """A synthetic scan: white map inside a drawn neatline, grey decorative collar."""
+def write_fixture_scan(path, wkt, *, pixel_size=2.032, margin_px=120):
+    """A synthetic scan: white map inside a drawn neatline, grey decorative collar.
+
+    The neatline is rasterised along the projected graticule, so the east and west sides
+    lean with meridian convergence as they do on the real sheets (PR #47). A fixture with
+    axis-aligned sides cannot tell a tilt-aware crop from a rectangle.
+    """
     crs = CRS.from_wkt(wkt)
     forward = Transformer.from_crs(CRS.from_epsg(4267), crs, always_xy=True)
-    corners = {
+    corner_xy = {
         name: forward.transform(lon, lat)
         for name, (lon, lat) in {
             "nw": (SEED[0], SEED[3]),
@@ -156,32 +162,61 @@ def write_fixture_scan(path, wkt, *, pixel_size=10.0, margin_px=120):
             "se": (SEED[2], SEED[1]),
         }.items()
     }
-    x_west = (corners["nw"][0] + corners["sw"][0]) / 2
-    x_east = (corners["ne"][0] + corners["se"][0]) / 2
-    y_north = (corners["nw"][1] + corners["ne"][1]) / 2
-    y_south = (corners["sw"][1] + corners["se"][1]) / 2
-    quad_cols = round((x_east - x_west) / pixel_size)
-    quad_rows = round((y_north - y_south) / pixel_size)
-    width = quad_cols + 2 * margin_px + 1
-    height = quad_rows + 2 * margin_px + 1
+    xs = [x for x, _ in corner_xy.values()]
+    ys = [y for _, y in corner_xy.values()]
+    width = round((max(xs) - min(xs)) / pixel_size) + 2 * margin_px + 1
+    height = round((max(ys) - min(ys)) / pixel_size) + 2 * margin_px + 1
     transform = Affine(
         pixel_size,
         0.0,
-        x_west - margin_px * pixel_size,
+        min(xs) - margin_px * pixel_size,
         0.0,
         -pixel_size,
-        y_north + margin_px * pixel_size,
+        max(ys) + margin_px * pixel_size,
     )
 
+    def edge(lons, lats):
+        x, y = forward.transform(np.asarray(lons), np.asarray(lats))
+        row, col = rowcol(transform, x, y, op=float)
+        return np.asarray(row), np.asarray(col)
+
+    samples = 512
+    lats = np.linspace(SEED[3], SEED[1], samples)
+    lons = np.linspace(SEED[0], SEED[2], samples)
+    west_rows, west_cols = edge(np.full(samples, SEED[0]), lats)
+    east_rows, east_cols = edge(np.full(samples, SEED[2]), lats)
+    north_rows, north_cols = edge(lons, np.full(samples, SEED[3]))
+    south_rows, south_cols = edge(lons, np.full(samples, SEED[1]))
+
+    all_rows = np.arange(height, dtype=float)
+    all_cols = np.arange(width, dtype=float)
+    # np.interp holds the end value beyond each edge, so the lines run past the corners.
+    west_at = np.interp(all_rows, west_rows, west_cols)
+    east_at = np.interp(all_rows, east_rows, east_cols)
+    north_at = np.interp(all_cols, north_cols, north_rows)
+    south_at = np.interp(all_cols, south_cols, south_rows)
+
     data = np.full((height, width), 200, dtype="uint8")
-    left, right = margin_px, margin_px + quad_cols
-    top, bottom = margin_px, margin_px + quad_rows
-    data[top : bottom + 1, left : right + 1] = 255
-    for centre, value in ((0, 40), (1, 0), (-1, 40)):
-        data[:, left + centre] = value
-        data[:, right + centre] = value
-        data[top + centre, :] = value
-        data[bottom + centre, :] = value
+    for row in range(height):
+        inside = (
+            (all_cols >= west_at[row])
+            & (all_cols <= east_at[row])
+            & (row >= north_at)
+            & (row <= south_at)
+        )
+        data[row, inside] = 255
+    for row in range(height):
+        for centre in (west_at[row], east_at[row]):
+            for offset, value in ((-1, 40), (0, 0), (1, 40)):
+                column = int(round(centre)) + offset
+                if 0 <= column < width:
+                    data[row, column] = value
+    for column in range(width):
+        for centre in (north_at[column], south_at[column]):
+            for offset, value in ((-1, 40), (0, 0), (1, 40)):
+                row = int(round(centre)) + offset
+                if 0 <= row < height:
+                    data[row, column] = value
 
     with rasterio.open(
         path,
@@ -197,6 +232,47 @@ def write_fixture_scan(path, wkt, *, pixel_size=10.0, margin_px=120):
     ) as dataset:
         dataset.write(data, 1)
     return path
+
+
+def drawn_corners_px(path):
+    """Where the fixture actually drew its four neatline corners, in pixel coordinates.
+
+    The two lines meeting at a corner are both rasterised through the projected graticule
+    corner, so that projected point is the drawn intersection.
+    """
+    with rasterio.open(path) as dataset:
+        crs = CRS.from_user_input(dataset.crs)
+        forward = Transformer.from_crs(CRS.from_epsg(4267), crs, always_xy=True)
+        corners = {}
+        for name, (lon, lat) in {
+            "nw": (SEED[0], SEED[3]),
+            "ne": (SEED[2], SEED[3]),
+            "sw": (SEED[0], SEED[1]),
+            "se": (SEED[2], SEED[1]),
+        }.items():
+            x, y = forward.transform(lon, lat)
+            corners[name] = rowcol(dataset.transform, x, y, op=float)
+        return corners
+
+
+def crop_corners_px(path, report):
+    """The crop's four corners, brought back into the scan's pixel grid.
+
+    The datum shift is undone with the very operation `demo` chose, so only the crop's
+    geometry is under test here and not PROJ's choice of transformation.
+    """
+    ring = report["crop_wgs84"]["coordinates"][0]
+    with rasterio.open(path) as dataset:
+        crs = CRS.from_user_input(dataset.crs)
+        geodetic = crs.geodetic_crs
+        forward = Transformer.from_crs(geodetic, crs, always_xy=True)
+        shift, _ = demo.datum_transformer(geodetic, SEED)
+        corners = {}
+        for name, index in demo.RING_CORNER_INDEX.items():
+            lon, lat = shift.transform(*ring[index], direction="INVERSE")
+            x, y = forward.transform(lon, lat)
+            corners[name] = rowcol(dataset.transform, x, y, op=float)
+        return corners
 
 
 def receipt(topo_id, path, root):
@@ -605,7 +681,7 @@ def test_inverted_latitude_bounds_rejected(tree):
 
 def test_bounds_wider_than_common_footprint_rejected(tree):
     def mutate(manifest):
-        manifest["view_bounds_wgs84"][0] -= 0.01
+        manifest["view_bounds_wgs84"][0] = demo.q6(manifest["view_bounds_wgs84"][0] - 0.01)
 
     assert "common mapped footprint" in failure(tree, mutate)
 
@@ -649,15 +725,56 @@ def test_excess_coordinate_precision_rejected(tree):
 
 def test_scan_margin_is_excluded_from_the_crop(tree, scans):
     """The verified crop must sit inside the scan, not on its outer edge."""
-    _, reports = scans
+    paths, reports = scans
     for eid in demo.EDITION_ORDER:
         crop = shape(reports[eid]["crop_wgs84"])
         footprint = shape(reports[eid]["source_footprint_wgs84"])
         assert crop.within(footprint)
         assert crop.area < footprint.area
-        for locator in reports[eid]["neatline_locators_px"].values():
-            assert abs(locator["offset_from_graticule_px"]) <= 2
-            assert locator["darkest_mean_value"] < locator["profile_median_value"]
+        drawn = drawn_corners_px(paths[eid])
+        cropped = crop_corners_px(paths[eid], reports[eid])
+        for name, (row, col) in drawn.items():
+            assert abs(cropped[name][0] - row) <= 1, (eid, name)
+            assert abs(cropped[name][1] - col) <= 1, (eid, name)
+        for edge in reports[eid]["neatline_locators_px"].values():
+            for end in (value for key, value in edge.items() if key.endswith("_end")):
+                assert abs(end["residual_px"]) <= 1
+                assert end["darkest_mean_value"] < end["profile_median_value"]
+
+
+def test_fixture_neatline_leans_the_way_the_real_scans_do(scans):
+    """Guards the guard: a fixture with straight sides could not catch a rectangular crop."""
+    paths, _ = scans
+    for eid in demo.EDITION_ORDER:
+        drawn = drawn_corners_px(paths[eid])
+        lean = abs((drawn["nw"][1] - drawn["sw"][1]) - (drawn["ne"][1] - drawn["se"][1]))
+        assert lean > 4, (eid, lean)
+
+
+def test_axis_aligned_crop_is_rejected(tree, scans):
+    """The crop that the pre-#47 code produced: corner columns and rows averaged."""
+    paths, reports = scans
+    eid = demo.EDITION_ORDER[0]
+    drawn = drawn_corners_px(paths[eid])
+    with rasterio.open(paths[eid]) as dataset:
+        crs = CRS.from_user_input(dataset.crs)
+        geodetic = crs.geodetic_crs
+        inverse = Transformer.from_crs(crs, geodetic, always_xy=True)
+        shift, _ = demo.datum_transformer(geodetic, SEED)
+        west = dataset.xy(0, round((drawn["nw"][1] + drawn["sw"][1]) / 2))[0]
+        east = dataset.xy(0, round((drawn["ne"][1] + drawn["se"][1]) / 2))[0]
+        north = dataset.xy(round((drawn["nw"][0] + drawn["ne"][0]) / 2), 0)[1]
+        south = dataset.xy(round((drawn["sw"][0] + drawn["se"][0]) / 2), 0)[1]
+    ring = demo._ring(west, south, east, north)
+    lons, lats = inverse.transform(*zip(*ring, strict=True))
+    lons, lats = shift.transform(lons, lats)
+    rectangle = [[demo.q6(lon), demo.q6(lat)] for lon, lat in zip(lons, lats, strict=True)]
+    assert rectangle != reports[eid]["crop_wgs84"]["coordinates"][0]
+
+    def mutate(manifest):
+        manifest["editions"][0]["crop_wgs84"]["coordinates"][0] = rectangle
+
+    assert "off the inspected neatline" in failure(tree, mutate)
 
 
 def test_scan_without_a_neatline_cannot_be_verified(tmp_path, scans):
