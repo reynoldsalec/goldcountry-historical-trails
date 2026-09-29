@@ -1,4 +1,4 @@
-"""D2a: the COG preparation stage, on synthetic scans only.
+"""D2a and D2b: the COG preparation and XYZ tiling stages, on synthetic scans only.
 
 The four-edition fixture tree comes from test_demo.py so both stages are checked against
 the same synthetic sources. Nothing here reads data/raw/ or the committed receipt ledger.
@@ -17,20 +17,31 @@ import warp_raster
 from click.testing import CliRunner
 from pyproj import CRS, Transformer
 from rasterio.transform import Affine
+from shapely.geometry import Point
 from warp_raster import WarpError
 
 # The full-resolution grid is zoom 16; these run at zoom 12 so a warp costs a second.
 TEST_ZOOM = 12
+# The committed view bounds, so a hand-built grid here is the one the demo really uses.
+VIEW_BOUNDS = [-121.126028, 38.874881, -121.001023, 38.99988]
 
 scans = test_demo.scans
 tree = test_demo.tree
 
 
 def run_cogs(tree, build_root, *args):
+    return _invoke(tree, build_root, "cogs", args)
+
+
+def run_rasters(tree, build_root, *args):
+    return _invoke(tree, build_root, "rasters", args)
+
+
+def _invoke(tree, build_root, command, args):
     return CliRunner().invoke(
         demo.cli,
         [
-            "cogs",
+            command,
             "--manifest",
             str(tree.manifest_path),
             "--schema",
@@ -604,3 +615,520 @@ def test_a_white_patch_stays_white_through_the_datum_shift(tmp_path):
         data, coverage = warp_raster.warp(dataset, grid, "nearest", operation["pipeline"])
     assert coverage.any()
     assert set(np.unique(data[0][coverage > 0])) == {255}
+
+
+# === D2b: the bounded XYZ PNG pyramid ==================================================
+
+
+def synthetic_cog(path, grid, *, north=255, south=100, margin=64):
+    """A COG on the shared grid whose north half differs from its south half.
+
+    A pyramid written with TMS y, or with a mirrored window, puts the southern value in the
+    northern tile, which no uniform fixture could reveal.
+    """
+    height, width = grid["height"], grid["width"]
+    data = np.full((1, height, width), south, "uint8")
+    data[0, : height // 2] = north
+    alpha = np.zeros((height, width), "uint8")
+    alpha[margin : height - margin, margin : width - margin] = 255
+    data[:, alpha == 0] = 0
+    warp_raster.write_cog(path, data, alpha, grid, "nearest")
+    return path
+
+
+def tile_path(root, zoom, x, y):
+    return root / str(zoom) / str(x) / f"{y}.png"
+
+
+def read_tile(root, zoom, x, y):
+    with rasterio.open(tile_path(root, zoom, x, y)) as dataset:
+        return dataset.read()
+
+
+def tiles_record(build_root):
+    return record_of(build_root)["tiles"]
+
+
+def published_tiles(build_root):
+    root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR
+    return sorted(p.relative_to(root).as_posix() for p in root.rglob("*.png"))
+
+
+# --- the XYZ convention ----------------------------------------------------------------
+
+
+def test_tile_numbering_is_xyz_and_not_tms():
+    assert warp_raster.tile_xy(-179.0, 85.0, 1) == (0, 0)
+    assert warp_raster.tile_xy(1.0, -1.0, 1) == (1, 1)
+    north = warp_raster.tile_xy(-121.06, 38.99, 14)
+    south = warp_raster.tile_xy(-121.06, 38.88, 14)
+    # TMS counts y up from the south; XYZ counts it down from the north.
+    assert north[1] < south[1]
+    assert north[0] == south[0]
+
+
+def test_the_tile_pixel_of_a_coordinate_is_inside_its_tile():
+    located = warp_raster.tile_pixel(-121.06, 38.94, 16)
+    assert (located["x"], located["y"]) == warp_raster.tile_xy(-121.06, 38.94, 16)
+    assert 0 <= located["column"] < warp_raster.TILE_SIZE
+    assert 0 <= located["row"] < warp_raster.TILE_SIZE
+
+
+def test_the_tile_range_matches_the_grid_and_halves_each_level():
+    grid = warp_raster.common_grid(VIEW_BOUNDS, 16)
+    assert warp_raster.tile_indices(grid, 16) == grid["tile_range"]
+    for zoom in range(10, 16):
+        coarse = warp_raster.tile_indices(grid, zoom)
+        finer = warp_raster.tile_indices(grid, zoom + 1)
+        assert coarse["x_min"] == finer["x_min"] // 2
+        assert coarse["y_max"] == finer["y_max"] // 2
+
+
+def test_a_zoom_finer_than_the_grid_is_refused():
+    grid = warp_raster.common_grid(VIEW_BOUNDS, 12)
+    with pytest.raises(WarpError, match="finer than the grid"):
+        warp_raster.tile_indices(grid, 13)
+
+
+def test_the_tile_window_is_whole_pixels_of_the_shared_grid():
+    grid = warp_raster.common_grid(VIEW_BOUNDS, 14)
+    extent = grid["tile_range"]
+    top_left = warp_raster.tile_window(grid, 14, extent["x_min"], extent["y_min"])
+    assert (top_left.col_off, top_left.row_off) == (0, 0)
+    assert (top_left.width, top_left.height) == (warp_raster.TILE_SIZE,) * 2
+    coarse = warp_raster.tile_window(grid, 12, extent["x_min"] // 4, extent["y_min"] // 4)
+    assert coarse.width == coarse.height == warp_raster.TILE_SIZE * 4
+    assert float(coarse.col_off).is_integer() and float(coarse.row_off).is_integer()
+
+
+# --- the tiles themselves --------------------------------------------------------------
+
+
+def test_the_top_zoom_tile_is_a_block_copy_of_the_cog(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM], "nearest", out)
+    extent = grid["tile_range"]
+    with rasterio.open(cog) as dataset:
+        block = dataset.read(window=warp_raster.Window(0, 0, 256, 256))
+    assert np.array_equal(read_tile(out, TEST_ZOOM, extent["x_min"], extent["y_min"]), block)
+
+
+def test_the_northern_tile_holds_the_northern_half_of_the_cog(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid, north=255, south=100)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM], "nearest", out)
+    extent = grid["tile_range"]
+    top = read_tile(out, TEST_ZOOM, extent["x_min"], extent["y_min"])
+    bottom = read_tile(out, TEST_ZOOM, extent["x_min"], extent["y_max"])
+    assert set(np.unique(top[0][top[1] > 0])) == {255}
+    assert set(np.unique(bottom[0][bottom[1] > 0])) == {100}
+
+
+def test_tiles_are_png_with_an_alpha_band(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM], "nearest", out)
+    extent = grid["tile_range"]
+    with rasterio.open(tile_path(out, TEST_ZOOM, extent["x_min"], extent["y_min"])) as tile:
+        assert tile.driver == "PNG"
+        assert tile.count == 2
+        assert tile.colorinterp[-1] == rasterio.enums.ColorInterp.alpha
+        assert (tile.width, tile.height) == (warp_raster.TILE_SIZE,) * 2
+    # PAM sidecars would make the pyramid's file set unstable.
+    assert list(out.rglob("*.aux.xml")) == []
+
+
+def test_empty_parts_of_the_footprint_get_fully_transparent_tiles(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    height, width = grid["height"], grid["width"]
+    data = np.zeros((1, height, width), "uint8")
+    alpha = np.zeros((height, width), "uint8")
+    # Only the first tile of the grid carries data; the rest of the pyramid is empty.
+    data[0, :256, :256] = 200
+    alpha[:256, :256] = 255
+    cog = tmp_path / "corner.tif"
+    warp_raster.write_cog(cog, data, alpha, grid, "nearest")
+    out = tmp_path / "tiles"
+    cut = warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM], "nearest", out)
+    extent = grid["tile_range"]
+    expected = (extent["x_max"] - extent["x_min"] + 1) * (extent["y_max"] - extent["y_min"] + 1)
+    assert cut["tiles"] == expected
+    assert cut["transparent_tiles"] == expected - 1
+    empty = read_tile(out, TEST_ZOOM, extent["x_max"], extent["y_max"])
+    assert empty.shape == (2, 256, 256)
+    assert empty.max() == 0
+
+
+def test_no_tile_is_written_outside_the_bounded_range(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM - 1, TEST_ZOOM], "nearest", out)
+    extent = grid["tile_range"]
+    assert not tile_path(out, TEST_ZOOM, extent["x_min"], extent["y_min"] - 1).exists()
+    assert not tile_path(out, TEST_ZOOM, extent["x_max"] + 1, extent["y_min"]).exists()
+    assert sorted(int(p.name) for p in out.iterdir()) == [TEST_ZOOM - 1, TEST_ZOOM]
+
+
+def test_alpha_stays_two_valued_at_every_zoom_even_under_cubic(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM - 2, TEST_ZOOM - 1, TEST_ZOOM], "cubic", out)
+    for path in out.rglob("*.png"):
+        with rasterio.open(path) as tile:
+            pixels = tile.read()
+        assert set(np.unique(pixels[-1])) <= {0, 255}
+        # Colour never survives where the tile is transparent.
+        assert pixels[0][pixels[-1] == 0].max(initial=0) == 0
+
+
+def test_each_level_records_its_opaque_and_ink_pixel_counts(tmp_path):
+    """The ink count is how much drawn line survives a zoom; the synthetic south half is ink."""
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid, north=255, south=100)
+    cut = warp_raster.cut_pyramid(
+        cog, grid, [TEST_ZOOM - 1, TEST_ZOOM], "nearest", tmp_path / "tiles"
+    )
+    with rasterio.open(cog) as dataset:
+        pixels = dataset.read()
+    opaque = pixels[-1] > 0
+    levels = {level["zoom"]: level for level in cut["levels"]}
+    assert levels[TEST_ZOOM]["opaque_px"] == int(opaque.sum())
+    assert levels[TEST_ZOOM]["ink_px"] == int(
+        (opaque & (pixels[0] < warp_raster.INK_THRESHOLD)).sum()
+    )
+    assert 0 < levels[TEST_ZOOM - 1]["ink_px"] < levels[TEST_ZOOM]["ink_px"]
+
+
+def test_a_cog_that_is_not_on_the_shared_grid_is_refused(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    other = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM - 1)
+    cog = synthetic_cog(tmp_path / "cog.tif", other)
+    with pytest.raises(WarpError, match="not the shared grid"):
+        warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM], "nearest", tmp_path / "tiles")
+
+
+def test_a_stray_file_in_a_pyramid_is_reported(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM], "nearest", out)
+    (out / str(TEST_ZOOM) / "notes.txt").write_text("stray", encoding="utf-8")
+    with pytest.raises(WarpError, match="not tiles"):
+        warp_raster.pyramid_digest(out)
+
+
+# --- the sample-point check ------------------------------------------------------------
+
+
+def sample_pair(grid):
+    """Two points inside the synthetic COG's opaque area, one north and one south of centre."""
+    left, bottom, right, top = grid["bounds"]
+    inverse = Transformer.from_crs(3857, 4326, always_xy=True)
+    lon, north_lat = inverse.transform((left + right) / 2, top - 0.25 * (top - bottom))
+    _, south_lat = inverse.transform((left + right) / 2, bottom + 0.25 * (top - bottom))
+    return {"north": (lon, north_lat), "south": (lon, south_lat)}
+
+
+def test_the_sample_points_resolve_to_the_tile_holding_their_pixels(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM], "nearest", out)
+    samples = sample_pair(grid)
+    checked = warp_raster.verify_tile_samples(cog, out, grid, TEST_ZOOM, samples)
+    by_name = {sample["name"]: sample for sample in checked}
+    assert by_name["north"]["opaque"] and by_name["south"]["opaque"]
+    north_y = int(by_name["north"]["tile"].split("/")[2])
+    south_y = int(by_name["south"]["tile"].split("/")[2])
+    assert north_y < south_y
+    assert by_name["north"]["values"][0] == 255
+    assert by_name["south"]["values"][0] == 100
+
+
+def test_a_pyramid_with_tms_y_fails_the_sample_check(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM], "nearest", out)
+    extent = grid["tile_range"]
+    mirrored = {}
+    for x in range(extent["x_min"], extent["x_max"] + 1):
+        for y in range(extent["y_min"], extent["y_max"] + 1):
+            flipped = extent["y_min"] + extent["y_max"] - y
+            mirrored[(x, flipped)] = tile_path(out, TEST_ZOOM, x, y).read_bytes()
+    for (x, y), payload in mirrored.items():
+        tile_path(out, TEST_ZOOM, x, y).write_bytes(payload)
+    with pytest.raises(WarpError, match="does not match the COG"):
+        warp_raster.verify_tile_samples(cog, out, grid, TEST_ZOOM, sample_pair(grid))
+
+
+def test_a_pyramid_cut_from_another_cog_fails_the_sample_check(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    mine = synthetic_cog(tmp_path / "mine.tif", grid, north=255, south=100)
+    other = synthetic_cog(tmp_path / "other.tif", grid, north=60, south=30)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(other, grid, [TEST_ZOOM], "nearest", out)
+    with pytest.raises(WarpError, match="does not match the COG"):
+        warp_raster.verify_tile_samples(mine, out, grid, TEST_ZOOM, sample_pair(grid))
+
+
+def test_a_missing_tile_at_a_sample_point_is_reported(tmp_path):
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    cog = synthetic_cog(tmp_path / "cog.tif", grid)
+    out = tmp_path / "tiles"
+    warp_raster.cut_pyramid(cog, grid, [TEST_ZOOM], "nearest", out)
+    samples = sample_pair(grid)
+    located = warp_raster.tile_pixel(*samples["north"], TEST_ZOOM)
+    tile_path(out, TEST_ZOOM, located["x"], located["y"]).unlink()
+    with pytest.raises(WarpError, match="which is missing"):
+        warp_raster.verify_tile_samples(cog, out, grid, TEST_ZOOM, samples)
+
+
+def test_the_sample_points_sit_inside_the_shared_footprint(tree):
+    footprint = demo.common_footprint(tree.manifest)
+    samples = demo.sample_points(footprint)
+    assert set(samples) == {"north", "south"}
+    for lon, lat in samples.values():
+        assert footprint.contains(Point(lon, lat))
+    assert samples["north"][1] > samples["south"][1]
+
+
+# --- the whole stage, over the four synthetic editions ---------------------------------
+
+
+def test_all_four_pyramids_are_produced_over_the_manifest_zoom_range(tree, tmp_path):
+    build_root = tmp_path / "build"
+    result = run_rasters(tree, build_root)
+    assert result.exit_code == 0, result.output
+    tiles = tiles_record(build_root)
+    assert tiles["scheme"] == "xyz"
+    assert tiles["zoom"] == {"min": tree.manifest["tile_zoom"]["min"], "max": TEST_ZOOM}
+    assert [entry["id"] for entry in tiles["editions"]] == list(demo.EDITION_ORDER)
+    grid = record_of(build_root)["grid"]
+    for entry in tiles["editions"]:
+        root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR / entry["id"]
+        assert entry["template"] == f"tiles/{entry['id']}/{{z}}/{{x}}/{{y}}.png"
+        zooms = sorted(int(p.name) for p in root.iterdir())
+        assert zooms == list(range(tree.manifest["tile_zoom"]["min"], TEST_ZOOM + 1))
+        assert entry["tiles"] == len(list(root.rglob("*.png")))
+        for level in entry["levels"]:
+            assert level["tile_range"] == warp_raster.tile_indices(grid, level["zoom"])
+            assert level["tiles"] == len(list((root / str(level["zoom"])).rglob("*.png")))
+            assert level["bytes"] > 0
+    assert tiles["totals"]["tiles"] == sum(e["tiles"] for e in tiles["editions"])
+    assert tiles["totals"]["bytes"] == sum(e["bytes"] for e in tiles["editions"])
+
+
+def test_each_pyramid_names_its_own_edition_and_cog(tree, tmp_path):
+    build_root = tmp_path / "build"
+    assert run_rasters(tree, build_root).exit_code == 0
+    record = record_of(build_root)
+    cogs = {entry["id"]: entry for entry in record["editions"]}
+    selected = {e["id"]: e["source_id"] for e in tree.manifest["editions"]}
+    for entry in record["tiles"]["editions"]:
+        assert entry["source_id"] == selected[entry["id"]]
+        assert entry["cog_sha256"] == cogs[entry["id"]]["output"]["sha256"]
+        assert entry["resampling"] == cogs[entry["id"]]["resampling"]
+        assert entry["path"] == f"tiles/demo/{entry['id']}"
+    assert record["tiles"]["editions"][2]["resampling"] == "cubic"
+
+
+def test_the_record_says_the_pyramid_is_xyz_and_inspected_automatically(tree, tmp_path):
+    build_root = tmp_path / "build"
+    assert run_rasters(tree, build_root).exit_code == 0
+    notes = tiles_record(build_root)["notes"]
+    assert "XYZ" in notes["y_orientation"]
+    assert "TMS" in notes["y_orientation"]
+    assert "automated only" in notes["inspection"]
+    assert "#38" in notes["human_acceptance"]
+    assert "transparent" in notes["empty_areas"]
+
+
+def test_every_published_tile_carries_alpha_and_zero_colour_outside_it(tree, tmp_path):
+    build_root = tmp_path / "build"
+    assert run_rasters(tree, build_root).exit_code == 0
+    root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR
+    seen = 0
+    for path in root.rglob("*.png"):
+        with rasterio.open(path) as tile:
+            assert tile.colorinterp[-1] == rasterio.enums.ColorInterp.alpha
+            pixels = tile.read()
+        assert set(np.unique(pixels[-1])) <= {0, 255}
+        assert pixels[0][pixels[-1] == 0].max(initial=0) == 0
+        seen += 1
+    assert seen == tiles_record(build_root)["totals"]["tiles"] > 0
+
+
+def test_a_rerun_reuses_every_pyramid_and_rewrites_an_identical_record(tree, tmp_path):
+    build_root = tmp_path / "build"
+    first = run_rasters(tree, build_root)
+    assert first.exit_code == 0, first.output
+    assert first.output.count(": cut") == 4
+    record_path = build_root / demo.RASTER_DIRNAME / demo.PROCESSING_FILENAME
+    before = record_path.read_bytes()
+    root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR
+    stamps = {p: p.stat().st_mtime_ns for p in root.rglob("*.png")}
+    second = run_rasters(tree, build_root)
+    assert second.exit_code == 0, second.output
+    assert ": cut" not in second.output
+    assert second.output.count(": reused") == 4
+    assert record_path.read_bytes() == before
+    assert {p: p.stat().st_mtime_ns for p in root.rglob("*.png")} == stamps
+
+
+def test_a_partial_pyramid_is_cut_again_and_never_recorded_as_complete(tree, tmp_path):
+    build_root = tmp_path / "build"
+    assert run_rasters(tree, build_root).exit_code == 0
+    before = tiles_record(build_root)
+    root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR / "auburn-1973"
+    victim = sorted(root.rglob("*.png"))[-1]
+    victim.unlink()
+    result = run_rasters(tree, build_root)
+    assert result.exit_code == 0, result.output
+    assert "auburn-1973: cut" in result.output
+    assert "auburn-1953: reused" in result.output
+    assert victim.is_file()
+    assert tiles_record(build_root) == before
+
+
+def test_a_tile_whose_bytes_changed_is_cut_again(tree, tmp_path):
+    build_root = tmp_path / "build"
+    assert run_rasters(tree, build_root).exit_code == 0
+    root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR / "auburn-1981"
+    victim = sorted(root.rglob("*.png"))[0]
+    victim.write_bytes(victim.read_bytes()[:-8])
+    result = run_rasters(tree, build_root)
+    assert result.exit_code == 0, result.output
+    assert "auburn-1981: cut" in result.output
+    with rasterio.open(victim) as tile:
+        assert tile.driver == "PNG"
+
+
+def test_a_changed_zoom_range_cuts_every_pyramid_again(tree, tmp_path):
+    build_root = tmp_path / "build"
+    assert run_rasters(tree, build_root).exit_code == 0
+    result = run_rasters(tree, build_root, "--grid-zoom", str(TEST_ZOOM - 1))
+    assert result.exit_code == 0, result.output
+    assert result.output.count(": cut") == 4
+    assert tiles_record(build_root)["zoom"]["max"] == TEST_ZOOM - 1
+
+
+def test_the_tile_fingerprint_follows_the_cog_and_every_parameter():
+    """Stale tiles are found by the key, so the key holds more than the COG's hash."""
+    grid = warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM)
+    versions = {"gdal": "3.10.3"}
+    entry = {
+        "id": "auburn-1953",
+        "resampling": "nearest",
+        "output": {"sha256": "a" * 64, "byte_count": 1024},
+    }
+    zooms = [10, 11, 12]
+    base = warp_raster.fingerprint(demo.tile_plan(entry, grid, zooms, versions))
+    variants = [
+        demo.tile_plan(
+            {**entry, "output": {"sha256": "b" * 64, "byte_count": 1024}}, grid, zooms, versions
+        ),
+        demo.tile_plan(
+            {**entry, "output": {"sha256": "a" * 64, "byte_count": 2048}}, grid, zooms, versions
+        ),
+        demo.tile_plan({**entry, "resampling": "cubic"}, grid, zooms, versions),
+        demo.tile_plan(entry, grid, [10, 11], versions),
+        demo.tile_plan(
+            entry, warp_raster.common_grid(VIEW_BOUNDS, TEST_ZOOM - 1), zooms, versions
+        ),
+        demo.tile_plan(entry, grid, zooms, {"gdal": "3.11.0"}),
+    ]
+    assert (
+        len({warp_raster.fingerprint(plan) for plan in variants} | {base}) == len(variants) + 1
+    )
+
+
+def test_the_top_zoom_never_exceeds_the_grid_the_cogs_are_on(tree, tmp_path):
+    build_root = tmp_path / "build"
+    result = run_rasters(tree, build_root, "--grid-zoom", "10")
+    assert result.exit_code == 0, result.output
+    tiles = tiles_record(build_root)
+    assert tiles["zoom"] == {"min": 10, "max": 10}
+    for entry in tiles["editions"]:
+        root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR / entry["id"]
+        assert [p.name for p in root.iterdir()] == ["10"]
+        assert entry["tiles"] == 1
+
+
+def test_a_failure_part_way_through_publishes_no_pyramid(tree, tmp_path, monkeypatch):
+    build_root = tmp_path / "build"
+    real = warp_raster.cut_pyramid
+    calls = []
+
+    def fail_on_the_third(cog_path, *args, **kwargs):
+        calls.append(cog_path.name)
+        if len(calls) == 3:
+            raise WarpError("disk full")
+        return real(cog_path, *args, **kwargs)
+
+    monkeypatch.setattr(warp_raster, "cut_pyramid", fail_on_the_third)
+    result = run_rasters(tree, build_root)
+    assert result.exit_code != 0
+    assert "disk full" in result.output
+    assert published_tiles(build_root) == []
+    assert "tiles" not in record_of(build_root)
+    assert not (build_root / demo.TILE_DIRNAME / demo.INCOMING_DIRNAME).exists()
+
+
+def test_a_later_failure_leaves_the_published_pyramids_and_record_intact(
+    tree, tmp_path, monkeypatch
+):
+    build_root = tmp_path / "build"
+    assert run_rasters(tree, build_root).exit_code == 0
+    root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR
+    published = {p: p.read_bytes() for p in root.rglob("*.png")}
+    record_path = build_root / demo.RASTER_DIRNAME / demo.PROCESSING_FILENAME
+    record_bytes = record_path.read_bytes()
+
+    def refuse(*args, **kwargs):
+        raise WarpError("tiler crashed")
+
+    monkeypatch.setattr(warp_raster, "cut_pyramid", refuse)
+    # A different zoom range invalidates all four, so all four would have been republished.
+    result = run_rasters(tree, build_root, "--grid-zoom", str(TEST_ZOOM - 1))
+    assert result.exit_code != 0
+    assert {p: p.read_bytes() for p in root.rglob("*.png")} == published
+    assert not (build_root / demo.TILE_DIRNAME / demo.INCOMING_DIRNAME).exists()
+    # The COG stage reran, so the record was rewritten; its tiles section still describes
+    # exactly the pyramids that are on disk.
+    reread = json.loads(record_path.read_bytes())["tiles"]
+    assert reread == json.loads(record_bytes)["tiles"]
+    for entry in reread["editions"]:
+        assert warp_raster.pyramid_digest(root / entry["id"])[0] == entry["digest"]
+
+
+def test_an_unexpected_directory_under_the_tile_root_is_reported(tree, tmp_path):
+    build_root = tmp_path / "build"
+    assert run_rasters(tree, build_root).exit_code == 0
+    (build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR / "auburn-1999").mkdir()
+    result = run_rasters(tree, build_root)
+    assert result.exit_code != 0
+    assert "unexpected entries" in result.output
+
+
+def test_a_tiling_run_changes_no_raw_byte_and_no_receipt(tree, tmp_path):
+    before = tree_digests(tree)
+    result = run_rasters(tree, tmp_path / "build")
+    assert result.exit_code == 0, result.output
+    assert tree_digests(tree) == before
+
+
+def test_the_cog_stage_keeps_a_valid_pyramid_from_looking_stale(tree, tmp_path):
+    build_root = tmp_path / "build"
+    assert run_rasters(tree, build_root).exit_code == 0
+    assert run_cogs(tree, build_root).exit_code == 0
+    assert "tiles" in record_of(build_root)
+    result = run_rasters(tree, build_root)
+    assert result.exit_code == 0, result.output
+    assert result.output.count(": reused") == 4

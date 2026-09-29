@@ -14,7 +14,7 @@ export TRAIL_ARCHIVE_ROOT
         coverage-ready coverage-report \
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup \
-        demo-check demo-inspect demo-test demo-cogs
+        demo-check demo-inspect demo-test demo-cogs demo-rasters
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -107,6 +107,12 @@ demo-inspect:
 # only what changed. See docs/demo-processing.md.
 demo-cogs:
 	$(RUN) python scripts/demo.py cogs
+
+## preflight + COGs + bounded XYZ PNG tiles -> build/tiles/demo/<edition>/{z}/{x}/{y}.png (D2b)
+# Zooms 10-16, XYZ y orientation, cut with the same bundled GDAL as demo-cogs. Unchanged
+# pyramids are reused. See docs/demo-processing.md.
+demo-rasters:
+	$(RUN) python scripts/demo.py rasters
 
 demo-test:
 	$(RUN) pytest -q scripts/test_demo.py scripts/test_demo_rasters.py
