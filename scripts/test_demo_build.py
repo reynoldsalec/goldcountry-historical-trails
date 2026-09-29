@@ -338,6 +338,32 @@ def test_a_bundle_without_a_page_or_a_script_is_refused(prepared, tmp_path):
     assert "no index.html" in str(error.value)
 
 
+def test_a_root_absolute_asset_reference_is_refused(prepared, tmp_path):
+    dist = write_dist(tmp_path / "rooted-dist")
+    (dist / "index.html").write_text(
+        '<!doctype html><html lang="en"><body>'
+        '<script type="module" src="/assets/index.js"></script></body></html>\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(click.ClickException) as error:
+        prepared.assemble(dist=dist)
+    assert "relative same-origin paths" in str(error.value)
+    assert not prepared.public.exists()
+
+
+def test_the_published_page_resolves_its_assets_relatively(prepared):
+    prepared.assemble()
+    references = [
+        reference
+        for reference in build_site.REFERENCE_PATTERN.findall(
+            (prepared.public / "index.html").read_text(encoding="utf-8")
+        )
+        if not reference.startswith("data:")
+    ]
+    assert references
+    assert all(not r.startswith("/") and "://" not in r for r in references)
+
+
 def test_the_dev_test_probe_cannot_reach_the_published_bundle(prepared, tmp_path):
     dist = write_dist(tmp_path / "probe-dist", js="window.__demoTestProbe = {};\n")
     with pytest.raises(click.ClickException) as error:

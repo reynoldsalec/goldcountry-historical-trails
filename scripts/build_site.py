@@ -90,6 +90,7 @@ FORBIDDEN_BUNDLE_TOKEN = "__demoTestProbe"
 FORBIDDEN_METADATA_TOKENS = ("crop_wgs84", "raw_path", "sha256", "retrieved_at", "data/raw")
 
 EDITION_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+REFERENCE_PATTERN = re.compile(r'(?:src|href)="([^"]*)"')
 TILE_COMPONENT_PATTERN = re.compile(r"^(0|[1-9][0-9]{0,8})$")
 
 PUBLIC_EDITION_KEYS = (
@@ -341,7 +342,21 @@ def check_staging(staging: Path, order: list[str]) -> list[Path]:
         tree = staging / TILE_PREFIX / edition_id
         if not tree.is_dir() or not any(tree.rglob(f"*.{warp_raster.TILE_FORMAT}")):
             fail(f"{edition_id}: the staged build has no tiles; its layer would be missing.")
+    check_relative_references(staging)
     return files
+
+
+def check_relative_references(staging: Path) -> None:
+    """Published pages resolve against themselves, so a subpath deploy works unchanged."""
+    for path in sorted(staging.rglob("*.html")):
+        for reference in REFERENCE_PATTERN.findall(path.read_text(encoding="utf-8")):
+            if reference.startswith(("data:", "#")) or not reference:
+                continue
+            if reference.startswith("/") or "://" in reference:
+                fail(
+                    f"{path.relative_to(staging).as_posix()} references {reference!r}; a "
+                    "published page must use relative same-origin paths."
+                )
 
 
 def scan_for_restricted(staging: Path, data_dir: Path, schema_dir: Path) -> str:

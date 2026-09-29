@@ -77,6 +77,9 @@ export default defineConfig({
   server: { port: PORT, strictPort: true, host: "127.0.0.1", open: false },
   // Pre-bundling rewrites MapLibre's worker URL and the worker then fails to start in dev.
   optimizeDeps: { exclude: ["maplibre-gl"] },
+  // "./" so the built page resolves its assets, editions.json and tiles against itself:
+  // build/public can then be served from a subpath, not only from a domain root (issue #45).
+  base: "./",
   build: { outDir: "dist", emptyOutDir: true, assetsDir: "assets" },
   test: { environment: "node", include: ["src/**/*.test.ts"] },
 });
