@@ -1,0 +1,26 @@
+[
+  {
+    "command": "make coverage-grid",
+    "output": "uv run python scripts/coverage.py grid\ncoverage grid: wrote <repo>/data/sources/coverage_grid.geojson \u2014 63 cells",
+    "exit_code": 0,
+    "error": null
+  },
+  {
+    "command": "make coverage-refresh THROUGH_DECADE=2020",
+    "output": "uv run python scripts/coverage.py refresh \\\n  --through-decade 2020\ncoverage refresh: wrote <repo>/data/sources/coverage.json \u2014 504 cells (63 areas x 8 decades), 310 with a source reference",
+    "exit_code": 0,
+    "error": null
+  },
+  {
+    "command": "make coverage-report",
+    "output": "uv run python scripts/coverage.py report\ncoverage report: wrote <repo>/docs/coverage.md \u2014 504 cells",
+    "exit_code": 0,
+    "error": null
+  },
+  {
+    "command": "make topo-plan",
+    "output": "uv run python scripts/fetch_topoview.py download --dry-run  \\\n  \nfetch-topo download: 615 sheets selected, 91 already present, 524 to fetch (5.4 GB)",
+    "exit_code": 0,
+    "error": null
+  }
+]

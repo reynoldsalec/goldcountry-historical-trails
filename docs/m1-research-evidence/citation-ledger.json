@@ -1,0 +1,251 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": 1,
+      "url": "https://mil.library.ucsb.edu/ap_indexes/FrameFinder",
+      "title": "UCSB FrameFinder",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 2,
+      "url": "https://www.nevadacountyca.gov/DocumentCenter/View/14259",
+      "title": "[PDF] western nevada county non-motorizedd recreational trails ...",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 3,
+      "url": "https://www.nevadacountyca.gov/3641/Recreation-and-Resiliency-Master-Plan",
+      "title": "Recreation and Resiliency Master Plan | Nevada County, CA",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "The final plan is available below:",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "url": "https://www.nevadacountyca.gov/m/newsflash/Home/Detail/8914",
+      "title": "Nevada County Launches the Mile One Recreation Hub with ...",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 5,
+      "url": "https://www.nevadacountyca.gov/DocumentCenter/View/19554",
+      "title": "[PDF] r 10 ~ 491 - Nevada County",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 6,
+      "url": "https://www.placer.ca.gov/9724/Parks-and-Trails-Master-Plan",
+      "title": "Parks and Trails Master Plan | Placer County, CA",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "Volume 2 includes trail related inventory, analysis and recommendations",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "url": "https://www.placer.ca.gov/8041/Parks-and-Trails-Master-Plan",
+      "title": "Parks and Trails Master Plan | Placer County, CA",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 8,
+      "url": "https://www.placer.ca.gov/5711/Parks",
+      "title": "Placer County Parks",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 9,
+      "url": "https://www.placer.ca.gov/6180/Trails",
+      "title": "Placer County Trails",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 10,
+      "url": "https://www.library.ucsb.edu/geospatial/aerial-photography",
+      "title": "Aerial Photography | UCSB Library",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 11,
+      "url": "https://www.library.ucsb.edu/geospatial/finding-airphotos",
+      "title": "Finding Aerial Photographs | UCSB Library",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "Click on any centerpoint to see metadata about the image and a link to download the full tiff.",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees",
+      "title": "Policies and Fees | UCSB Library",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "Permission to republish materials must be obtained from the copyright holder where applicable.",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "url": "https://www.library.ucsb.edu/geospatial/finding-materials",
+      "title": "Finding and Accessing Materials | UCSB Library",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 14,
+      "url": "https://www.library.ucsb.edu/geospatial/airphotos/california-aerial-photography-county",
+      "title": "",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 15,
+      "url": "https://tnmaccess.nationalmap.gov/api/v1/products?datasets=US%20Topo&bbox=-121.2,39.1,-121.0,39.3&max=2",
+      "title": "",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 16,
+      "url": "https://tnmaccess.nationalmap.gov/api/v1/products?datasets=US%20Topo&bbox=-121.279784,39.00516,-120.003773,39.52692&max=1000",
+      "title": "",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "US Topo 7.5-minute map for Alleghany, CA",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "url": "https://tnmaccess.nationalmap.gov/api/v1/products?datasets=US%20Topo&bbox=-121.484442,38.711395,-120.002461,39.316496&max=1000",
+      "title": "",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "US Topo 7.5-minute map for Auburn, CA",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "url": "https://mil.library.ucsb.edu/apcatalog/ap_indexes/county.php?county_id=213&state_id=5",
+      "title": "",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "37 flights found",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "url": "https://mil.library.ucsb.edu/apcatalog/ap_indexes/county.php?county_id=215&state_id=5",
+      "title": "",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "76 flights found",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "url": "https://mil.library.ucsb.edu/apcatalog/report/report.php?filed_by=CAS-4042",
+      "title": "",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "Grass Valley. Scale stamped on the actual frame is incorrect. UCSB owns only 1 photograph in this flight.",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "url": "https://mil.library.ucsb.edu/apcatalog/report/report.php?filed_by=PAI-Tahoe-50",
+      "title": "",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "Pacific Air Industries?",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "url": "https://www.nevadacountyca.gov/site/copyright",
+      "title": "",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "All rights reserved.",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "url": "https://www.placer.ca.gov/site/copyright",
+      "title": "",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "All rights reserved.",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "url": "https://mil.library.ucsb.edu/ap_indexes/cas4042",
+      "title": "",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 25,
+      "url": "https://mil.library.ucsb.edu/ap_images",
+      "title": "",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 26,
+      "url": "https://mil.library.ucsb.edu/ap_images/cas-4042",
+      "title": "",
+      "accessed": "2026-09-17",
+      "quotes": [
+        {
+          "text": "Name                    Size  \n cas-4042_1.tif           28M",
+          "added": "2026-09-17"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "url": "https://mil.library.ucsb.edu/ap_images/cas-4042/cas-4042_1.tif",
+      "title": "",
+      "accessed": "2026-09-17"
+    },
+    {
+      "id": 28,
+      "url": "https://mil.library.ucsb.edu/ap_indexes/cas4042/CAS_4042.pdf",
+      "title": "",
+      "accessed": "2026-09-17"
+    }
+  ]
+}

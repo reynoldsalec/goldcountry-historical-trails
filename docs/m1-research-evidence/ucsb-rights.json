@@ -1,0 +1,522 @@
+{
+  "requested_url": "https://www.library.ucsb.edu/geospatial/policies-and-fees",
+  "observed_at": "2026-09-18T00:04:58Z",
+  "page": {
+    "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees",
+    "title": "\ud83d\udc34 Policies and Fees | UCSB Library",
+    "w": 1536,
+    "h": 643,
+    "sx": 0,
+    "sy": 0,
+    "pw": 1521,
+    "ph": 3240
+  },
+  "text": "As of June 14, 2024, on demand aerial photograph scanning services are no longer offered by the Library.\u00a0 However, we are greatly increasing our in-house bulk digitization of the air photo collection and new images will be downloadable for free through FrameFinder as they become available.\u00a0 This policy allows us to more quickly provide free access to digital versions of our collection.\nUCSB does not hold copyright over materials in the geospatial collection (with very few exceptions), though some of the materials are in the public domain.\u00a0 Permission to republish materials\u00a0must be obtained from the copyright holder where applicable.\u00a0 It is the responsibility of the researcher to determine who holds the copyright and pursue the copyright holder for permission to publish where the UC Regents do not hold the copyright.\u00a0",
+  "links": [
+    {
+      "text": "Jump to navigation",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#block-menu-block-1"
+    },
+    {
+      "text": "University of California, Santa Barbara",
+      "url": "https://www.ucsb.edu/"
+    },
+    {
+      "text": "HOURS",
+      "url": "https://www.library.ucsb.edu/hours"
+    },
+    {
+      "text": "LOGIN",
+      "url": "https://www.library.ucsb.edu/logon"
+    },
+    {
+      "text": "GIVING",
+      "url": "https://www.library.ucsb.edu/give"
+    },
+    {
+      "text": " Off-Campus Login",
+      "url": "https://proxy.library.ucsb.edu/login"
+    },
+    {
+      "text": " My Library Account",
+      "url": "https://search.library.ucsb.edu/discovery/account?vid=01UCSB_INST:UCSB"
+    },
+    {
+      "text": " My Special Collections Research Account",
+      "url": "https://researchspecial.library.ucsb.edu/logon/"
+    },
+    {
+      "text": " Help",
+      "url": "https://www.library.ucsb.edu/node/1352"
+    },
+    {
+      "text": "Forgot your login?",
+      "url": "https://www.library.ucsb.edu/node/1352"
+    },
+    {
+      "text": "Website Search",
+      "url": "https://www.library.ucsb.edu/search"
+    },
+    {
+      "text": "X",
+      "url": "https://www.library.ucsb.edu/%23"
+    },
+    {
+      "text": "Research",
+      "url": "https://www.library.ucsb.edu/research"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/research/collections"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/research"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/research/catalogs"
+    },
+    {
+      "text": "",
+      "url": "https://guides.library.ucsb.edu/az/databases"
+    },
+    {
+      "text": "",
+      "url": "https://search.library.ucsb.edu/discovery/jsearch?vid=01UCSB_INST%3AUCSB"
+    },
+    {
+      "text": "",
+      "url": "http://www.oac.cdlib.org/search?institution=UC+Santa+Barbara%3A%3ASpecial+Collections"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/special-collections/digital-collections"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/special-collections"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/scholarly-communication"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/research/awards-fellowships"
+    },
+    {
+      "text": "",
+      "url": "http://guides.library.ucsb.edu/"
+    },
+    {
+      "text": "Services",
+      "url": "https://www.library.ucsb.edu/services/services-for"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/borrowing"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/course-reserves"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/interlibrary-loan"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/dreamlab"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/makerspace"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/research-teaching"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/research-data-services"
+    },
+    {
+      "text": "",
+      "url": "https://ucsb.libanswers.com/"
+    },
+    {
+      "text": "Visit",
+      "url": "https://www.library.ucsb.edu/visitors"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/visit/floor-plans-locations"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/visit/study-spaces"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/services/computing"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/events-exhibitions"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/directions-parking"
+    },
+    {
+      "text": "About",
+      "url": "https://www.library.ucsb.edu/about"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/about"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/news"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/give"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/human-resources/opportunities"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/policies"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/about/contact"
+    },
+    {
+      "text": "Slide Menu",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#"
+    },
+    {
+      "text": "Close Nav",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#"
+    },
+    {
+      "text": "Research",
+      "url": "https://www.library.ucsb.edu/research"
+    },
+    {
+      "text": "Toggle Submenu",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#"
+    },
+    {
+      "text": "Collections",
+      "url": "https://www.library.ucsb.edu/research/collections"
+    },
+    {
+      "text": "Search",
+      "url": "https://www.library.ucsb.edu/research"
+    },
+    {
+      "text": "Toggle Submenu",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#"
+    },
+    {
+      "text": "Catalogs",
+      "url": "https://www.library.ucsb.edu/research/catalogs"
+    },
+    {
+      "text": "Articles & Databases",
+      "url": "https://guides.library.ucsb.edu/az/databases"
+    },
+    {
+      "text": "Journal Search",
+      "url": "https://search.library.ucsb.edu/discovery/jsearch?vid=01UCSB_INST%3AUCSB"
+    },
+    {
+      "text": "Archives & Manuscripts",
+      "url": "http://www.oac.cdlib.org/search?institution=UC+Santa+Barbara%3A%3ASpecial+Collections"
+    },
+    {
+      "text": "Digital Collections",
+      "url": "https://www.library.ucsb.edu/special-collections/digital-collections"
+    },
+    {
+      "text": "Special Research Collections",
+      "url": "https://www.library.ucsb.edu/special-collections"
+    },
+    {
+      "text": "Scholarly Communication",
+      "url": "https://www.library.ucsb.edu/scholarly-communication"
+    },
+    {
+      "text": "Awards & Fellowships",
+      "url": "https://www.library.ucsb.edu/research/awards-fellowships"
+    },
+    {
+      "text": "Subject & Course Guides",
+      "url": "http://guides.library.ucsb.edu/"
+    },
+    {
+      "text": "Services",
+      "url": "https://www.library.ucsb.edu/services/services-for"
+    },
+    {
+      "text": "Toggle Submenu",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#"
+    },
+    {
+      "text": "Borrowing",
+      "url": "https://www.library.ucsb.edu/borrowing"
+    },
+    {
+      "text": "Course Reserves",
+      "url": "https://www.library.ucsb.edu/course-reserves"
+    },
+    {
+      "text": "Interlibrary Loan",
+      "url": "https://www.library.ucsb.edu/interlibrary-loan"
+    },
+    {
+      "text": "DREAM Lab",
+      "url": "https://www.library.ucsb.edu/dreamlab"
+    },
+    {
+      "text": "Makerspace & Media Rooms",
+      "url": "https://www.library.ucsb.edu/makerspace"
+    },
+    {
+      "text": "Research & Teaching",
+      "url": "https://www.library.ucsb.edu/research-teaching"
+    },
+    {
+      "text": "Research Data Services",
+      "url": "https://www.library.ucsb.edu/research-data-services"
+    },
+    {
+      "text": "Ask a Librarian",
+      "url": "https://ucsb.libanswers.com/"
+    },
+    {
+      "text": "Visit",
+      "url": "https://www.library.ucsb.edu/visitors"
+    },
+    {
+      "text": "Toggle Submenu",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#"
+    },
+    {
+      "text": "Call Numbers & Floor Plans",
+      "url": "https://www.library.ucsb.edu/visit/floor-plans-locations"
+    },
+    {
+      "text": "Study Spaces",
+      "url": "https://www.library.ucsb.edu/visit/study-spaces"
+    },
+    {
+      "text": "Computers & Printing",
+      "url": "https://www.library.ucsb.edu/services/computing"
+    },
+    {
+      "text": "Events & Exhibitions",
+      "url": "https://www.library.ucsb.edu/events-exhibitions"
+    },
+    {
+      "text": "Directions & Parking",
+      "url": "https://www.library.ucsb.edu/directions-parking"
+    },
+    {
+      "text": "About",
+      "url": "https://www.library.ucsb.edu/about"
+    },
+    {
+      "text": "Toggle Submenu",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#"
+    },
+    {
+      "text": "About",
+      "url": "https://www.library.ucsb.edu/about"
+    },
+    {
+      "text": "News",
+      "url": "https://www.library.ucsb.edu/news"
+    },
+    {
+      "text": "Giving",
+      "url": "https://www.library.ucsb.edu/give"
+    },
+    {
+      "text": "Employment",
+      "url": "https://www.library.ucsb.edu/human-resources/opportunities"
+    },
+    {
+      "text": "Policies",
+      "url": "https://www.library.ucsb.edu/policies"
+    },
+    {
+      "text": "Contact",
+      "url": "https://www.library.ucsb.edu/about/contact"
+    },
+    {
+      "text": "Slide Menu",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#"
+    },
+    {
+      "text": "Close Nav",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees#"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/"
+    },
+    {
+      "text": "Home",
+      "url": "https://www.library.ucsb.edu/"
+    },
+    {
+      "text": "Geospatial Collection",
+      "url": "https://www.library.ucsb.edu/geospatial"
+    },
+    {
+      "text": "FrameFinder",
+      "url": "https://mil.library.ucsb.edu/ap_indexes/FrameFinder/"
+    },
+    {
+      "text": "reproduction policy",
+      "url": "https://www.library.ucsb.edu/special-collections/research/copies"
+    },
+    {
+      "text": "DREAM Lab",
+      "url": "https://www.library.ucsb.edu/dreamlab"
+    },
+    {
+      "text": "guidelines",
+      "url": "https://www.lib.ncsu.edu/maps/citingmaps"
+    },
+    {
+      "text": "Special Collections Research Account ",
+      "url": "https://researchspecial.library.ucsb.edu/logon/"
+    },
+    {
+      "text": "Directions and Parking",
+      "url": "https://www.library.ucsb.edu/directions-parking"
+    },
+    {
+      "text": "DREAM Lab",
+      "url": "https://www.library.ucsb.edu/dreamlab"
+    },
+    {
+      "text": "Geospatial Collection",
+      "url": "https://www.library.ucsb.edu/geospatial"
+    },
+    {
+      "text": "Materials",
+      "url": "https://www.library.ucsb.edu/geospatial/materials"
+    },
+    {
+      "text": "Aerial Photography",
+      "url": "https://www.library.ucsb.edu/geospatial/aerial-photography"
+    },
+    {
+      "text": "Maps",
+      "url": "https://www.library.ucsb.edu/geospatial/maps"
+    },
+    {
+      "text": "Spatial Data",
+      "url": "https://www.library.ucsb.edu/geospatial/spatial-data"
+    },
+    {
+      "text": "Atlases & Books",
+      "url": "https://www.library.ucsb.edu/geospatial/atlases-and-books"
+    },
+    {
+      "text": "Geospatial Collection History",
+      "url": "https://www.library.ucsb.edu/geospatial/geospatial-collection-history"
+    },
+    {
+      "text": "Finding & Accessing Materials",
+      "url": "https://www.library.ucsb.edu/geospatial/finding-materials"
+    },
+    {
+      "text": "Policies & Fees",
+      "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees"
+    },
+    {
+      "text": "Contact Us",
+      "url": "https://www.library.ucsb.edu/geospatial/contact-us"
+    },
+    {
+      "text": "Undergraduates",
+      "url": "https://www.library.ucsb.edu/services/undergraduates"
+    },
+    {
+      "text": "Faculty",
+      "url": "https://www.library.ucsb.edu/services/faculty"
+    },
+    {
+      "text": "Users with Disabilities",
+      "url": "https://www.library.ucsb.edu/disability-services"
+    },
+    {
+      "text": "Library Employees",
+      "url": "https://www.library.ucsb.edu/employee"
+    },
+    {
+      "text": "Graduate Students",
+      "url": "https://www.library.ucsb.edu/services/graduate-students"
+    },
+    {
+      "text": "Staff",
+      "url": "https://www.library.ucsb.edu/services/staff"
+    },
+    {
+      "text": "Visitors",
+      "url": "https://www.library.ucsb.edu/visitors"
+    },
+    {
+      "text": "Report a Problem",
+      "url": "https://www.library.ucsb.edu/form/website-problem"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/"
+    },
+    {
+      "text": "LinkedIn",
+      "url": "https://www.linkedin.com/company/ucsb-library/"
+    },
+    {
+      "text": "Facebook",
+      "url": "https://www.facebook.com/UCSantaBarbaraLibrary/"
+    },
+    {
+      "text": "Instagram",
+      "url": "https://www.instagram.com/ucsblibrary/"
+    },
+    {
+      "text": "Subscribe to our Newsletters!",
+      "url": "https://www.library.ucsb.edu/subscribe"
+    },
+    {
+      "text": "",
+      "url": "https://www.library.ucsb.edu/"
+    },
+    {
+      "text": "",
+      "url": "http://www.ucsb.edu/"
+    },
+    {
+      "text": "(805) 893-2478",
+      "url": "tel:8058932478"
+    },
+    {
+      "text": "Terms of Use",
+      "url": "https://www.library.ucsb.edu/terms-use"
+    }
+  ],
+  "retention_note": "Selected verbatim excerpts only; navigation and unrelated full-page prose omitted. Links and observed metadata retained."
+}

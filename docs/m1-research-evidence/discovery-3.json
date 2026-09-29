@@ -1,0 +1,31 @@
+{
+  "success": true,
+  "data": {
+    "web": [
+      {
+        "url": "https://www.library.ucsb.edu/geospatial/aerial-photography",
+        "title": "Aerial Photography | UCSB Library",
+        "description": "However, we are greatly increasing our in-house bulk digitization of the air photo collection and new images will be downloadable for free through FrameFinder ...",
+        "category": null
+      },
+      {
+        "url": "https://www.library.ucsb.edu/geospatial/finding-airphotos",
+        "title": "Finding Aerial Photographs | UCSB Library",
+        "description": "The FrameFinder tool allows you to search for and download more than 400,000 individual photographs online for free. The map defaults to the UC Santa Barbara ...",
+        "category": null
+      },
+      {
+        "url": "https://www.library.ucsb.edu/geospatial/policies-and-fees",
+        "title": "Policies and Fees | UCSB Library",
+        "description": "However, we are greatly increasing our in-house bulk digitization of the air photo collection and new images will be downloadable for free through FrameFinder ...",
+        "category": null
+      },
+      {
+        "url": "https://www.library.ucsb.edu/geospatial/finding-materials",
+        "title": "Finding and Accessing Materials | UCSB Library",
+        "description": "Some of our aerial photographs can be found through our online map interface called FrameFinder. We are continually adding content to this tool. For aerial ...",
+        "category": null
+      }
+    ]
+  }
+}

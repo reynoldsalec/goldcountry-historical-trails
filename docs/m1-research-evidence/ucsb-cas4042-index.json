@@ -1,0 +1,29 @@
+{
+  "requested_url": "http://mil.library.ucsb.edu/ap_indexes/cas4042/",
+  "observed_at": "2026-09-18T00:07:29Z",
+  "page": {
+    "url": "https://mil.library.ucsb.edu/ap_indexes/cas4042/",
+    "title": "\ud83d\udc34 Index of /ap_indexes/cas4042",
+    "w": 1536,
+    "h": 643,
+    "sx": 0,
+    "sy": 0,
+    "pw": 1536,
+    "ph": 643
+  },
+  "text": "Index of /ap_indexes/cas4042\n Name                    Size  \n CAS_4042.pdf            398K  \n\nApache/2.4.66 (Debian) Server at mil.library.ucsb.edu Port 80",
+  "links": [
+    {
+      "text": "Name",
+      "url": "https://mil.library.ucsb.edu/ap_indexes/cas4042/?C=N;O=D"
+    },
+    {
+      "text": "Size",
+      "url": "https://mil.library.ucsb.edu/ap_indexes/cas4042/?C=S;O=A"
+    },
+    {
+      "text": "CAS_4042.pdf",
+      "url": "https://mil.library.ucsb.edu/ap_indexes/cas4042/CAS_4042.pdf"
+    }
+  ]
+}

@@ -1,139 +1,244 @@
-# M0 and M1 implementation handoff
+# Auburn Map Browser Implementation Plan
 
-This plan decomposes the first two MVP milestones into bounded tasks. It defines
-future implementation contracts; it does not claim those contracts are implemented.
-M2–M5 are outside this issue-creation batch. Parent issues retain their milestone
-acceptance criteria and close only after the children and final acceptance pass.
+> **For Hermes:** Use subagent-driven-development for task-by-task implementation if
+> requested; an explicitly authorized Looper run may instead use these same contracts.
+> This revision is planning only. Do not start implementation from a documentation edit.
 
-## Dispatch rules
+**Goal:** let a reader page through four Auburn map editions while remaining at exactly
+the same location and zoom, with unambiguous dates and source attribution.
 
-- Assign only `coder` tasks to a Sol coding worker. Research, GIS review, source
-  operations, and milestone acceptance require the role named in each issue.
-- Start a task only after its listed prerequisites are accepted. All M1 tasks also
-  require parent M0 acceptance. Existing acquisition work remains intact.
-- Implement one child issue per focused PR. A child PR must not close its parent.
-- Serialize tasks sharing a file, particularly Makefile, README, coverage.py, and
-  coverage.json. In isolated branches, rebase and review overlapping changes before
-  integration. Workers must preserve each other's edits.
-- Each issue contains file ownership, the implementation contract, failure cases,
-  acceptance criteria, verification commands, exclusions, and rollback guidance.
-- Missing evidence is a blocker for evidence-dependent acceptance, never permission
-  to invent a date, geometry, review event, source identifier, or citation.
+**Architecture:** immutable local GeoTIFFs are verified and converted offline into
+same-origin XYZ PNG rasters on a shared Web Mercator grid. A single MapLibre map changes
+raster edition without recreating the map or moving its camera. A clean allowlisted
+public build contains only the viewer, sanitized edition metadata and selected tiles.
 
-## Architecture decisions
+**Tech stack:** existing uv-managed Python, GDAL CLI, vanilla TypeScript, Vite,
+MapLibre GL JS; Vitest for UI state and Playwright for browser acceptance. Pin all added
+dependencies and record GDAL/PROJ versions. No React, backend, external basemap or storage.
 
-### Data contracts and temporal rules
+**Status:** approved product direction recorded 2026-09-28; D1–D4 below are proposed
+implementation work, not completed milestones. Existing M0/M1 tooling is retained.
 
-Remove the obsolete trail `tier` field. Preserve IDs and existing corridor values;
-`corridor` remains a required nonempty grouping string without a locality enum.
-The four alignment temporal fields remain unchanged.
+---
 
-Decade classification must depend on linked observations and support roles. A lone
-past opening or closure does not establish every later decade. A null observation
-end date is not an ongoing interval. The current schema cannot distinguish uncertain
-range dating from continuous-use testimony, so a range alone cannot establish
-continuous presence across decades. M0.2 specifies the conservative decision table,
-conflict reasons, schema-description correction, and twelve isolated examples.
-Feature dates on revised maps still require source inspection. This task set does
-not implement the viewer's classifier or decide dates for real sources.
+## A. Decisions workers must not reopen independently
 
-Build validator regressions around temporary datasets and temporary output. Test
-calendar validity, provenance, geometry, and planted restricted values separately.
-An absent public build does not establish publication safety. Keep existing CI
-checks and add a single `make test-validation` entry point.
+### Product boundary
 
-### Coverage inventory
+Four editions, one shared Auburn quadrangle area. Initial edition is 1953; display
+order is 1953, 1973, 1975 aerial, 1981. Previous/Next stop at endpoints. Direct selection
+is supported. Reset view is separate and is the only edition-control action allowed
+to fit bounds. Normal pan/zoom remains available, with north-up bearing and no pitch.
+No trails or synthetic fixtures are displayed. Showing a raster does not assert that
+its roads are trails or establish present-day access.
 
-Use a deterministic 0.125-degree reference grid generated from the county AOI,
-not from available map sheets. This prevents missing sources from removing areas
-from the inventory. Cell IDs are `q7p5-{i}-{j}` relative to the global origin
-(-180, -90); they are reference IDs, not official quadrangle names. Keep cells
-with positive-area county intersections and record both county GEOIDs when shared.
+The full original quadrangle may include El Dorado context. Do not crop to a county
+boundary merely to match the deferred countywide vector program. Use the shared mapped
+footprint of these four sources, excluding decorative scan margins. Keep nodata explicit.
 
-Planned artifacts:
+### Fixed input set
 
-| Path | Responsibility |
-| --- | --- |
-| `data/sources/coverage_grid.geojson` | Reproducible grid with county intersections |
-| `data/sources/coverage.json` | Area/decade cells, source candidates, searches, reviews, and batches |
-| `schema/coverage_grid.schema.json` | Grid structure |
-| `schema/coverage.schema.json` | Inventory structure and field contracts |
-| `scripts/coverage.py` | Grid generation, refresh, validation, and reporting |
-| `scripts/test_coverage_*.py` | Offline regression cases |
-| `data/sources/mvp-topo-selection.json` | Exact topo IDs selected for acquisition |
-| `docs/coverage.md` | Generated research coverage report |
+| Edition ID | Exact topo/source ID | Kind | Base | Revision | Photography | Field check |
+| --- | --- | --- | --- | --- | --- | --- |
+| auburn-1953 | CA_Auburn_288101_1953_24000 | topo | 1953 | null | 1952 | 1953 |
+| auburn-1973 | CA_Auburn_288103_1953_24000 | topo | 1953 | 1973 | 1973 (revision); 1952 (base) | 1953 (base); revision not checked |
+| auburn-1975 | CA_Auburn_288104_1975_24000 | orthophotoquad | null | null | 1975-08-29 | null |
+| auburn-1981 | CA_Auburn_288105_1953_24000 | topo | 1953 | 1981 | 1978 (revision); 1952 (base) | 1953 (base); revision not checked |
 
-The inventory contains every reference cell and every decade from 1950 through
-its explicit `through_decade`. Sources located, sources reviewed, and trails
-digitized are separate facts. Metadata import never creates review timestamps or
-claims that a trail was observed. Preserve manual reviews and search records on
-refresh; fail on orphaning changes rather than silently deleting them.
+Use these exact scan variants, not every identically named/reprinted sheet. The 1975
+product is already georeferenced and is not a raw aerial requiring GCPs. The 1981 sheet
+also cites other source data; its imagery year must not be presented as universal.
+Source card wording must distinguish base versus revision and say revisions were not
+field checked where applicable. Preserve the existing legal-framing safeguards.
 
-`topo:<topo_id>` references the existing index; `candidate:<candidate_id>` references
-a separately verified source candidate. Candidate records include a source kind,
-known or null dates/bounds, rights, sensitivity, access status, and publisher ID.
-Reviews identify their source, cell, county, decade, actual reviewer/time, evidence
-locator, and dating confidence. Schemas and semantic validators are separate tasks;
-M1.3 performs local schema/preservation checks before M1.4 extends full validation.
+### Manifest contract (to implement, not an existing file)
 
-Normal validation accepts explicit evidence gaps. `make coverage-ready` additionally
-requires four qualifying ready batches: an earlier and a later decade in each county,
-plus an obtainable verified aerial frame dated 1950 or later. Pre-2000 batches
-include qualifying topo editions so acquisition covers both counties. M1 rejects
-`digitized` batch status until M3 adds verified source-to-observation linkage.
-Aerials with unknown redistribution rights can support internal review but cannot
-be published. Coverage files remain internal research inputs until audience-aware
-export is implemented later.
+Create `data/sources/demo-editions.json`, checked by
+`schema/demo-editions.schema.json`. No additional properties at any level.
 
-### Acquisition and evidence work
+Top-level keys:
+- `version`: integer 1.
+- `area_id`: literal `auburn`.
+- `edition_order`: the four edition IDs above in that exact order.
+- `view_bounds_wgs84`: ordered `[west, south, east, north]` derived from the common
+  mapped footprint after datum transformation; never guessed from file labels.
+- `tile_zoom`: object `{ "min": 10, "max": 16 }`.
+- `editions`: array of exactly four edition objects, unique IDs/source IDs.
 
-Extend the existing downloader with exact-ID selection; do not create another
-fetcher. Validate the entire selection before network access, keep dry-run free of
-writes, and preserve receipt, hashing, interruption, and immutable-file behavior.
-An exact selection must not trigger a countywide index refresh.
+Each edition carries `id`, `source_id`, `kind` (`topo` or `orthophotoquad`), `label`,
+`citation`, `source_url`, `rights` (literal `public_domain`), `attribution`, `dates`,
+`date_note`, and `crop_wgs84` (a valid closed Polygon footprint verified against the
+source neatline). Crops exclude borders only; they must not erase white map content.
 
-Separate research tasks locate later-period sources for each county and verify an
-obtainable aerial. Four GIS-review tasks select and justify the actual batches;
-no source locations or feature dates are invented in this plan. A source operator
-then acquires and verifies the selected topo bytes and their separate archive.
-The engineering reviewer verifies the M1 gate and supplies concrete M2 inputs.
+`dates` has only `map_year` (1953, 1953, 1975, 1953 in display order),
+`base_year` (nullable), `revision_year` (nullable), `base_photography` (nullable
+YYYY or YYYY-MM-DD), `revision_photography` (nullable YYYY or YYYY-MM-DD),
+`photography` (nullable, used for the orthophotoquad), `base_field_check_year`
+(nullable), and `revision_field_checked` (nullable boolean). For both photorevisions
+`revision_field_checked=false`; for non-revised products it is null. Null means unknown
+or not applicable as explained by `date_note`, not ongoing presence. Actual calendar
+validity is required. No automatic trail dating or inferred continuous intervals.
 
-## Task index
+Resolve source bytes through `retrievals.jsonl` by source ID and verify hash/byte count;
+reuse existing archive helpers rather than assuming legacy filenames. Fail on missing,
+ambiguous or corrupt selected receipts/bytes before producing output. Unselected local
+files are not necessary for a fresh MVP build. Do not modify receipt timestamps.
 
-Dependencies below are child-task dependencies. The parent M0 gate also blocks
-all M1 work. Links are the authoritative worker instructions.
+Internal `build/rasters/demo-processing.json` records exact source hashes, crop geometry,
+tool versions, reprojection/resampling parameters, output digests, zoom range and size.
+Public `build/public/editions.json` exports only display metadata, bounds, zoom limits,
+and relative tile templates `tiles/<edition-id>/{z}/{x}/{y}.png`. It omits receipt paths,
+private notes and processing host details. Do not copy the internal manifest wholesale.
 
-| Task | Role | Deliverable | Prerequisites |
-| --- | --- | --- | --- |
-| [M0.1](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/3) | coder | Remove obsolete geographic constraints from the trail contract | None |
-| [M0.2](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/4) | coder | Specify observation dating and decade-state examples | None |
-| [M0.3](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/5) | coder | Add isolated schema and provenance regression tests | M0.1 |
-| [M0.4](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/6) | coder | Validate calendar dates and temporal bound ordering | M0.1, M0.2 |
-| [M0.5](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/7) | coder | Prove restricted-value leak detection with temporary output | M0.1 |
-| [M0.6](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/8) | coder | Wire validator regression targets into CI and record M0 acceptance | M0.1, M0.2, M0.3, M0.4, M0.5 |
-| [M1.1](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/9) | coder | Define coverage inventory schemas and neutral initial document | M0.6 |
-| [M1.2](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/10) | coder | Generate the complete county-intersecting quadrangle grid | M1.1 |
-| [M1.3](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/11) | coder | Build area-by-decade cells and attach candidate source references | M1.2 |
-| [M1.4](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/12) | coder | Validate inventory references and batch readiness | M1.3 |
-| [M1.5](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/13) | coder | Add coverage reporting and CI completeness checks | M1.4 |
-| [M1.6](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/14) | coder | Support explicit topo edition selection in the existing downloader | M0.6 |
-| [M1.7](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/15) | researcher | Research modern maps and agency records for Nevada County | M1.5 |
-| [M1.8](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/16) | researcher | Research modern maps and agency records for Placer County | M1.5 |
-| [M1.9](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/17) | researcher | Verify one obtainable aerial frame for the raster pipeline | M1.5 |
-| [M1.10](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/18) | GIS reviewer | Review and select one Nevada digitizing batch before 2000 | M1.7, M1.6 |
-| [M1.11](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/19) | GIS reviewer | Review and select one Nevada digitizing batch from 2000 onward | M1.7, M1.6 |
-| [M1.12](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/20) | GIS reviewer | Review and select one Placer digitizing batch before 2000 | M1.8, M1.6 |
-| [M1.13](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/21) | GIS reviewer | Review and select one Placer digitizing batch from 2000 onward | M1.8, M1.6 |
-| [M1.14](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/22) | source operator | Acquire and archive the reviewed topo selection | M1.10, M1.11, M1.12, M1.13 |
-| [M1.15](https://github.com/reynoldsalec/goldcountry-historical-trails/issues/23) | engineering reviewer | Audit the M1 completion gate and hand off to raster work | M1.5, M1.9, M1.14 |
+### Raster and display contract
 
-## Acceptance record
+- Reproject to EPSG:3857 using source CRS/datum metadata. Record the transformation;
+  never silently assume an unknown CRS. Use one shared output extent/grid.
+- Source nearest-neighbor sampling for topo scans; cubic for aerial imagery. Preserve
+  alpha/nodata. MapLibre raster resampling uses nearest for topo, linear for imagery.
+- Produce XYZ (not TMS) PNG tiles for zooms 10–16. Do not confuse flipped Y conventions.
+  Encode transparent tiles for empty portions of the bounded pyramid so blank areas
+  are distinct from network failures. Do not use white-color transparency heuristics.
+- Keep EPSG:3857 COG intermediates under `build/rasters/`, tiles under `build/tiles/demo/`.
+  GDAL version and chosen tiler invocation are pinned/documented in D2. No vector tiles,
+  PMTiles dependency, tile service or new download pipeline.
+- One MapLibre instance. Edition selection must not call `fitBounds`, `jumpTo`, recreate
+  the map, or change center/zoom/bearing/pitch. Camera state equality is tested.
+- Track requested versus displayed edition separately. Until visible-viewport tiles
+  for the requested edition are loaded, retain the prior edition and its matching card
+  with an explicit loading notice. On success switch visibility and card together.
+- Use request-generation IDs so late loads/errors from older selections cannot replace
+  the current selection. A failed edition leaves the last valid layer/card displayed,
+  with an explicit error and retry. Camera movement while loading restarts readiness
+  for the current viewport. Failures during later pan/zoom remain visible warnings.
+- Never flash another edition under a new label. No silent fallback, invented map years,
+  blank success screens, false trail-access assertions or browser persistence.
 
-Planning completed on 2026-09-16. No implementation child is complete merely because
-its issue was created. M0.6 and M1.15 record command results, CI references, evidence
-review, and unresolved blockers in their parent issues before milestone closure.
+## B. D1 — Edition contract and selected-source verification
 
-Implementation estimates are intentionally not calendar promises. Coding tasks are
-scoped to one focused PR; the worker should report when a discovered dependency
-would require changing another task's contract. Research duration depends on actual
-source access and review, which cannot be estimated from code alone.
+**Dependencies:** none of the deferred research issues. Existing validation must remain
+passing; missing selected bytes or unresolved rights/CRS are genuine blockers.
+
+**Files:** create the manifest/schema above, `scripts/demo.py`, `scripts/test_demo.py`;
+modify `Makefile` and dependency locks only as necessary. Record scan-margin locators
+and actual source-card checks in `docs/demo-source-review.md` (do not invent reviewers).
+
+1. Write isolated failing tests: wrong/missing/duplicate edition, unknown field,
+   invalid date, nonpublic rights, inverted bounds, crop outside source, missing or
+   mismatched receipt, checksum mismatch, and source-kind mismatch for 1975.
+2. Add `make demo-check` calling `scripts/demo.py check` and `make demo-test` for the
+   explicit Python test module. Record the expected failing test output before coding.
+3. Implement source preflight using existing index/receipt helpers. No network access,
+   source writes, inventory refresh or fake historical observation records.
+4. Populate only values verified from the four inputs; derive crop/bounds from their
+   georeferencing and inspect neatlines. If ambiguous, record the precise gap.
+5. Run `make demo-test`, `make demo-check`, `make validate`, `make lint`. Record actual
+   results and selected hashes. Separate data-only commits from code/docs commits.
+
+**Accept:** exactly four verified public inputs with traceable dates and crops; tests
+reject every listed invalid case. No claim that the manifest dates individual features.
+
+## C. D2 — Reproducible raster preparation
+
+**Depends on D1. Files:** create `scripts/warp_raster.py`,
+`scripts/test_demo_rasters.py`, `docs/demo-processing.md`; extend `scripts/demo.py`,
+`Makefile` and explicit `demo-test` modules. Reuse existing dependencies where possible.
+
+1. Write failing tests using small synthetic georeferenced rasters for CRS transformation,
+   common grid, XYZ orientation, alpha/nodata, resampling dispatch, missing GDAL, corrupt
+   input and idempotent reruns. Fixtures remain outside authoritative source data.
+2. Add `make demo-rasters`: preflight → COGs → bounded XYZ tiles → processing record.
+   Fail atomically; do not advertise incomplete outputs. Pin/document GDAL prerequisites.
+3. Implement read-only source processing, nearest/cubic separation and content-aware
+   reuse keyed to input hashes plus processing parameters. Never overwrite raw inputs.
+4. Run tests and build the real four-layer set. Compare source hashes before/after.
+5. Inspect at least three dispersed stable landmarks across the shared footprint in all
+   editions. Record pixel/metre offsets at fixed zoom, locations and fit-for-comparison
+   decision; unresolved datum/systematic shifts block acceptance. Historical source
+   error must be disclosed, not silently corrected with arbitrary GCPs.
+6. Record tile count, output size, processing time, max useful zoom and label legibility.
+   Read a known north/south tile to rule out TMS-Y inversion. Repeat build and verify
+   deterministic source/processing manifests and equivalent outputs.
+
+**Accept:** correct four raster pyramids, usable readable comparisons, documented
+registration limitations and unchanged source hashes. Raw aerial acquisition is not needed.
+
+## D. D3 — The edition browser
+
+**Depends on D1/D2. Files:** `site/package.json`, lockfile, `site/index.html`,
+`site/tsconfig.json`, `site/vite.config.ts`, `site/src/main.ts`, `site/src/style.css`,
+`site/src/editions.ts`, `site/src/editions.test.ts`, `site/tests/editions.spec.ts`,
+`site/playwright.config.ts`. No framework beyond Vite; self-host all dependencies.
+
+1. Write failing unit tests for initial selection, fixed order, endpoint disabling,
+   direct selection, loading/error state, stale response rejection and truthful cards.
+2. Add the four sources/layers to one map. Use neutral empty background outside coverage,
+   constrained pan bounds and zooms 10–16. Reset fits the shared area; switching does not.
+3. Implement accessible native controls, loading/retry notices, source card and attribution.
+   No gestures may be required to reveal essential dates. Small-screen card may collapse,
+   but its toggle, selected edition and attribution remain reachable.
+4. Add browser tests: zoom/pan, traverse all editions and back, direct jumps, fast clicks,
+   pan during load, simulated tile errors, retry, endpoints, keyboard operation and
+   narrow/desktop viewports. Assert camera equality within 1e-7 degrees and 1e-6 zoom
+   units before/after settled switches with no concurrent user movement.
+5. Add `make demo-dev` and integrate frontend unit/browser checks into `make demo-test`
+   (small raster test fixtures for CI, never downloadable gigabyte production sources).
+6. Run tests, then inspect real output at local static origin. Measure loading behavior;
+   do not claim a speed guarantee without test-machine/network context.
+
+**Accept:** actual source rasters, fixed camera, correct card/layer pairing, usable error
+states and no network requests except same-origin app/tiles. Original citation links
+navigate only when clicked. No localStorage, sessionStorage, IndexedDB or service worker.
+
+## E. D4 — Public assembly, regression gate and local acceptance
+
+**Depends on D1–D3. Files:** create `scripts/build_site.py`,
+`scripts/test_demo_build.py`, `docs/demo-acceptance.md`; modify `Makefile`, CI and
+`docs/mvp-runbook.md`. Extend `demo-test` explicitly to include all new test files.
+
+1. Write failing build tests: missing layer, incomplete manifest, stale output injection,
+   path traversal, extra unselected tiles and prohibited data copied into the build.
+2. Implement `make demo-build`: selected preflight/raster preparation → Vite build into
+   staging → copy only selected tile trees and sanitized public metadata → validate
+   staged output and run restricted-value scanning → publish `build/public/` atomically.
+   A stale build must never mask a failed build. No broad copy of `data/`, docs or raw files.
+3. Add `make demo-accept`: `demo-test`, `demo-build`, then existing baseline validation
+   against the newly built public tree. Keep CI's existing suites and add offline demo
+   tests/build fixtures. The real four-source build/manual review is a separate recorded
+   acceptance artifact, not falsely claimed by CI fixtures.
+4. Replace `build-public`/`dev` placeholders with documented aliases to demo-build/demo-dev.
+   Reorder default `make` so the public build exists before final validation. Preserve
+   `tiles` and `build-restricted` as clearly deferred; update obsolete scaffold messages.
+   Never remove or weaken `coverage-ready`; it remains the future countywide gate.
+5. Run [the manual runbook](mvp-runbook.md) on actual output; record exact commit, source
+   hashes, commands, browser versions, screenshots, sizes, registration and limitations.
+6. Verify source restoration instructions: existing exact-ID downloader and real backup
+   tools remain available. Independent-archive mount absence is documented, not relabeled
+   as success. Do not make the entire countywide research archive an implicit demo gate.
+7. Hand over a working localhost URL and build directory. Stop here: hosting/provider,
+   quota, public URL and deployment are a separate approval, not part of acceptance.
+
+**Accept:** functional static build and all source/privacy/browser checks pass. The owner
+can page through all four actual editions. Manual approval is recorded by the actual
+reviewer; test results alone do not manufacture approval. Nothing implies completed trails.
+
+## F. Dispatch, rollback and old work
+
+One focused PR per D-step, sequential. Split oversized steps into dependency-ordered
+subtasks with explicit file ownership; do not parallelize edits to shared manifests,
+Makefile or build state. TDD steps above are separate actions: test → observed failure →
+minimal implementation → pass → review → commit. Never push main directly.
+
+Rollback code/docs by reverting their commits. Rebuild derived output; never delete or
+rewrite raw sources/receipts. No evidence ingestion or data-model migration is included.
+
+Existing GitHub issues #1–#23 and their status are historical/independent of this plan.
+No issue is closed, reassigned or claimed accepted by this rewrite. Countywide research
+issues #15–#23 do not block D1–D4. Do not dispatch the old milestone to implement this
+new scope. Create a separate demo issue set only when implementation is authorized.
+
+Preserved references: [countywide roadmap](countywide-roadmap.md),
+[old task index](countywide-implementation-plan.md),
+[deferred human research runbook](m1-human-runbook.md). Their evidence and validation
+contracts still apply if that work resumes; their former release scope does not gate
+this edition-browser MVP.

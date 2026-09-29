@@ -1,0 +1,4 @@
+Please continue to make use of our full imagery catalog and our directory of scanned images for existing digital content, linked here, if you are unable to find available scans in our FrameFinder.
+Some of our aerial photographs can be found through our online map interface called FrameFinder.  We are continually adding content to this tool.  For aerial photographs not in FrameFinder, you can use our AP Flights Catalog and navigate directly to our directory of scanned images to see if they are available.  To better understand how our aerial photographs are organized into flights, see Identifying Aerial Photography Flights.
+Click on any centerpoint to see metadata about the image and a link to download the full tiff.
+California Counties

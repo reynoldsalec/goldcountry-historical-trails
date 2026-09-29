@@ -1,0 +1,38 @@
+[
+  {
+    "command": "make validate",
+    "output": "uv run python scripts/validate.py\nleak: <repo>/build/public does not exist yet, nothing to scan (5 restricted values are under watch)\nvalidate: OK \u2014 2 trails 3 alignments 4 observations 5 support; all six checks passed\nuv run python scripts/source_archive.py verify --available\nverify: 91 sources match SHA-256; 0 local copies absent\nmake validate-coverage\nmake[1]: Entering directory '<repo>'\nuv run python scripts/coverage.py validate\ncoverage validate: inventory OK \u2014 504 cells, 0 candidates, 0 searches, 0 reviews, 0 batches\nmake[1]: Leaving directory '<repo>'",
+    "exit_code": 0,
+    "error": null
+  },
+  {
+    "command": "make test-topo",
+    "output": "uv run pytest -q scripts/test_fetch_topoview.py scripts/test_source_archive.py\n.....................................................                    [100%]\n=============================== warnings summary ===============================\nscripts/test_fetch_topoview.py::test_valid_download_and_rerun\nscripts/test_fetch_topoview.py::test_concurrent_publication_does_not_replace_file\nscripts/test_fetch_topoview.py::test_same_size_corruption_is_rejected_on_reuse\nscripts/test_fetch_topoview.py::test_remote_changed_bytes_do_not_replace_missing_recorded_source\nscripts/test_fetch_topoview.py::test_selection_requests_only_the_named_editions\nscripts/test_fetch_topoview.py::test_unknown_selection_id_blocks_every_download\nscripts/test_fetch_topoview.py::test_selection_dry_run_plans_without_network_or_writes\nscripts/test_fetch_topoview.py::test_selection_rerun_reuses_the_raw_file\n  <repo>/.venv/lib/python3.11/site-packages/rasterio/transform.py:178: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication\n    return Affine.translation(west, north) * Affine.scale(xsize, -ysize)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n53 passed, 8 warnings in 0.84s",
+    "exit_code": 0,
+    "error": null
+  },
+  {
+    "command": "make test-validation",
+    "output": "uv run pytest -q scripts/test_validate.py scripts/test_validate_dates.py scripts/test_validate_leaks.py\n........................................................................ [ 85%]\n............                                                             [100%]\n84 passed in 0.83s",
+    "exit_code": 0,
+    "error": null
+  },
+  {
+    "command": "make test-coverage",
+    "output": "uv run pytest -q scripts/test_coverage_schema.py scripts/test_coverage_grid.py \\\n  scripts/test_coverage_refresh.py scripts/test_coverage_validate.py \\\n  scripts/test_coverage_report.py\n........................................................................ [ 36%]\n........................................................................ [ 72%]\n........................................................                 [100%]\n200 passed in 1.81s",
+    "exit_code": 0,
+    "error": null
+  },
+  {
+    "command": "make coverage-ready",
+    "output": "uv run python scripts/coverage.py validate --release-ready\nFAIL [release] candidates: no verified, available, dated aerial_frame candidate inside the county AOI\nFAIL [release] county 06057: needs two decades of status ready batches, has none\nFAIL [release] county 06057: no status ready batch in a decade before 2000\nFAIL [release] county 06057: no status ready batch in a decade from 2000 onward\nFAIL [release] county 06061: needs two decades of status ready batches, has none\nFAIL [release] county 06061: no status ready batch in a decade before 2000\nFAIL [release] county 06061: no status ready batch in a decade from 2000 onward\ncoverage validate: 7 failure(s)\nmake: *** [Makefile:121: coverage-ready] Error 1",
+    "exit_code": 2,
+    "error": null
+  },
+  {
+    "command": "make verify-backup",
+    "output": "uv run python scripts/source_archive.py verify-backup\nError: Archive parent is unavailable; mount the backup drive first.\nmake: *** [Makefile:88: verify-backup] Error 1",
+    "exit_code": 2,
+    "error": null
+  }
+]

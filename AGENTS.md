@@ -9,19 +9,21 @@ conflicts with an instruction in a task prompt, stop and ask rather than guessin
 
 ## 1. What this project is
 
-A temporal GIS dataset and static web viewer mapping historical foot trails throughout
-Nevada and Placer Counties, California, from 1950 to the present. The entire area of
-both counties is in scope, including the foothills, mountains, and eastern portions.
-Countywide coverage applies to source research, raster acquisition, digitizing, and
-the viewer.
+**Active MVP, revised 2026-09-28:** a static Auburn historical map browser. Users
+page through the 1953 base topo, 1973 photorevision, 1975 orthophotoquad and 1981
+photorevision while retaining the same map camera. README and
+`docs/implementation-plan.md` define this bounded release; `docs/mvp-runbook.md`
+is its acceptance checklist. These documents are plans, not proof of implementation.
 
-Map where foot trails are documented, how their alignments change, and where evidence
-is missing, decade by decade. A named trail, local organization, or landowner dispute
-does not determine the project's geographic or temporal priorities.
+The countywide Nevada/Placer temporal foot-trail atlas remains a long-term program.
+Its preserved roadmap is `docs/countywide-roadmap.md`; it is not the current MVP gate.
+Do not require trail identification, digitizing, four county/era batches, new aerial
+acquisition, restricted hosting or completed countywide research for the map browser.
 
-The dataset is **evidence**, not decoration. It may inform historical research, trail
-stewardship, and work by organizations such as the Open Trails Community Alliance
-(OTCA). Every geometry and attribute must be traceable to its supporting sources.
+The evidence safeguards below still apply. The MVP shows original source rasters,
+not reconstructed trail geometry or public-access claims. It may show context across
+the original Auburn sheet, including outside Placer County; that does not expand the
+future authoritative trail dataset's county scope.
 
 ---
 
@@ -76,7 +78,11 @@ linking it to an `observation_id`. `make validate` enforces this. Do not add an
 
 ### 2.5 The public/restricted split is enforced in code, not by convention
 
-Two builds come from one dataset:
+The future trail atlas has two audience builds. The current raster-only MVP has
+only a public allowlisted build and must not import authoritative/restricted records.
+Authenticated/restricted build implementation is deferred, not its security safeguards.
+
+For the future atlas, two builds come from one dataset:
 
 - **public** — no parcel APNs, no owner names, no declarant names, no restricted
   observations, no document links to unpublished records.
@@ -116,7 +122,7 @@ attribution control.
 | Coordinate precision | 6 decimal places (~0.1 m); truncate on write |
 | Tile CRS | EPSG:3857 |
 | Vector geometry | `LineString` for alignments; no `MultiLineString` — split into separate alignments |
-| Raster output | Cloud-Optimized GeoTIFF with internal overviews, or raster PMTiles |
+| Raster output | MVP: COG intermediates plus static XYZ PNG tiles; raster PMTiles deferred |
 | Raster resampling | `cubic` for aerials, `nearest` for scanned map sheets (preserves line color) |
 | Warp method | Thin-plate spline for aerial frames; polynomial 1 or 2 for map sheets |
 | Null geometry | Not permitted; a record without geometry belongs in a CSV, not GeoJSON |
@@ -140,15 +146,18 @@ files.
 
 - Python 3.11+, managed with `uv`. Dependencies in `pyproject.toml`.
 - Geospatial: GDAL/OGR CLI, `geopandas`, `shapely`, `rasterio`, `pyproj`.
-- Tiling: `tippecanoe` (vector), `rio-cogeo` (raster).
-- Frontend: vanilla TypeScript + MapLibre GL JS + `pmtiles`. No React, no build
+- MVP raster tiling: GDAL-based static XYZ PNG pipeline, versions pinned during implementation.
+- Future vector tiling: `tippecanoe`; not an MVP prerequisite. PMTiles packaging is deferred.
+- Frontend: vanilla TypeScript + MapLibre GL JS; `pmtiles` is deferred. No React, no build
   framework beyond `vite`. Keep the viewer readable by a volunteer.
 - Formatting: `ruff format` for Python, `prettier` for TS/JS/JSON/Markdown.
 
 ### 4.3 Everything runs through the Makefile
 
 Add a target rather than documenting a bare command. Targets must be idempotent and
-safe to re-run. `make` with no argument runs `validate build-public`.
+safe to re-run. Current bare `make` still runs the legacy `validate build-public`
+placeholder flow. D4 must build real public output before final validation. Until then,
+use existing regression targets and label future demo targets as unimplemented.
 
 ### 4.4 Commits
 
@@ -164,28 +173,23 @@ safe to re-run. `make` with no argument runs `validate build-public`.
 
 ### 5.1 Scope discipline
 
-The project scope is all of Nevada and Placer Counties from 1950 to the present
-(README §2). `data/sources/aoi_counties.geojson` defines the geographic boundary for
-research, acquisition, and digitizing. Countywide digitizing is authorized; no corridor
-must be completed before work elsewhere in either county can begin.
+The owner selected the four-edition Auburn map browser as the next MVP. Implement
+D1–D4 from `docs/implementation-plan.md` only when authorized. Use an explicit source
+allowlist, common mapped footprint and honest date cards. Existing raw bytes, receipts,
+research inventory and schemas remain intact. No synthetic trails reach the browser.
 
-Organize work into manageable batches by quadrangle, locality, or source coverage and
-decade. Choose batches to improve coverage across both counties and fill documented
-gaps. Record what has been searched, what has been digitized, and what remains
-unexamined. Uneven source availability must remain visible.
+The countywide atlas and its M0–M5 roadmap are deferred, not silently marked complete.
+`make coverage-ready` remains the old countywide release check; do not weaken it and
+do not make it a prerequisite for the demo. New demo targets must have their own
+artifact, source, privacy and browser gates. Preserve existing regression suites.
 
-The former Tier 1/2/3 priority system and raster-only countywide restriction are
-superseded. `data/sources/aoi_tier1.geojson` is a legacy Bear River Canal work-area
-reference, not a digitizing boundary. Existing `tier`, `in_tier1`, and `--tier1` names
-are implementation remnants, not instructions to narrow the project.
+No automatic GitHub milestone migration: existing issues and Looper plans are not
+rewritten by these documents. Reconcile/create a separate demo issue set before a
+new dispatch. Do not resume an old countywide milestone to implement the new scope.
 
-Pre-1950 sources may supply background, but do not establish a trail's presence in
-1950 or later without supporting observations. A separate 19th-century layer and
-special treatment of 1967–1972 are not project requirements.
-
-Focus on foot trails. Roads, canals, and other linear features are contextual unless
-a cited source supports their relevance to a foot-trail alignment. Do not turn a canal
-or road centerline into a trail merely because it follows a plausible route.
+For future trail work, both counties from 1950 onward remain in scope; legacy tier
+filters impose no priority. Roads/canals are not trails without evidence, modern lines
+cannot be projected backward, and pre-1950 context does not establish later presence.
 
 ### 5.2 Before writing code
 

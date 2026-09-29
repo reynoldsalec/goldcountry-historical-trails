@@ -1,0 +1,49 @@
+{
+  "requested_url": "https://mil.library.ucsb.edu/apcatalog/report/report.php?filed_by=PAI-Tahoe-50",
+  "observed_at": "2026-09-18T00:06:54Z",
+  "page": {
+    "url": "https://mil.library.ucsb.edu/apcatalog/report/report.php?filed_by=PAI-Tahoe-50",
+    "title": "\ud83d\udc34 Flight PAI-Tahoe-50",
+    "w": 1536,
+    "h": 643,
+    "sx": 0,
+    "sy": 0,
+    "pw": 1521,
+    "ph": 837
+  },
+  "text": "Skip to main content\nSkip to navigation\nUCSB Library Home Page\nAerial Photography Information Geospatial Collection Contact Us\nImagery Report: Flight PAI-Tahoe-50\nDigital\nView Index\n\n\nCountry:\tUnited States\nState(s):\t\nCalifornia, Nevada\n\nCounties:\tCalifornia:\n\nEl Dorado, Placer\nNevada:\n\nCarson City, Douglas, Washoe\n\nFiled by (catalog):\tPAI-Tahoe-50\nFiled by\u00a0 (collection):\tPAI-22, PAI-23\nImagery Location:\tRoom 2552\n\nIndex type:\tline\nIndex scale:\t1:100,000\nSize:\tframes 9 x 9 inches\nHeight:\t9\nWidth:\t9\n\t\nBegin date:\t\n1950-09-23\n\nEnd date:\t\n1950-09-23\n\nScale:\t1:4,800\nOverlap:\t60%\nSidelap:\t20%\nDirectional\u00a0 orientation:\tvarious\nAltitude:\t4,800\nLens focal length:\t12 inches\nCamera:\tK-17\nSpectral range:\t400-700 nm\nGeneration held:\t1st generation\n\t\nNote:\nLake Tahoe shoreline. Frame numbers have prefix C-112. Frames C-112-1 to C-112-179 are on roll PAI-22. Frames C-112-180 to C-112-308 are on roll PAI-23.\n\nPhysical Details:\tblack and white; negative transparencies; digital copy; film roll; vertical view; \u00a0\nCopyright:\tPacific Air Industries?\nFlown by:\tPacific Air Industries\nContractor/requestor:\tCalifornia State Lands Commission\nAcquired from:\tTeledyne. Inc.\nEst. frame count:\t324\nLibrary Home\n\nCopyright \u00a9 2012 The Regents of the University of California, All Rights Reserved.",
+  "links": [
+    {
+      "text": "Skip to main content",
+      "url": "https://mil.library.ucsb.edu/apcatalog/report/report.php?filed_by=PAI-Tahoe-50#MILcontent-wrapper"
+    },
+    {
+      "text": "Skip to navigation",
+      "url": "https://mil.library.ucsb.edu/apcatalog/report/report.php?filed_by=PAI-Tahoe-50#MILmain-menu"
+    },
+    {
+      "text": "UCSB Library Home Page",
+      "url": "http://www.library.ucsb.edu/"
+    },
+    {
+      "text": "Aerial Photography Information",
+      "url": "https://mil.library.ucsb.edu/apcatalog/"
+    },
+    {
+      "text": "Geospatial Collection",
+      "url": "https://www.library.ucsb.edu/geospatial"
+    },
+    {
+      "text": "Contact Us",
+      "url": "https://www.library.ucsb.edu/geospatial/contact-us"
+    },
+    {
+      "text": "View Index",
+      "url": "http://mil.library.ucsb.edu/ap_indexes/paitahoe50/"
+    },
+    {
+      "text": "Library Home",
+      "url": "https://www.library.ucsb.edu/"
+    }
+  ]
+}

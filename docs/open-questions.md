@@ -1,5 +1,11 @@
 # Open questions
 
+> **Scope update — 2026-09-28:** the next MVP is the [Auburn map browser](../README.md).
+> This document retains countywide research history/requirements; those requirements
+> are deferred and are not the new demo gate. Use the [active runbook](mvp-runbook.md)
+> and [implementation plan](implementation-plan.md). No historical evidence or issue
+> acceptance is changed by this notice.
+
 Gaps and ambiguities that need a human decision. Append with a date, the question, what
 was tried, and what would resolve it (AGENTS.md §5.4). Do not resolve one by guessing.
 

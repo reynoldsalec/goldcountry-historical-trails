@@ -1,0 +1,14 @@
+{
+  "observed_at": "2026-09-18T00:08:59Z",
+  "requested_url": "https://mil.library.ucsb.edu/ap_images/cas-4042/cas-4042_1.tif",
+  "final_url": "https://mil.library.ucsb.edu/ap_images/cas-4042/cas-4042_1.tif",
+  "method": "GET Range bytes=0-15; read maximum 16 bytes then close; not full scan acquisition",
+  "status": 206,
+  "headers": {
+    "Content-Type": "image/tiff",
+    "Content-Length": "16",
+    "Accept-Ranges": "bytes",
+    "Content-Range": "bytes 0-15/29520680"
+  },
+  "first_16_bytes_hex": "49492a00080000001400fe0004000100"
+}

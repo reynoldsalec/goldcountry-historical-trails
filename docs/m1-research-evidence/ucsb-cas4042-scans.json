@@ -1,0 +1,29 @@
+{
+  "requested_url": "https://mil.library.ucsb.edu/ap_images/cas-4042/",
+  "observed_at": "2026-09-18T00:08:23Z",
+  "page": {
+    "url": "https://mil.library.ucsb.edu/ap_images/cas-4042/",
+    "title": "\ud83d\udc34 Index of /ap_images/cas-4042",
+    "w": 1536,
+    "h": 643,
+    "sx": 0,
+    "sy": 0,
+    "pw": 1536,
+    "ph": 643
+  },
+  "text": "Index of /ap_images/cas-4042\n Name                    Size  \n cas-4042_1.tif           28M  \n\nApache/2.4.66 (Debian) Server at mil.library.ucsb.edu Port 80",
+  "links": [
+    {
+      "text": "Name",
+      "url": "https://mil.library.ucsb.edu/ap_images/cas-4042/?C=N;O=D"
+    },
+    {
+      "text": "Size",
+      "url": "https://mil.library.ucsb.edu/ap_images/cas-4042/?C=S;O=A"
+    },
+    {
+      "text": "cas-4042_1.tif",
+      "url": "https://mil.library.ucsb.edu/ap_images/cas-4042/cas-4042_1.tif"
+    }
+  ]
+}

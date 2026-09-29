@@ -1,0 +1,5 @@
+{
+  "output": "county properties [{'GEOID': '06057', 'BASENAME': 'Nevada'}, {'GEOID': '06061', 'BASENAME': 'Placer'}]\nnevada 222 128 {'2020': 32, '2010': 96}\nplacer 320 182 {'2020': 50, '2010': 132}\nnevada flight links 37\nplacer flight links 76\nreceipt digest/count and AOI difference verified 5.1999998326998494e-11",
+  "exit_code": 0,
+  "error": null
+}
