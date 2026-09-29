@@ -1,0 +1,726 @@
+{
+  "version": 1,
+  "area_id": "auburn",
+  "edition_order": [
+    "auburn-1953",
+    "auburn-1973",
+    "auburn-1975",
+    "auburn-1981"
+  ],
+  "view_bounds_wgs84": [
+    -121.126028,
+    38.874881,
+    -121.001023,
+    38.99988
+  ],
+  "tile_zoom": {
+    "min": 10,
+    "max": 16
+  },
+  "editions": [
+    {
+      "id": "auburn-1953",
+      "source_id": "CA_Auburn_288101_1953_24000",
+      "kind": "topo",
+      "label": "1953 topographic map",
+      "citation": "U.S. Geological Survey, Auburn quadrangle, California, 1:24,000, 1953 (CA_Auburn_288101_1953_24000)",
+      "source_url": "https://www.sciencebase.gov/catalog/item/5a8a2904e4b00f54eb3c61ca",
+      "rights": "public_domain",
+      "attribution": "Historical topographic maps: U.S. Geological Survey",
+      "dates": {
+        "map_year": 1953,
+        "base_year": 1953,
+        "revision_year": null,
+        "base_photography": "1952",
+        "revision_photography": null,
+        "photography": null,
+        "base_field_check_year": 1953,
+        "revision_field_checked": null
+      },
+      "date_note": "Base sheet dated 1953, compiled from 1952 aerial photography and field checked in 1953. Sheet dates describe the map, not the age of anything drawn on it.",
+      "crop_wgs84": {
+        "coordinates": [
+          [
+            [
+              -121.126026,
+              38.874881
+            ],
+            [
+              -121.112137,
+              38.874881
+            ],
+            [
+              -121.098248,
+              38.874881
+            ],
+            [
+              -121.084358,
+              38.874881
+            ],
+            [
+              -121.070469,
+              38.874881
+            ],
+            [
+              -121.05658,
+              38.874881
+            ],
+            [
+              -121.04269,
+              38.874881
+            ],
+            [
+              -121.028801,
+              38.874881
+            ],
+            [
+              -121.014912,
+              38.874882
+            ],
+            [
+              -121.001023,
+              38.874882
+            ],
+            [
+              -121.001023,
+              38.88877
+            ],
+            [
+              -121.001023,
+              38.902659
+            ],
+            [
+              -121.001023,
+              38.916548
+            ],
+            [
+              -121.001023,
+              38.930436
+            ],
+            [
+              -121.001024,
+              38.944325
+            ],
+            [
+              -121.001024,
+              38.958214
+            ],
+            [
+              -121.001024,
+              38.972102
+            ],
+            [
+              -121.001024,
+              38.985991
+            ],
+            [
+              -121.001024,
+              38.99988
+            ],
+            [
+              -121.014914,
+              38.999879
+            ],
+            [
+              -121.028803,
+              38.999879
+            ],
+            [
+              -121.042692,
+              38.999879
+            ],
+            [
+              -121.056582,
+              38.999879
+            ],
+            [
+              -121.070471,
+              38.999879
+            ],
+            [
+              -121.08436,
+              38.999879
+            ],
+            [
+              -121.098249,
+              38.999879
+            ],
+            [
+              -121.112139,
+              38.999879
+            ],
+            [
+              -121.126028,
+              38.999878
+            ],
+            [
+              -121.126028,
+              38.98599
+            ],
+            [
+              -121.126027,
+              38.972101
+            ],
+            [
+              -121.126027,
+              38.958212
+            ],
+            [
+              -121.126027,
+              38.944324
+            ],
+            [
+              -121.126027,
+              38.930435
+            ],
+            [
+              -121.126027,
+              38.916547
+            ],
+            [
+              -121.126026,
+              38.902658
+            ],
+            [
+              -121.126026,
+              38.888769
+            ],
+            [
+              -121.126026,
+              38.874881
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    },
+    {
+      "id": "auburn-1973",
+      "source_id": "CA_Auburn_288103_1953_24000",
+      "kind": "topo",
+      "label": "1973 photorevision",
+      "citation": "U.S. Geological Survey, Auburn quadrangle, California, 1:24,000, 1953, photorevised 1973 (CA_Auburn_288103_1953_24000)",
+      "source_url": "https://www.sciencebase.gov/catalog/item/5a8a2905e4b00f54eb3c61d1",
+      "rights": "public_domain",
+      "attribution": "Historical topographic maps: U.S. Geological Survey",
+      "dates": {
+        "map_year": 1953,
+        "base_year": 1953,
+        "revision_year": 1973,
+        "base_photography": "1952",
+        "revision_photography": "1973",
+        "photography": null,
+        "base_field_check_year": 1953,
+        "revision_field_checked": false
+      },
+      "date_note": "1953 base sheet (1952 photography, field checked 1953) carrying a 1973 photorevision made from 1973 photography. The revision was not field checked. Sheet dates describe the map, not the age of anything drawn on it.",
+      "crop_wgs84": {
+        "coordinates": [
+          [
+            [
+              -121.126026,
+              38.874881
+            ],
+            [
+              -121.112137,
+              38.874881
+            ],
+            [
+              -121.098248,
+              38.874881
+            ],
+            [
+              -121.084358,
+              38.874881
+            ],
+            [
+              -121.070469,
+              38.874881
+            ],
+            [
+              -121.05658,
+              38.874881
+            ],
+            [
+              -121.04269,
+              38.874881
+            ],
+            [
+              -121.028801,
+              38.874881
+            ],
+            [
+              -121.014912,
+              38.874882
+            ],
+            [
+              -121.001023,
+              38.874882
+            ],
+            [
+              -121.001023,
+              38.88877
+            ],
+            [
+              -121.001023,
+              38.902659
+            ],
+            [
+              -121.001023,
+              38.916548
+            ],
+            [
+              -121.001023,
+              38.930436
+            ],
+            [
+              -121.001024,
+              38.944325
+            ],
+            [
+              -121.001024,
+              38.958214
+            ],
+            [
+              -121.001024,
+              38.972102
+            ],
+            [
+              -121.001024,
+              38.985991
+            ],
+            [
+              -121.001024,
+              38.99988
+            ],
+            [
+              -121.014914,
+              38.999879
+            ],
+            [
+              -121.028803,
+              38.999879
+            ],
+            [
+              -121.042692,
+              38.999879
+            ],
+            [
+              -121.056582,
+              38.999879
+            ],
+            [
+              -121.070471,
+              38.999879
+            ],
+            [
+              -121.08436,
+              38.999879
+            ],
+            [
+              -121.098249,
+              38.999879
+            ],
+            [
+              -121.112139,
+              38.999879
+            ],
+            [
+              -121.126028,
+              38.999878
+            ],
+            [
+              -121.126028,
+              38.98599
+            ],
+            [
+              -121.126027,
+              38.972101
+            ],
+            [
+              -121.126027,
+              38.958212
+            ],
+            [
+              -121.126027,
+              38.944324
+            ],
+            [
+              -121.126027,
+              38.930435
+            ],
+            [
+              -121.126027,
+              38.916547
+            ],
+            [
+              -121.126026,
+              38.902658
+            ],
+            [
+              -121.126026,
+              38.888769
+            ],
+            [
+              -121.126026,
+              38.874881
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    },
+    {
+      "id": "auburn-1975",
+      "source_id": "CA_Auburn_288104_1975_24000",
+      "kind": "orthophotoquad",
+      "label": "1975 orthophotoquad",
+      "citation": "U.S. Geological Survey, Auburn orthophotoquad, California, 1:24,000, 1975 (CA_Auburn_288104_1975_24000)",
+      "source_url": "https://www.sciencebase.gov/catalog/item/5a8a2905e4b00f54eb3c61d4",
+      "rights": "public_domain",
+      "attribution": "Historical topographic maps: U.S. Geological Survey",
+      "dates": {
+        "map_year": 1975,
+        "base_year": null,
+        "revision_year": null,
+        "base_photography": null,
+        "revision_photography": null,
+        "photography": "1975-08-29",
+        "base_field_check_year": null,
+        "revision_field_checked": null
+      },
+      "date_note": "Orthophotoquad made from aerial photography of 1975-08-29. No base compilation, revision or field check applies to it. The photography date describes the image, not the age of anything visible in it.",
+      "crop_wgs84": {
+        "coordinates": [
+          [
+            [
+              -121.126026,
+              38.874881
+            ],
+            [
+              -121.112137,
+              38.874881
+            ],
+            [
+              -121.098248,
+              38.874881
+            ],
+            [
+              -121.084358,
+              38.874881
+            ],
+            [
+              -121.070469,
+              38.874881
+            ],
+            [
+              -121.05658,
+              38.874881
+            ],
+            [
+              -121.04269,
+              38.874881
+            ],
+            [
+              -121.028801,
+              38.874881
+            ],
+            [
+              -121.014912,
+              38.874882
+            ],
+            [
+              -121.001023,
+              38.874882
+            ],
+            [
+              -121.001023,
+              38.88877
+            ],
+            [
+              -121.001023,
+              38.902659
+            ],
+            [
+              -121.001023,
+              38.916548
+            ],
+            [
+              -121.001023,
+              38.930436
+            ],
+            [
+              -121.001024,
+              38.944325
+            ],
+            [
+              -121.001024,
+              38.958214
+            ],
+            [
+              -121.001024,
+              38.972102
+            ],
+            [
+              -121.001024,
+              38.985991
+            ],
+            [
+              -121.001024,
+              38.99988
+            ],
+            [
+              -121.014914,
+              38.999879
+            ],
+            [
+              -121.028803,
+              38.999879
+            ],
+            [
+              -121.042692,
+              38.999879
+            ],
+            [
+              -121.056582,
+              38.999879
+            ],
+            [
+              -121.070471,
+              38.999879
+            ],
+            [
+              -121.08436,
+              38.999879
+            ],
+            [
+              -121.098249,
+              38.999879
+            ],
+            [
+              -121.112139,
+              38.999879
+            ],
+            [
+              -121.126028,
+              38.999878
+            ],
+            [
+              -121.126028,
+              38.98599
+            ],
+            [
+              -121.126027,
+              38.972101
+            ],
+            [
+              -121.126027,
+              38.958212
+            ],
+            [
+              -121.126027,
+              38.944324
+            ],
+            [
+              -121.126027,
+              38.930435
+            ],
+            [
+              -121.126027,
+              38.916547
+            ],
+            [
+              -121.126026,
+              38.902658
+            ],
+            [
+              -121.126026,
+              38.888769
+            ],
+            [
+              -121.126026,
+              38.874881
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    },
+    {
+      "id": "auburn-1981",
+      "source_id": "CA_Auburn_288105_1953_24000",
+      "kind": "topo",
+      "label": "1981 photorevision",
+      "citation": "U.S. Geological Survey, Auburn quadrangle, California, 1:24,000, 1953, photorevised 1981 (CA_Auburn_288105_1953_24000)",
+      "source_url": "https://www.sciencebase.gov/catalog/item/5a8a2905e4b00f54eb3c61d9",
+      "rights": "public_domain",
+      "attribution": "Historical topographic maps: U.S. Geological Survey",
+      "dates": {
+        "map_year": 1953,
+        "base_year": 1953,
+        "revision_year": 1981,
+        "base_photography": "1952",
+        "revision_photography": "1978",
+        "photography": null,
+        "base_field_check_year": 1953,
+        "revision_field_checked": false
+      },
+      "date_note": "1953 base sheet (1952 photography, field checked 1953) carrying a 1981 photorevision made from 1978 photography; the sheet also cites other source data, so 1978 does not date every revised feature. The revision was not field checked. Sheet dates describe the map, not the age of anything drawn on it.",
+      "crop_wgs84": {
+        "coordinates": [
+          [
+            [
+              -121.126026,
+              38.874881
+            ],
+            [
+              -121.112137,
+              38.874881
+            ],
+            [
+              -121.098248,
+              38.874881
+            ],
+            [
+              -121.084358,
+              38.874881
+            ],
+            [
+              -121.070469,
+              38.874881
+            ],
+            [
+              -121.05658,
+              38.874881
+            ],
+            [
+              -121.04269,
+              38.874881
+            ],
+            [
+              -121.028801,
+              38.874881
+            ],
+            [
+              -121.014912,
+              38.874882
+            ],
+            [
+              -121.001023,
+              38.874882
+            ],
+            [
+              -121.001023,
+              38.88877
+            ],
+            [
+              -121.001023,
+              38.902659
+            ],
+            [
+              -121.001023,
+              38.916548
+            ],
+            [
+              -121.001023,
+              38.930436
+            ],
+            [
+              -121.001024,
+              38.944325
+            ],
+            [
+              -121.001024,
+              38.958214
+            ],
+            [
+              -121.001024,
+              38.972102
+            ],
+            [
+              -121.001024,
+              38.985991
+            ],
+            [
+              -121.001024,
+              38.99988
+            ],
+            [
+              -121.014914,
+              38.999879
+            ],
+            [
+              -121.028803,
+              38.999879
+            ],
+            [
+              -121.042692,
+              38.999879
+            ],
+            [
+              -121.056582,
+              38.999879
+            ],
+            [
+              -121.070471,
+              38.999879
+            ],
+            [
+              -121.08436,
+              38.999879
+            ],
+            [
+              -121.098249,
+              38.999879
+            ],
+            [
+              -121.112139,
+              38.999879
+            ],
+            [
+              -121.126028,
+              38.999878
+            ],
+            [
+              -121.126028,
+              38.98599
+            ],
+            [
+              -121.126027,
+              38.972101
+            ],
+            [
+              -121.126027,
+              38.958212
+            ],
+            [
+              -121.126027,
+              38.944324
+            ],
+            [
+              -121.126027,
+              38.930435
+            ],
+            [
+              -121.126027,
+              38.916547
+            ],
+            [
+              -121.126026,
+              38.902658
+            ],
+            [
+              -121.126026,
+              38.888769
+            ],
+            [
+              -121.126026,
+              38.874881
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    }
+  ]
+}

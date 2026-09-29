@@ -372,3 +372,33 @@ before those decades can render, and must enter each further decade a source exp
 supports as its own justified observation. Feature-level dating on revised sheets stays
 in the research inventory (see the 2026-08-30 entry on which topo date dates an
 observation). No real observation, feature date, or alignment was created here.
+
+---
+
+## 2026-09-28 — Two unverified values behind the Auburn edition manifest
+
+**The 1975 photography day.** `data/sources/demo-editions.json` records
+`photography: "1975-08-29"` for `CA_Auburn_288104_1975_24000`. The committed index holds
+only `aerial_photo_year: 1975`, and `scripts/demo.py check` confirms nothing finer than the
+year. The month and day come from the fixed input table in `docs/implementation-plan.md`.
+
+*What was tried.* Every per-sheet column in `data/sources/topo_index.csv`, and the GeoTIFF's
+own tags (only TIFF resolution tags and `AREA_OR_POINT` are present). No network lookup was
+made and the sheet margin was not read by machine.
+
+*To resolve.* A reviewer reads the photography date off the orthophotoquad's margin, or off
+its USGS metadata record at
+<https://www.sciencebase.gov/catalog/item/5a8a2905e4b00f54eb3c61d4>, and either confirms
+`1975-08-29` or replaces it. If it cannot be confirmed, the field becomes `"1975"` and the
+source card says the day is unknown.
+
+**The NAD27 → WGS84 transformation.** The grid-based operations `NAD27 to WGS 84 (40)` and
+`(79)` need `us_noaa_cnhpgn.tif`, which the pinned PROJ 9.5.1 install does not carry, so the
+crops and view bounds were derived through the Helmert operation `NAD27 to WGS 84 (6)`
+(declared accuracy 7 m). `demo-check` records which operation ran and refuses a ballpark
+offset, so this is disclosed rather than silent.
+
+*To resolve.* Decide whether to vendor the NADCON grids before D2 warps anything. Installing
+them will move the tiles by metres. Either way the caveat belongs on the demo's source
+information, and no alignment may be digitized against these rasters until the datum
+question is settled. See `docs/demo-source-review.md` §3.
