@@ -14,6 +14,7 @@ import {
   publicManifestFrom,
   sourceIdFor,
 } from "./editions";
+import { loadStrictTile, strictTileUrl } from "./tileProtocol";
 import { attachTileWatcher, type TileEvent, type TileEventSource } from "./tileWatcher";
 
 const rejections: unknown[] = [];
@@ -111,6 +112,28 @@ function tileError(editionId: string, message: string): TileEvent {
   return { sourceId: sourceIdFor(editionId), error: { message } };
 }
 
+/**
+ * The event MapLibre fires for a tile the server answered 404, as the protocol handler
+ * makes it: the handler's error carries no `status`, so `TileManager._loadTile` reports
+ * it instead of silently overzooming a parent tile (PR #51 review).
+ */
+async function notFoundTileError(editionId: string, tilePath: string): Promise<TileEvent> {
+  try {
+    await loadStrictTile({ url: strictTileUrl(tilePath) }, new AbortController(), {
+      fetch: async () => ({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        arrayBuffer: async () => new ArrayBuffer(0),
+      }),
+      baseUrl: "http://127.0.0.1:5173/",
+    });
+  } catch (reason: unknown) {
+    return { sourceId: sourceIdFor(editionId), error: reason as Error };
+  }
+  throw new Error("a 404 tile response must not resolve");
+}
+
 describe("attachTileWatcher", () => {
   it("displays the first edition only once its source reports loaded", () => {
     const parsed = manifest();
@@ -164,6 +187,44 @@ describe("attachTileWatcher", () => {
     expect(browser.state.displayedId).toBe("auburn-1953");
     expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
     expect(map.cameraCalls).toBe(0);
+  });
+
+  it("fails the switch when a tile 404s, naming the tile", async () => {
+    const { browser, map } = harness();
+    browser.select("auburn-1973");
+
+    map.emit(
+      "error",
+      await notFoundTileError("auburn-1973", "tiles/auburn-1973/13/1341/3132.png"),
+    );
+    expect(browser.state.status).toBe("error");
+    expect(browser.state.errorMessage).toBe(
+      "tiles/auburn-1973/13/1341/3132.png: HTTP 404 Not Found",
+    );
+    // No silent fallback: 1973 stays off screen and 1953 keeps the card.
+    expect(browser.state.displayedId).toBe("auburn-1953");
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
+  });
+
+  it("warns when a tile 404s after the switch has settled", async () => {
+    const { browser, map } = harness();
+    browser.select("auburn-1973");
+    map.loaded.add(sourceIdFor("auburn-1973"));
+    map.emit("idle");
+
+    map.emit("movestart");
+    map.emit(
+      "error",
+      await notFoundTileError("auburn-1973", "tiles/auburn-1973/14/2682/6265.png"),
+    );
+    expect(browser.state.status).toBe("displayed");
+    expect(browser.state.warningMessage).toBe(
+      "tiles/auburn-1973/14/2682/6265.png: HTTP 404 Not Found",
+    );
+    map.emit("idle");
+    expect(browser.state.warningMessage).toBe(
+      "tiles/auburn-1973/14/2682/6265.png: HTTP 404 Not Found",
+    );
   });
 
   it("does not let a source-loaded event after an error reveal the failed edition", () => {

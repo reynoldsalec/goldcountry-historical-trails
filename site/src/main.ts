@@ -6,6 +6,7 @@ import {
   Map as MapLibreMap,
   NavigationControl,
   ScaleControl,
+  addProtocol,
   type RasterLayerSpecification,
   type RasterSourceSpecification,
   type RasterTileSource,
@@ -24,6 +25,7 @@ import {
   resamplingFor,
   sourceIdFor,
 } from "./editions.ts";
+import { STRICT_TILE_PROTOCOL, loadStrictTile, strictTileUrl } from "./tileProtocol.ts";
 import { attachTileWatcher, type TileEventSource } from "./tileWatcher.ts";
 
 const BACKGROUND_LAYER_ID = "outside-coverage";
@@ -50,7 +52,7 @@ function buildStyle(manifest: PublicManifest): StyleSpecification {
   for (const [index, edition] of manifest.editions.entries()) {
     sources[sourceIdFor(edition.id)] = {
       type: "raster",
-      tiles: [edition.tile_url],
+      tiles: [strictTileUrl(edition.tile_url)],
       tileSize: 256,
       minzoom: manifest.tile_zoom.min,
       maxzoom: manifest.tile_zoom.max,
@@ -117,7 +119,18 @@ const CAVEAT =
   "These sheets record what the survey depicted on its stated dates. A line on a map " +
   "is not a statement about who may use it today.";
 
+/** Registered before the map exists: the style's first tile request already uses it. */
+function registerTileProtocol(): void {
+  addProtocol(STRICT_TILE_PROTOCOL, (params, abortController) =>
+    loadStrictTile(params, abortController, {
+      fetch: (url, init) => fetch(url, init),
+      baseUrl: document.baseURI,
+    }),
+  );
+}
+
 async function start(): Promise<void> {
+  registerTileProtocol();
   const response = await fetch("./editions.json", { cache: "no-store" });
   if (!response.ok) {
     element("notice").textContent = `Could not load editions.json (HTTP ${response.status}).`;
@@ -159,7 +172,9 @@ async function start(): Promise<void> {
     setPaintProperty: (map.setPaintProperty as unknown as PropertySetter).bind(map),
     fitBounds: (bounds, options) => map.fitBounds(bounds, options as never),
     setSourceTiles: (sourceId, tiles) =>
-      (map.getSource(sourceId) as RasterTileSource | undefined)?.setTiles(tiles),
+      (map.getSource(sourceId) as RasterTileSource | undefined)?.setTiles(
+        tiles.map(strictTileUrl),
+      ),
   };
 
   const browser = new EditionBrowser({ manifest, map: controls, resetPadding: 16 });
