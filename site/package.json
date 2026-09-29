@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:browser": "playwright test",
+    "test:browser:built": "playwright test --config playwright.built.config.ts",
     "browsers": "playwright install chromium",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",

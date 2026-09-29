@@ -134,7 +134,12 @@ export function writeFixtures(root: string): { manifestPath: string; tileRoot: s
   const tileRoot = join(root, "tiles");
   mkdirSync(root, { recursive: true });
   writeFileSync(manifestPath, `${JSON.stringify(fixtureSourceManifest(), null, 2)}\n`);
+  writeFixtureTiles(tileRoot);
+  return { manifestPath, tileRoot };
+}
 
+/** The four flat-colour pyramids under `tileRoot`, laid out as `<id>/<z>/<x>/<y>.png`. */
+export function writeFixtureTiles(tileRoot: string): void {
   const coordinates = fixtureTiles();
   for (const edition of FIXTURE_EDITIONS) {
     const png = solidPng(TILE_SIZE, edition.colour);
@@ -144,5 +149,4 @@ export function writeFixtures(root: string): { manifestPath: string; tileRoot: s
       writeFileSync(path, png);
     }
   }
-  return { manifestPath, tileRoot };
 }

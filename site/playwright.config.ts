@@ -23,6 +23,9 @@ const { manifestPath, tileRoot } = writeFixtures(fixtureRoot);
 
 export default defineConfig({
   testDir: "./tests",
+  // tests/built runs against the built bundle on its own server; see
+  // playwright.built.config.ts.
+  testIgnore: "built/**",
   // One worker: every test drives a WebGL map and a routed tile server, and a shared dev
   // server. Determinism matters more here than wall clock.
   workers: 1,

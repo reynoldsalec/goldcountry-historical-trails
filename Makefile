@@ -146,12 +146,16 @@ site-browsers: site-deps
 # Offline: the dev server is pointed at generated fixtures, never at data/sources or
 # build/tiles. DEMO_TEST_PORT (default 5274) is this suite's own port, separate from
 # 'make demo-dev'. Bundled Chromium only. See docs/demo-browser-tests.md.
+# The second suite serves the built bundle from a subpath on DEMO_BUILT_PORT (default 5275),
+# so a production-only failure such as a missing worker asset cannot pass unseen (PR #53).
 DEMO_TEST_PORT ?= 5274
-export DEMO_TEST_PORT
+DEMO_BUILT_PORT ?= 5275
+export DEMO_TEST_PORT DEMO_BUILT_PORT
 demo-browser-test: site-browsers
 	cd $(SITE) && $(NPM) run build
 	cd $(SITE) && node tests/assert-no-test-probe.mjs
 	cd $(SITE) && $(NPM) run test:browser
+	cd $(SITE) && $(NPM) run test:browser:built
 
 ## preflight + rasters + site bundle -> allowlisted build/public/ (D4a)
 # Only the four recorded tile trees, the built app assets and a sanitized editions.json are
