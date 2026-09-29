@@ -1425,6 +1425,108 @@ def rasters(
 
 
 @cli.command()
+@_common_options
+@click.option(
+    "--build-root",
+    "build_root",
+    type=click.Path(path_type=Path),
+    default=BUILD_ROOT,
+    show_default=False,
+)
+@click.option(
+    "--grid-zoom",
+    "zoom",
+    type=int,
+    default=None,
+    help="Grid zoom to warp onto, and the pyramid's top zoom; defaults to the manifest "
+    "maximum. A lower value publishes, and advertises, only the zooms it cut.",
+)
+@click.option("--site-dir", "site_dir", type=click.Path(path_type=Path), default=None)
+@click.option(
+    "--dist",
+    "dist",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Built site to publish from. Used with --no-vite to publish an existing bundle.",
+)
+@click.option("--data-dir", "data_dir", type=click.Path(path_type=Path), default=None)
+@click.option("--schema-dir", "schema_dir", type=click.Path(path_type=Path), default=None)
+@click.option("--npm", "npm", default="npm", show_default=True)
+@click.option(
+    "--vite/--no-vite",
+    "vite",
+    default=True,
+    help="Run 'npm run build' in site/ first. --no-vite republishes the existing site/dist.",
+)
+def build(
+    manifest_path,
+    schema_path,
+    index_path,
+    receipts_path,
+    sources_path,
+    raw_root,
+    build_root,
+    zoom,
+    site_dir,
+    dist,
+    data_dir,
+    schema_dir,
+    npm,
+    vite,
+) -> None:
+    """Assemble the allowlisted public site into build/public/ (D4a).
+
+    Preflight, rasters, site build, staging, the restricted-value scan, then one atomic
+    swap. A failure publishes nothing and leaves any previous build/public untouched.
+    """
+    import build_site
+
+    started = time.monotonic()
+    optional = {
+        key: value
+        for key, value in (
+            ("site_dir", site_dir),
+            ("dist", dist),
+            ("data_dir", data_dir),
+            ("schema_dir", schema_dir),
+        )
+        if value is not None
+    }
+    result = build_site.run_build(
+        manifest_path,
+        schema_path,
+        index_path,
+        receipts_path,
+        sources_path,
+        raw_root,
+        build_root,
+        zoom,
+        npm=npm,
+        vite=vite,
+        **optional,
+    )
+    inventory = result["inventory"]
+    for entry in inventory["app_assets"]:
+        click.echo(f"asset {entry['path']}: {entry['byte_count']} bytes")
+    click.echo(
+        f"metadata {inventory['metadata']['path']}: {inventory['metadata']['byte_count']} bytes"
+    )
+    for entry in inventory["editions"]:
+        click.echo(
+            f"{entry['id']}: {entry['path']}/{{z}}/{{x}}/{{y}}.png {entry['tiles']} tiles, "
+            f"{entry['bytes']} bytes, digest={entry['digest'][:12]}"
+        )
+    click.echo(inventory["leak_scan"])
+    totals = inventory["totals"]
+    click.echo(
+        f"demo-build: published {totals['files']} files, {totals['bytes']} bytes to "
+        f"{inventory['root']}/ (zoom {inventory['zoom']['min']}-{inventory['zoom']['max']}, "
+        f"{totals['tiles']} tiles); {time.monotonic() - started:.1f} s; "
+        f"inventory {result['inventory_path'].name}"
+    )
+
+
+@cli.command()
 @click.option("--index", "index_path", type=click.Path(path_type=Path), default=INDEX_PATH)
 @click.option(
     "--receipts", "receipts_path", type=click.Path(path_type=Path), default=RECEIPTS_PATH

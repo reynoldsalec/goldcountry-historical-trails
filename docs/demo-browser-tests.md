@@ -135,13 +135,41 @@ displayedId: this.current.displayedId ?? id,
 Fourteen of the seventeen tests failed on that one change. No assertion was loosened to make
 either case pass; the code was put back instead.
 
-## 6. Limits
+## 6. The second suite: the built bundle, served from a subpath
+
+The suite above drives `npm run dev`, so it cannot see a failure that exists only in the
+built output. One did: `vite build` emitted no MapLibre worker asset, the published page
+404'd on `assets/maplibre-gl-worker.mjs`, and no edition ever appeared (PR #53 review).
+
+`site/playwright.built.config.ts` closes that gap. It copies `site/dist` into
+`site/.playwright-built/` (gitignored), adds the same fixture `editions.json` and fixture
+tile pyramids, and serves that tree with `site/tests/built/serve.mjs` under `/sub/` on port
+5275 (`DEMO_BUILT_PORT`) - a non-root prefix on purpose, because the published tree has to
+work where it is deployed. The server never falls back to `index.html`, so a missing file
+stays a 404.
+
+`site/tests/built/built.spec.ts`, 2 tests:
+
+| Area | Assertion |
+| --- | --- |
+| First load from `/sub/` | `#notice` reaches `data-status="displayed"` and names the first edition, the card names it too, one canvas; no request failed and no response was 4xx or worse; every request was under `/sub/`; the MapLibre worker asset and the first edition's tiles were among them |
+| The 404 control | an unknown path under the prefix really returns 404, so the no-4xx assertion is not vacuous |
+
+Verified against a deliberate regression: with `setWorkerUrl` removed from
+`site/src/main.ts`, the staged page requested `/sub/assets/maplibre-gl-worker.mjs`, got a
+404, and `#notice` read `Could not load Fixture sheet one (test data, 1899): Worker failed
+to load. Check that the worker URL is correct.. No edition is on screen yet.` with
+`data-status="error"`. The first test failed; with the fix in place both pass.
+
+`make demo-browser-test` runs both suites, dev first.
+
+## 7. Limits
 
 - Chromium only, headless, one worker, on a fixture world of flat-colour tiles. Nothing here
   checks that the real rasters register against each other, that the scans are legible, or
   that the card text is factually right about a USGS sheet.
-- The suite drives the dev server, so it exercises the dev module graph. The production
-  bundle is built and inspected for the test hook, but it is not the artifact the browser
-  tests load. The public build is D4.
+- The built-bundle suite (§6) loads the real `vite build` output, but against fixture tiles
+  and a fixture `editions.json`, not `build/public`. It says the bundle starts, fetches its
+  own assets relatively and renders one edition; it says nothing about the real pyramids.
 - No screenshot or pixel comparison. "The right edition is on screen" is asserted through the
   state the viewer publishes (the notice status and the card), not through pixels.

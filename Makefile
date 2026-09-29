@@ -14,7 +14,7 @@ export TRAIL_ARCHIVE_ROOT
         coverage-ready coverage-report \
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup \
-        demo-check demo-inspect demo-test demo-cogs demo-rasters \
+        demo-check demo-inspect demo-test demo-cogs demo-rasters demo-build \
         demo-dev site-deps demo-frontend-test site-browsers demo-browser-test
 
 ## validate build-public (AGENTS.md §4.3)
@@ -146,15 +146,28 @@ site-browsers: site-deps
 # Offline: the dev server is pointed at generated fixtures, never at data/sources or
 # build/tiles. DEMO_TEST_PORT (default 5274) is this suite's own port, separate from
 # 'make demo-dev'. Bundled Chromium only. See docs/demo-browser-tests.md.
+# The second suite serves the built bundle from a subpath on DEMO_BUILT_PORT (default 5275),
+# so a production-only failure such as a missing worker asset cannot pass unseen (PR #53).
 DEMO_TEST_PORT ?= 5274
-export DEMO_TEST_PORT
+DEMO_BUILT_PORT ?= 5275
+export DEMO_TEST_PORT DEMO_BUILT_PORT
 demo-browser-test: site-browsers
 	cd $(SITE) && $(NPM) run build
 	cd $(SITE) && node tests/assert-no-test-probe.mjs
 	cd $(SITE) && $(NPM) run test:browser
+	cd $(SITE) && $(NPM) run test:browser:built
+
+## preflight + rasters + site bundle -> allowlisted build/public/ (D4a)
+# Only the four recorded tile trees, the built app assets and a sanitized editions.json are
+# copied. Nothing is published until the staged tree passes its completeness and
+# restricted-value checks, so a failure leaves any previous build/public untouched.
+# The output inventory is written to build/publish/demo-publish.json.
+demo-build: site-deps
+	$(RUN) python scripts/demo.py build
 
 demo-test: demo-frontend-test demo-browser-test
-	$(RUN) pytest -q scripts/test_demo.py scripts/test_demo_rasters.py
+	$(RUN) pytest -q scripts/test_demo.py scripts/test_demo_rasters.py \
+	  scripts/test_demo_build.py
 
 # Files are listed explicitly so a deleted or renamed regression module fails loudly
 # instead of silently shrinking the glob.
@@ -203,10 +216,10 @@ tiles:
 	@echo "  See README.md §7, M4."
 	@exit 1
 
-## assemble build/public/ (restricted fields stripped)
+## assemble the countywide build/public/ (restricted fields stripped)
 build-public:
-	@echo "make build-public: not implemented until M5 (split builds and deploy)."
-	@echo "  Needs scripts/build_site.py. Until then 'make validate' is the M0 entry point."
+	@echo "make build-public: not implemented until M5 (countywide split builds and deploy)."
+	@echo "  The Auburn map-browser MVP publishes build/public with 'make demo-build'."
 	@echo "  See README.md §7, M5."
 	@exit 1
 
@@ -236,4 +249,5 @@ lint:
 
 ## remove derived output; never touches data/
 clean:
-	rm -rf build/public build/restricted build/tiles build/rasters
+	rm -rf build/public build/restricted build/tiles build/rasters build/publish \
+	  build/.public-incoming build/.public-previous

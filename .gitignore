@@ -13,6 +13,7 @@ build/*
 site/dist/
 # Generated browser-test fixtures and Playwright output (issue #44).
 site/.playwright-fixtures/
+site/.playwright-built/
 site/test-results/
 site/playwright-report/
 
