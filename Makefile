@@ -88,8 +88,6 @@ restore-sources:
 verify-backup:
 	$(RUN) python scripts/source_archive.py verify-backup
 
-# Files are listed explicitly so a deleted or renamed regression module fails loudly
-# instead of silently shrinking the glob.
 ## Auburn map-browser demo (docs/implementation-plan.md, D1)
 # DEMO_RAW_ROOT points the preflight at the raw scans when they are not in this checkout
 # (data/raw is gitignored, so a worktree usually has none).
@@ -107,6 +105,8 @@ demo-inspect:
 demo-test:
 	$(RUN) pytest -q scripts/test_demo.py
 
+# Files are listed explicitly so a deleted or renamed regression module fails loudly
+# instead of silently shrinking the glob.
 test-validation:
 	$(RUN) pytest -q scripts/test_validate.py scripts/test_validate_dates.py scripts/test_validate_leaks.py
 

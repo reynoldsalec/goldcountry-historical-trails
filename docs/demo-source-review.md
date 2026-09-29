@@ -75,48 +75,67 @@ carry a metre-scale datum uncertainty on top of the original map's own accuracy.
 the NADCON grids would move them. This is a positional caveat, not a licence to nudge
 geometry by hand.
 
-## 4. Neatline locators — scan margin excluded
+## 4. Neatline residuals — scan margin excluded
 
-The crop keeps the mapped face of each sheet and drops the decorative collar. The locator
-is found, not assumed: the quadrangle graticule corners from `topo_index.csv` are projected
-into the scan only to **seed** a search, then the accepted line is the darkest column or row
-within 60 m of that seed, profiled over the middle 70% of each edge (away from the corner
-ticks and tie marks).
+The crop keeps the mapped face of each sheet and drops the decorative collar. Its boundary
+is the **labelled graticule quadrilateral** from `topo_index.csv` (−121.125, 38.875,
+−121.0, 39.0 NAD27, identical on all four sheets), densified along each edge and sent
+through the datum operation. It is deliberately not a rectangle in the source projection:
+the east and west neatlines are meridians, they converge, and the drawn line therefore
+leans about 4.7 px (≈9.5 m) from the top of the sheet to the bottom. An axis-aligned crop
+agrees with the drawn line only near mid-height, and cuts 6–10 m of map content at the
+south corners while keeping collar at the north corners.
 
-`offset` is the accepted line's distance from the seeded corner, in pixels (1 px ≈ 2.03 m).
-`dark` is the mean value of the accepted line, `collar` the median of the search window; a
-line that is not at least 15 grey levels darker than its surroundings is a failure, not a
-guess.
+The scan is still read, but to **verify** rather than to seed. For each of the four edges,
+two bands are profiled — one starting 15% in from each end, each 15% of the edge long, away
+from the corner ticks and tie marks. The accepted line in a band is the darkest column or
+row within 60 m of the projected graticule; a line that is not at least 15 grey levels
+darker than its surroundings is a failure, not a guess. The **residual** is that line's
+signed distance from the graticule at the band's midpoint, in pixels (1 px ≈ 2.03 m).
+A residual over 3.0 px fails `demo-check`.
 
-| Edition | west | east | north | south |
-| --- | --- | --- | --- | --- |
-| auburn-1953 | col 635, offset +0, dark 157.0 / collar 218.5 | col 5968, offset −1, dark 134.5 / collar 194.9 | row 385, offset −1, dark 71.8 / collar 211.9 | row 7214, offset −1, dark 86.3 / collar 200.0 |
-| auburn-1973 | col 611, offset +1, dark 180.3 / collar 227.9 | col 5943, offset −1, dark 168.3 / collar 213.7 | row 395, offset +1, dark 126.6 / collar 224.9 | row 7223, offset +0, dark 138.0 / collar 218.4 |
-| auburn-1975 | col 557, offset +1, dark 93.7 / collar 129.1 | col 5859, offset −2, dark 71.9 / collar 157.5 | row 364, offset −2, dark 31.8 / collar 78.9 | row 7156, offset −2, dark 58.1 / collar 228.8 |
-| auburn-1981 | col 622, offset +1, dark 173.9 / collar 228.0 | col 5953, offset −1, dark 162.9 / collar 216.3 | row 365, offset +0, dark 109.7 / collar 219.6 | row 7194, offset +0, dark 129.9 / collar 220.8 |
+| Edition | west edge | east edge | north edge | south edge | max |
+| --- | --- | --- | --- | --- | --- |
+| auburn-1953 | north −0.53 (px 636, dark 105.9/230.0); south −0.97 (px 633, dark 81.6/223.3) | north −0.66 (px 5967, dark 74.7/196.8); south −0.26 (px 5970, dark 85.0/214.2) | west −1.35 (px 385, dark 95.1/238.3); east −1.34 (px 385, dark 67.4/219.5) | west −1.35 (px 7214, dark 75.2/213.6); east −1.33 (px 7214, dark 88.2/229.2) | 1.35 |
+| auburn-1973 | north −0.34 (px 611, dark 156.7/236.7); south −0.78 (px 608, dark 112.2/231.4) | north −0.47 (px 5942, dark 101.8/210.7); south −1.07 (px 5944, dark 133.4/224.8) | west −0.03 (px 395, dark 131.4/244.6); east −0.01 (px 395, dark 134.2/227.0) | west −1.02 (px 7223, dark 116.6/226.1); east −1.00 (px 7223, dark 136.2/243.4) | 1.07 |
+| auburn-1975 | north −0.47 (px 557, dark 41.9/129.8); south +0.08 (px 555, dark 58.1/138.3) | north −1.51 (px 5858, dark 58.1/204.0); south −1.10 (px 5861, dark 42.4/106.2) | west −2.61 (px 364, dark 37.2/120.7); east −2.60 (px 364, dark 30.6/82.6) | west −2.34 (px 7156, dark 45.4/236.7); east −2.32 (px 7156, dark 67.0/225.0) | 2.61 |
+| auburn-1981 | north +0.21 (px 622, dark 108.5/234.2); south −0.23 (px 619, dark 133.8/232.7) | north −0.92 (px 5952, dark 133.7/223.3); south −1.51 (px 5954, dark 140.9/232.3) | west −0.79 (px 365, dark 122.8/244.2); east −0.78 (px 365, dark 121.8/228.1) | west −1.79 (px 7193, dark 122.8/221.4); east −0.77 (px 7194, dark 153.0/242.6) | 1.79 |
 
-Every offset is within 2 px (≈4 m) of the projected graticule corner, so the delivered
-georeferencing and the drawn neatline agree on all sixteen edges. The crop follows the
-neatline and therefore excludes only the collar; no white map content inside the neatline is
-removed.
+What these sixteen measurements say, stated as measured rather than in general terms:
+
+- The largest deviation anywhere is **2.61 px (5.3 m)**, on the 1975 orthophotoquad's north
+  edge. The three topo sheets stay within 1.79 px (3.6 m).
+- Every residual on the north and south edges is negative, and all but two of the eight
+  east/west residuals are: the drawn line sits a pixel or two outside the graticule the
+  GeoTIFF delivers. The two ends of an edge agree to within 1.02 px in the worst case (the
+  1981 south edge) and within 0.60 px on the other fifteen edges, so what is left is an
+  offset of the whole line, not the tilt the earlier axis-aligned crop showed.
+- The drawn neatline's own ink is 2–3 px wide on all four sheets, so the crop boundary
+  falls within the drawn line, not inside the mapped face. The worst case, the 1975 north
+  edge, trims about 1 px (2 m) of orthophoto tone just inside the line; on the topo sheets
+  the boundary stays inside the ink.
+- `demo-check` fails outright, rather than warning, if any residual exceeds 3.0 px. The
+  3.0 px limit is set from the 2.61 px measurement above, not chosen in advance.
 
 ## 5. Derived geometry
 
-`crop_wgs84` per edition is that neatline rectangle, densified to 9 points per edge so the
-Polyconic and Lambert curvature survives the conversion, then expressed in WGS84 at six
-decimal places. `view_bounds_wgs84` is the bounding box of the intersection of the four
-crops:
+`crop_wgs84` per edition is that graticule quadrilateral, densified to 9 points per edge so
+the constant-longitude and constant-latitude sides stay curves through the datum shift
+instead of collapsing to chords, then expressed in WGS84 at six decimal places. Because all
+four sheets carry the same graticule labels, the four crops are the same polygon, and the
+common mapped footprint is that polygon exactly. `view_bounds_wgs84` is its bounding box:
 
 ```
-[-121.126036, 38.874903, -121.001, 38.999875]
+[-121.126028, 38.874881, -121.001023, 38.99988]
 ```
 
-That box is a few metres wider than the intersection polygon itself, because the sheet edges
-are curves rather than meridians and parallels. D2 must keep nodata/alpha explicit so the
-sliver outside the mapped face reads as "no data", not as a failed tile.
+That box is a few metres wider than the polygon itself, because the sheet edges are curves
+in WGS84 rather than straight lines. D2 must keep nodata/alpha explicit so the sliver
+outside the mapped face reads as "no data", not as a failed tile.
 
-None of these numbers comes from the index corner labels; `demo-check` recomputes them from
-the rasters on every run and fails if the manifest drifts by more than 1e-5 degrees.
+`demo-check` recomputes the crop and the bounds from the index labels and the rasters on
+every run, fails if the manifest drifts by more than 1e-5 degrees, and fails if the drawn
+line has moved off the graticule.
 
 The footprint spans the whole original Auburn quadrangle, including ground outside Placer
 County. That is source context only. It does not widen the county scope of the deferred
