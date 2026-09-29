@@ -378,16 +378,20 @@ export class EditionBrowser {
   /**
    * Re-request the edition that failed, under a fresh generation. The tile URLs get a new
    * reload counter: without it the browser replays its cached failure and the retry never
-   * settles, which is the gap PR #50's review left open.
+   * settles, which is the gap PR #50's review left open. A warned edition that is already
+   * on screen is refetched the same way, because MapLibre keeps its errored tiles cached
+   * and never asks for them again on its own (PR #51 review).
    */
   retry(): number {
     const id = this.current.requestedId;
     const displayed = id === this.current.displayedId;
-    if (!displayed) {
+    if (!displayed || this.current.warningMessage !== null) {
       const reload = (this.reloads.get(id) ?? 0) + 1;
       this.reloads.set(id, reload);
       this.map.setSourceTiles(sourceIdFor(id), [tileUrlFor(this.edition(id), reload)]);
-      this.beginLoading(id);
+      if (!displayed) {
+        this.beginLoading(id);
+      }
     }
     const generation = this.current.generation + 1;
     this.commit({
@@ -395,6 +399,8 @@ export class EditionBrowser {
       generation,
       status: displayed ? "displayed" : "loading",
       errorMessage: null,
+      // The refetch is in flight; a tile that fails again raises the warning afresh.
+      warningMessage: displayed ? null : this.current.warningMessage,
     });
     return generation;
   }
@@ -457,7 +463,8 @@ export class EditionBrowser {
   /**
    * A tile failure that arrives once a switch has settled: the pixels on screen are still
    * the edition the card names, so this warns instead of unsetting the layer. It survives
-   * later pans and zooms, because the gap it reports is still on screen.
+   * later pans, zooms and idles, because the gap it reports is still on screen: only a
+   * switch or a retry retires it.
    */
   noteTileWarning(message: string): void {
     if (this.current.warningMessage === message) {
@@ -474,14 +481,6 @@ export class EditionBrowser {
     const viewportToken = this.current.viewportToken + 1;
     this.commit({ ...this.current, viewportToken });
     return viewportToken;
-  }
-
-  /** The displayed edition covered the current viewport with no failures: drop the warning. */
-  clearTileWarning(): void {
-    if (this.current.warningMessage === null) {
-      return;
-    }
-    this.commit({ ...this.current, warningMessage: null });
   }
 
   /**

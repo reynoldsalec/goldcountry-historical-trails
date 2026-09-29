@@ -183,7 +183,8 @@ async function start(): Promise<void> {
     select.value = state.requestedId;
     previous.disabled = !browser.canGoPrevious;
     next.disabled = !browser.canGoNext;
-    retry.hidden = state.status !== "error";
+    // A standing tile warning also needs the button: the refetch is the only way back.
+    retry.hidden = state.status !== "error" && state.warningMessage === null;
     const notice = element("notice");
     notice.textContent = noticeFor(state, browser);
     notice.dataset.status = state.status;

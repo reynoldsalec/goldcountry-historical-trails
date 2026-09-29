@@ -16,6 +16,7 @@ import {
   noticeFor,
   publicManifestFrom,
   resamplingFor,
+  sourceIdFor,
 } from "./editions";
 
 // Every path under test is synchronous, so any rejection here is a defect, not a race.
@@ -653,6 +654,26 @@ describe("tile failures after a settled switch", () => {
     expect(browser.state.warningMessage).toBe("HTTP 404");
   });
 
+  it("keeps the warning until the user retries or the displayed edition changes", () => {
+    const { browser, map } = browserForRealManifest();
+    browser.confirmDisplayed("auburn-1973", browser.select("auburn-1973"));
+    browser.noteTileWarning("HTTP 404");
+
+    // No number of settled viewports retires it: MapLibre caches the errored tiles.
+    browser.noteCameraMove();
+    browser.noteCameraMove();
+    expect(browser.state.warningMessage).toBe("HTTP 404");
+
+    browser.retry();
+    expect(browser.state.status).toBe("displayed");
+    expect(browser.state.displayedId).toBe("auburn-1973");
+    expect(browser.state.warningMessage).toBeNull();
+    // The refetch is the point of the retry: cached failures need a fresh URL.
+    expect(map.tiles[sourceIdFor("auburn-1973")]).toEqual([
+      "tiles/auburn-1973/{z}/{x}/{y}.png?reload=1",
+    ]);
+  });
+
   it("says nothing about failures when a bounded pyramid is simply empty here", () => {
     const { browser } = browserForRealManifest();
     browser.confirmDisplayed("auburn-1975", browser.select("auburn-1975"));
@@ -664,10 +685,10 @@ describe("tile failures after a settled switch", () => {
     );
   });
 
-  it("retires the warning once a clean pass covers the viewport", () => {
+  it("retires the warning when a different edition reaches the screen", () => {
     const { browser } = browserForRealManifest();
     browser.noteTileWarning("HTTP 404");
-    browser.clearTileWarning();
+    browser.confirmDisplayed("auburn-1981", browser.select("auburn-1981"));
     expect(browser.state.warningMessage).toBeNull();
   });
 

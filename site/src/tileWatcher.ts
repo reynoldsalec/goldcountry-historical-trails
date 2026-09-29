@@ -35,21 +35,12 @@ export function attachTileWatcher(browser: EditionBrowser, map: TileEventSource)
     const state = browser.state;
     // MapLibre also reports a source loaded once its tiles have settled as errored, so a
     // failed request must stay failed: only a request still loading can be confirmed.
-    if (state.status === "loading") {
-      if (map.isSourceLoaded(sourceIdFor(state.requestedId))) {
-        browser.confirmDisplayed(state.requestedId, state.generation, state.viewportToken);
-      }
-      return;
+    if (state.status === "loading" && map.isSourceLoaded(sourceIdFor(state.requestedId))) {
+      browser.confirmDisplayed(state.requestedId, state.generation, state.viewportToken);
     }
-    // A blank stretch of a bounded pyramid is a transparent tile that loads normally, so a
-    // clean pass over the displayed edition retires the warning; empty is not a failure.
-    if (
-      state.status === "displayed" &&
-      state.displayedId !== null &&
-      map.isSourceLoaded(sourceIdFor(state.displayedId))
-    ) {
-      browser.clearTileWarning();
-    }
+    // No branch retires a tile warning here. `isSourceLoaded` goes true again on the idle
+    // right after the failure, while the gap is still on screen (PR #51 review), so the
+    // warning is retired only by a switch or by the user's retry.
   }
 
   function onError(event: TileEvent): void {

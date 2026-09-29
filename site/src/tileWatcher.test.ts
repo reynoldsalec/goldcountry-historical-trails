@@ -269,15 +269,64 @@ describe("attachTileWatcher", () => {
     expect(browser.state.warningMessage).toBe("HTTP 404");
     expect(map.onScreen()).toEqual([layerIdFor("auburn-1981")]);
 
-    // The warning stays through further panning while tiles are still missing.
-    map.emit("movestart");
-    map.loaded.delete(sourceIdFor("auburn-1981"));
+    // MapLibre counts an errored tile as settled, so the source reports itself loaded
+    // again on the very next idle while the gap is still on screen (PR #51 review).
+    map.emit("idle");
+    expect(browser.state.warningMessage).toBe("HTTP 404");
     map.emit("idle");
     expect(browser.state.warningMessage).toBe("HTTP 404");
 
-    // A clean pass over the current viewport retires it.
+    // Panning back over the gap does not refetch the cached failure either.
+    map.emit("movestart");
+    map.emit("idle");
+    expect(browser.state.warningMessage).toBe("HTTP 404");
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1981")]);
+  });
+
+  it("retires the warning when the user retries the displayed edition and it loads", () => {
+    const { browser, map } = harness();
+    browser.select("auburn-1981");
     map.loaded.add(sourceIdFor("auburn-1981"));
     map.emit("idle");
+    map.emit("error", tileError("auburn-1981", "HTTP 404"));
+    expect(browser.state.warningMessage).toBe("HTTP 404");
+
+    browser.retry();
+    expect(map.tiles[sourceIdFor("auburn-1981")]).toEqual([
+      "tiles/auburn-1981/{z}/{x}/{y}.png?reload=1",
+    ]);
+    expect(browser.state.status).toBe("displayed");
+    expect(browser.state.warningMessage).toBeNull();
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1981")]);
+
+    map.loaded.add(sourceIdFor("auburn-1981"));
+    map.emit("idle");
+    expect(browser.state.warningMessage).toBeNull();
+  });
+
+  it("raises the warning again when the retried tiles fail again", () => {
+    const { browser, map } = harness();
+    browser.select("auburn-1981");
+    map.loaded.add(sourceIdFor("auburn-1981"));
+    map.emit("idle");
+    map.emit("error", tileError("auburn-1981", "HTTP 404"));
+
+    browser.retry();
+    map.emit("error", tileError("auburn-1981", "HTTP 404"));
+    expect(browser.state.status).toBe("displayed");
+    expect(browser.state.warningMessage).toBe("HTTP 404");
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1981")]);
+  });
+
+  it("retires the warning when the displayed edition changes", () => {
+    const { browser, map } = harness();
+    map.emit("error", tileError("auburn-1953", "HTTP 404"));
+    expect(browser.state.warningMessage).toBe("HTTP 404");
+
+    browser.select("auburn-1975");
+    map.loaded.add(sourceIdFor("auburn-1975"));
+    map.emit("idle");
+    expect(browser.state.displayedId).toBe("auburn-1975");
     expect(browser.state.warningMessage).toBeNull();
   });
 
