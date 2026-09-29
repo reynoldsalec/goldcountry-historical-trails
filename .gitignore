@@ -10,6 +10,7 @@ data/sources/.retrievals.lock
 # Derived output (README §5).
 build/*
 !build/.gitkeep
+site/dist/
 
 # Environments
 .venv/

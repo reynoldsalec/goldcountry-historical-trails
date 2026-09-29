@@ -14,7 +14,8 @@ export TRAIL_ARCHIVE_ROOT
         coverage-ready coverage-report \
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup \
-        demo-check demo-inspect demo-test demo-cogs demo-rasters
+        demo-check demo-inspect demo-test demo-cogs demo-rasters \
+        demo-dev site-deps demo-frontend-test
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -114,7 +115,30 @@ demo-cogs:
 demo-rasters:
 	$(RUN) python scripts/demo.py rasters
 
-demo-test:
+NPM ?= npm
+SITE := site
+
+## install the pinned frontend dependencies; a no-op once the lockfile is satisfied
+site-deps: $(SITE)/node_modules/.package-lock.json
+$(SITE)/node_modules/.package-lock.json: $(SITE)/package.json $(SITE)/package-lock.json
+	cd $(SITE) && $(NPM) ci --no-audit --fund=false
+	@touch $@
+
+## vitest unit tests and prettier/tsc checks for the edition browser shell (D3a)
+demo-frontend-test: site-deps
+	cd $(SITE) && $(NPM) run format:check
+	cd $(SITE) && $(NPM) run typecheck
+	cd $(SITE) && $(NPM) run test
+
+## vite dev server for the edition browser -> http://127.0.0.1:5173/
+# Serves /editions.json from data/sources/demo-editions.json and /tiles from
+# build/tiles/demo, so run 'make demo-rasters' first or the map has no imagery.
+demo-dev: site-deps
+	@test -d build/tiles/demo || { \
+	  echo 'demo-dev: no tiles in build/tiles/demo; run "make demo-rasters" first.'; exit 1; }
+	cd $(SITE) && $(NPM) run dev
+
+demo-test: demo-frontend-test
 	$(RUN) pytest -q scripts/test_demo.py scripts/test_demo_rasters.py
 
 # Files are listed explicitly so a deleted or renamed regression module fails loudly
