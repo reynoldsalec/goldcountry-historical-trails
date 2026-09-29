@@ -12,8 +12,13 @@ import { publicManifestFrom } from "./src/editions.ts";
 
 const SITE_DIR = fileURLToPath(new URL(".", import.meta.url));
 const REPO_ROOT = resolve(SITE_DIR, "..");
-const MANIFEST_PATH = join(REPO_ROOT, "data/sources/demo-editions.json");
-const TILE_ROOT = join(REPO_ROOT, "build/tiles/demo");
+// The Playwright suite points these at generated fixtures so it never serves, and never
+// depends on, the real scans or their receipts (issue #44).
+const MANIFEST_PATH = resolve(
+  process.env.DEMO_MANIFEST ?? join(REPO_ROOT, "data/sources/demo-editions.json"),
+);
+const TILE_ROOT = resolve(process.env.DEMO_TILE_ROOT ?? join(REPO_ROOT, "build/tiles/demo"));
+const PORT = Number(process.env.DEMO_PORT ?? 5173);
 
 /** Reject `..` before it is joined, so a request cannot escape the tile tree. */
 function safeTilePath(urlPath: string): string | null {
@@ -69,7 +74,7 @@ function demoDevServer(): Plugin {
 export default defineConfig({
   root: SITE_DIR,
   plugins: [demoDevServer()],
-  server: { port: 5173, strictPort: true, host: "127.0.0.1", open: false },
+  server: { port: PORT, strictPort: true, host: "127.0.0.1", open: false },
   // Pre-bundling rewrites MapLibre's worker URL and the worker then fails to start in dev.
   optimizeDeps: { exclude: ["maplibre-gl"] },
   build: { outDir: "dist", emptyOutDir: true, assetsDir: "assets" },

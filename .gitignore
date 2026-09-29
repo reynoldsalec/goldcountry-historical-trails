@@ -11,6 +11,10 @@ data/sources/.retrievals.lock
 build/*
 !build/.gitkeep
 site/dist/
+# Generated browser-test fixtures and Playwright output (issue #44).
+site/.playwright-fixtures/
+site/test-results/
+site/playwright-report/
 
 # Environments
 .venv/
