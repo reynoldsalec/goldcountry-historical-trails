@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- No third-party origin is contacted: no remote basemap, font or analytics host. -->
+    <title>Auburn historical map editions</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1 class="bar-heading">Auburn quadrangle, 1:24,000</h1>
+      <!-- Toggle sits outside the collapsible region so it stays reachable when collapsed. -->
+      <button
+        id="detail-toggle"
+        class="bar-button"
+        type="button"
+        aria-expanded="true"
+        aria-controls="details"
+      >
+        Hide source details
+      </button>
+    </header>
+
+    <p id="shell-status" class="shell-status" role="status">
+      Work in progress: the D3a shell. Loading and error handling are not finished, so this is
+      not a release-ready viewer.
+    </p>
+
+    <main class="layout">
+      <div id="map" class="map" aria-label="Auburn quadrangle map"></div>
+
+      <aside class="panel">
+        <section class="controls" aria-labelledby="controls-heading">
+          <h2 id="controls-heading" class="section-heading">Edition</h2>
+
+          <p class="control-row">
+            <label class="selector-label" for="edition-select">Choose an edition</label>
+            <select id="edition-select"></select>
+          </p>
+
+          <div class="control-row">
+            <button id="previous" type="button">Previous</button>
+            <button id="next" type="button">Next</button>
+          </div>
+
+          <div class="control-row">
+            <button id="reset-view" type="button">Reset view</button>
+          </div>
+
+          <p id="notice" class="notice" role="status" aria-live="polite"></p>
+          <div class="control-row">
+            <button id="retry" type="button" hidden>Retry this edition</button>
+          </div>
+        </section>
+
+        <!-- Collapsible on a narrow screen. The selected edition, its dates and the
+             attribution stay in the page when it is open, and no gesture hides them. -->
+        <section id="details" class="card" aria-labelledby="card-heading">
+          <h2 id="card-heading" class="section-heading">Source</h2>
+          <!-- Rendered from data/sources/demo-editions.json; card text is never retyped. -->
+          <div id="card"></div>
+        </section>
+      </aside>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
