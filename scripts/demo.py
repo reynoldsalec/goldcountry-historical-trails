@@ -8,12 +8,16 @@ nothing here dates a mapped feature: every value describes a source sheet.
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 from datetime import date
 from pathlib import Path
 
 import click
 import numpy as np
 import rasterio
+import warp_raster
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 from pyproj import CRS, Transformer
@@ -23,6 +27,7 @@ from rasterio.transform import rowcol
 from rasterio.windows import Window
 from shapely.geometry import Polygon, shape
 from source_archive import check_record, load_receipts
+from warp_raster import WarpError
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = REPO_ROOT / "data/sources/demo-editions.json"
@@ -31,6 +36,13 @@ INDEX_PATH = REPO_ROOT / "data/sources/topo_index.csv"
 RECEIPTS_PATH = REPO_ROOT / "data/sources/retrievals.jsonl"
 SOURCES_PATH = REPO_ROOT / "data/sources/sources.yml"
 RAW_ROOT = REPO_ROOT / "data/raw"
+BUILD_ROOT = REPO_ROOT / "build"
+RASTER_DIRNAME = "rasters"
+PROCESSING_FILENAME = "demo-processing.json"
+INCOMING_DIRNAME = ".incoming"
+
+# Steps that only reorder lon/lat and so say nothing about which datum shift ran.
+AXIS_ORDER_STEP = "axis order change (2D)"
 
 AREA_ID = "auburn"
 EDITION_ORDER = ["auburn-1953", "auburn-1973", "auburn-1975", "auburn-1981"]
@@ -692,6 +704,279 @@ def run_check(
     return {"manifest": manifest, "resolved": resolved, "reports": reports}
 
 
+def datum_steps(description: str) -> list[str]:
+    """The named datum steps in a transformation description, axis reorderings dropped."""
+    if description.startswith("none "):
+        return []
+    return [
+        step.strip()
+        for step in description.split(" + ")
+        if step.strip() and step.strip() != AXIS_ORDER_STEP
+    ]
+
+
+def edition_plan(
+    edition: dict,
+    record: dict,
+    report: dict,
+    grid: dict,
+    operation: dict,
+    resampling: str,
+    versions: dict,
+) -> dict:
+    """Everything a COG's content depends on. Its digest decides whether to rewarp."""
+    return {
+        "processing_version": warp_raster.PROCESSING_VERSION,
+        "source": {
+            "source_id": record["topo_id"],
+            "sha256": record["sha256"],
+            "byte_count": record["byte_count"],
+        },
+        "crop_wgs84": edition["crop_wgs84"],
+        "grid": grid,
+        "resampling": resampling,
+        "source_crs_wkt": report["crs_wkt"],
+        "datum_transformation": operation,
+        "tool_versions": versions,
+    }
+
+
+def edition_recipe(
+    edition: dict, resolved: dict, report: dict, grid: dict, versions: dict
+) -> dict:
+    """Resolve how one edition would be warped, without reading a pixel of it."""
+    resampling = warp_raster.resampling_for(edition["kind"])
+    with warp_raster.open_source(resolved["path"]) as dataset:
+        src_crs = CRS.from_user_input(dataset.crs)
+    operation = warp_raster.select_operation(
+        src_crs,
+        tuple(report["graticule_labels_source_datum"]),
+        datum_steps(report["datum_transformation"]["description"]),
+    )
+    plan = edition_plan(
+        edition, resolved["record"], report, grid, operation, resampling, versions
+    )
+    return {
+        "resampling": resampling,
+        "operation": operation,
+        "fingerprint": warp_raster.fingerprint(plan),
+    }
+
+
+def reusable(entry: dict | None, plan_digest: str, output: Path) -> dict | None:
+    """An existing COG is reused only when its inputs and its own bytes both still match."""
+    if entry is None or entry.get("fingerprint") != plan_digest or not output.is_file():
+        return None
+    digest, byte_count = warp_raster.sha256_file(output)
+    if (digest, byte_count) != (entry["output"]["sha256"], entry["output"]["byte_count"]):
+        return None
+    return entry
+
+
+def process_edition(
+    edition: dict,
+    resolved: dict,
+    report: dict,
+    grid: dict,
+    recipe: dict,
+    destination: Path,
+) -> dict:
+    """Warp one edition onto the shared grid and write its COG to `destination`."""
+    eid = edition["id"]
+    resampling = recipe["resampling"]
+    operation = recipe["operation"]
+    with warp_raster.open_source(resolved["path"]) as dataset:
+        registration = warp_raster.verify_pipeline(dataset, operation["pipeline"])
+        data, coverage = warp_raster.warp(dataset, grid, resampling, operation["pipeline"])
+        bands = dataset.count
+    alpha = np.where(
+        coverage > 0, warp_raster.crop_mask(edition["crop_wgs84"], grid), 0
+    ).astype("uint8")
+    if not alpha.any():
+        fail(f"{eid}: nothing of the source lands inside its crop on the shared grid.")
+    # Masked-out pixels are zeroed so the COG's bytes depend only on the recorded inputs.
+    data[:, alpha == 0] = 0
+    warp_raster.write_cog(destination, data, alpha, grid, resampling)
+    digest, byte_count = warp_raster.sha256_file(destination)
+    pixel_size = report["pixel_size_metres"]
+    return {
+        "id": eid,
+        "source": {
+            "source_id": resolved["record"]["topo_id"],
+            "sha256": resolved["record"]["sha256"],
+            "byte_count": resolved["record"]["byte_count"],
+            "raw_path": resolved["record"]["raw_path"],
+            "size_px": report["size_px"],
+            "pixel_size_metres": pixel_size,
+        },
+        "kind": edition["kind"],
+        "resampling": resampling,
+        "source_crs_wkt": report["crs_wkt"],
+        "source_datum": report["datum"],
+        "source_projection": report["projection"],
+        "datum_transformation": operation,
+        "crop_wgs84": edition["crop_wgs84"],
+        "registration": {
+            **registration,
+            "neatline_residual_px": report["max_abs_neatline_residual_px"],
+            "neatline_residual_metres": round(
+                report["max_abs_neatline_residual_px"] * pixel_size, 3
+            ),
+            "datum_accuracy_metres": operation["accuracy_metres"],
+            "correction_applied": "none; no GCP adjustment was made to any source",
+        },
+        "coverage": {
+            "alpha_opaque_px": int((alpha > 0).sum()),
+            "grid_px": grid["width"] * grid["height"],
+        },
+        "output": {
+            "path": f"{RASTER_DIRNAME}/{destination.name}",
+            "sha256": digest,
+            "byte_count": byte_count,
+            "width": grid["width"],
+            "height": grid["height"],
+            "bands": bands + 1,
+            "dtype": "uint8",
+            "alpha_band": bands + 1,
+            "nodata_representation": "alpha band; no nodata value and no colour keying",
+        },
+        "fingerprint": recipe["fingerprint"],
+    }
+
+
+def registration_notes(entries: list[dict]) -> dict:
+    """What is and is not established about registration, in the numbers actually measured."""
+    return {
+        "inspection": "automated only; no human source review is asserted here",
+        "human_acceptance": "deferred to the acceptance tracker (issue #38)",
+        "independent_ground_control": (
+            "none available in this repository: no surveyed landmark or modern reference "
+            "layer is committed, so no landmark check was run"
+        ),
+        "checks_run": [
+            "the drawn neatline of each scan against its labelled graticule (demo-check, px)",
+            "GDAL's warped extent against the pinned pyproj pipeline (m)",
+            "GDAL's unpinned choice of operation against the pinned one (m)",
+        ],
+        "unresolved_systematic_offsets": [
+            {
+                "edition_id": entry["id"],
+                "drawn_neatline_off_labelled_graticule_metres": entry["registration"][
+                    "neatline_residual_metres"
+                ],
+                "datum_transformation_accuracy_metres": entry["registration"][
+                    "datum_accuracy_metres"
+                ],
+            }
+            for entry in entries
+        ],
+        "note": (
+            "These offsets are carried, not corrected. The scans are used as published; "
+            "no control point was moved."
+        ),
+    }
+
+
+def write_record(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w", dir=path.parent, prefix=".demo-processing-", suffix=".json", delete=False
+    ) as handle:
+        staged = Path(handle.name)
+        try:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+            handle.close()
+            staged.replace(path)
+        finally:
+            staged.unlink(missing_ok=True)
+
+
+def run_cogs(
+    manifest_path: Path,
+    schema_path: Path,
+    index_path: Path,
+    receipts_path: Path,
+    sources_path: Path,
+    raw_root: Path,
+    build_root: Path,
+    zoom: int | None = None,
+) -> dict:
+    """Warp the four verified sources onto one EPSG:3857 grid and record how it was done."""
+    checked = run_check(
+        manifest_path, schema_path, index_path, receipts_path, sources_path, raw_root
+    )
+    manifest, resolved, reports = checked["manifest"], checked["resolved"], checked["reports"]
+    try:
+        versions = warp_raster.require_gdal()
+        grid_zoom = manifest["tile_zoom"]["max"] if zoom is None else zoom
+        if not manifest["tile_zoom"]["min"] <= grid_zoom <= manifest["tile_zoom"]["max"]:
+            fail(f"Grid zoom {grid_zoom} is outside the manifest's tile_zoom range.")
+        grid = warp_raster.common_grid(manifest["view_bounds_wgs84"], grid_zoom)
+    except WarpError as exc:
+        fail(str(exc))
+
+    raster_root = build_root / RASTER_DIRNAME
+    incoming = raster_root / INCOMING_DIRNAME
+    record_path = raster_root / PROCESSING_FILENAME
+    previous = read_json(record_path) if record_path.is_file() else {"editions": []}
+    known = {entry["id"]: entry for entry in previous.get("editions", [])}
+
+    entries, reused = [], []
+    if incoming.exists():
+        shutil.rmtree(incoming)
+    incoming.mkdir(parents=True)
+    try:
+        for edition in manifest["editions"]:
+            eid = edition["id"]
+            published = raster_root / f"{eid}.tif"
+            try:
+                recipe = edition_recipe(edition, resolved[eid], reports[eid], grid, versions)
+                entry = reusable(known.get(eid), recipe["fingerprint"], published)
+                if entry is not None:
+                    entries.append(entry)
+                    reused.append(eid)
+                    continue
+                entries.append(
+                    process_edition(
+                        edition,
+                        resolved[eid],
+                        reports[eid],
+                        grid,
+                        recipe,
+                        incoming / f"{eid}.tif",
+                    )
+                )
+            except WarpError as exc:
+                fail(f"{eid}: {exc}")
+        for eid in manifest["edition_order"]:
+            # Raw bytes must be exactly what they were before the warp (AGENTS.md §2.2).
+            check_record(resolved[eid]["record"], raw_root)
+        # Nothing reaches build/rasters/ until every edition has been warped and
+        # every source has been re-verified.
+        for edition in manifest["editions"]:
+            staged = incoming / f"{edition['id']}.tif"
+            if staged.is_file():
+                os.replace(staged, raster_root / f"{edition['id']}.tif")
+    finally:
+        shutil.rmtree(incoming, ignore_errors=True)
+
+    payload = {
+        "version": 1,
+        "processing_version": warp_raster.PROCESSING_VERSION,
+        "area_id": manifest["area_id"],
+        "edition_order": list(manifest["edition_order"]),
+        "tile_zoom": manifest["tile_zoom"],
+        "tool_versions": versions,
+        "grid": grid,
+        "editions": entries,
+        "registration_notes": registration_notes(entries),
+    }
+    write_record(record_path, payload)
+    return {"record": payload, "record_path": record_path, "reused": reused}
+
+
 @click.group()
 def cli() -> None:
     """Auburn demo edition manifest tools."""
@@ -770,6 +1055,62 @@ def check(
         f"demo-check: 4 public editions verified; common footprint "
         f"{west}, {south}, {east}, {north}; zoom "
         f"{result['manifest']['tile_zoom']['min']}-{result['manifest']['tile_zoom']['max']}"
+    )
+
+
+@cli.command()
+@_common_options
+@click.option(
+    "--build-root",
+    "build_root",
+    type=click.Path(path_type=Path),
+    default=BUILD_ROOT,
+    show_default=False,
+)
+@click.option(
+    "--grid-zoom",
+    "zoom",
+    type=int,
+    default=None,
+    help="Grid zoom to warp onto; defaults to the manifest maximum. Lower values are for "
+    "inspection and tests, and the chosen zoom is recorded with the output.",
+)
+def cogs(
+    manifest_path,
+    schema_path,
+    index_path,
+    receipts_path,
+    sources_path,
+    raw_root,
+    build_root,
+    zoom,
+) -> None:
+    """Warp the four verified sources onto one EPSG:3857 grid as COGs under build/rasters/."""
+    result = run_cogs(
+        manifest_path,
+        schema_path,
+        index_path,
+        receipts_path,
+        sources_path,
+        raw_root,
+        build_root,
+        zoom,
+    )
+    record = result["record"]
+    grid = record["grid"]
+    for entry in record["editions"]:
+        state = "reused" if entry["id"] in result["reused"] else "warped"
+        click.echo(
+            f"{entry['id']}: {state} {entry['resampling']} from {entry['source']['source_id']} "
+            f"-> {entry['output']['path']} sha256={entry['output']['sha256']} "
+            f"alpha={entry['coverage']['alpha_opaque_px']}/{entry['coverage']['grid_px']} px"
+        )
+    versions = record["tool_versions"]
+    click.echo(
+        f"demo-cogs: {len(record['editions'])} COGs on one {grid['width']}x{grid['height']} "
+        f"{grid['crs']} grid at {grid['resolution_metres']:.6f} m/px (zoom {grid['zoom']}); "
+        f"GDAL {versions['gdal']} / PROJ {versions['proj_gdal']}; "
+        f"record {result['record_path'].name}"
     )
 
 

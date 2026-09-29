@@ -14,7 +14,7 @@ export TRAIL_ARCHIVE_ROOT
         coverage-ready coverage-report \
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup \
-        demo-check demo-inspect demo-test
+        demo-check demo-inspect demo-test demo-cogs
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -102,8 +102,14 @@ demo-check:
 demo-inspect:
 	$(RUN) python scripts/demo.py inspect
 
+## warp the four verified sources onto one EPSG:3857 grid -> build/rasters/ (D2a)
+# Uses the GDAL inside the rasterio wheel; no gdalwarp binary is needed. Re-running warps
+# only what changed. See docs/demo-processing.md.
+demo-cogs:
+	$(RUN) python scripts/demo.py cogs
+
 demo-test:
-	$(RUN) pytest -q scripts/test_demo.py
+	$(RUN) pytest -q scripts/test_demo.py scripts/test_demo_rasters.py
 
 # Files are listed explicitly so a deleted or renamed regression module fails loudly
 # instead of silently shrinking the glob.
