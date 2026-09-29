@@ -1,5 +1,11 @@
 # M1 human research and acceptance runbook
 
+> **Scope update — 2026-09-28:** the next MVP is the [Auburn map browser](../README.md).
+> This document retains countywide research history/requirements; those requirements
+> are deferred and are not the new demo gate. Use the [active runbook](mvp-runbook.md)
+> and [implementation plan](implementation-plan.md). No historical evidence or issue
+> acceptance is changed by this notice.
+
 **Status: instructions, not evidence of completed review.** Start with the
 [assessment](m1-research-assessment.md) and saved
 [issue contracts](m1-research-evidence/issue-contracts.json). This document closes

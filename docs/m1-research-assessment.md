@@ -1,5 +1,11 @@
 # M1 research assessment — 2026-09-18 UTC
 
+> **Scope update — 2026-09-28:** the next MVP is the [Auburn map browser](../README.md).
+> This document retains countywide research history/requirements; those requirements
+> are deferred and are not the new demo gate. Use the [active runbook](mvp-runbook.md)
+> and [implementation plan](implementation-plan.md). No historical evidence or issue
+> acceptance is changed by this notice.
+
 **M1 is not complete.** This is an agent-performed discovery and readiness assessment,
 not a human source review or acceptance record. Follow [the human runbook](m1-human-runbook.md).
 
