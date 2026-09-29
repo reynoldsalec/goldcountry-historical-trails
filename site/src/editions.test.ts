@@ -1,10 +1,11 @@
-// Unit coverage for issue #42: order and default, endpoint limits, direct selection, the
-// independent reset, and the proof that a switch builds no second map and moves no camera.
+// Unit coverage for issues #42 and #43: order and default, endpoint limits, direct
+// selection, the independent reset, the proof that a switch builds no second map and moves
+// no camera, and the requested/displayed contract with its generation and viewport gating.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import {
   EditionBrowser,
@@ -12,9 +13,18 @@ import {
   type PublicManifest,
   cardRows,
   layerIdFor,
+  noticeFor,
   publicManifestFrom,
   resamplingFor,
+  sourceIdFor,
 } from "./editions";
+
+// Every path under test is synchronous, so any rejection here is a defect, not a race.
+const rejections: unknown[] = [];
+process.on("unhandledRejection", (reason) => rejections.push(reason));
+afterAll(() => {
+  expect(rejections).toEqual([]);
+});
 
 const MANIFEST_PATH = fileURLToPath(
   new URL("../../data/sources/demo-editions.json", import.meta.url),
@@ -50,13 +60,24 @@ const CAMERA_METHODS = [
   "setMaxZoom",
 ] as const;
 
+interface Camera {
+  lng: number;
+  lat: number;
+  zoom: number;
+}
+
 interface FakeMap extends MapLike {
   calls: Array<{ method: string; args: unknown[] }>;
   visibility: Record<string, string>;
   opacity: Record<string, number>;
+  tiles: Record<string, string[]>;
+  /** Moved by every camera method, so an unwanted call shows up as a moved camera. */
+  camera: Camera;
   /** What the user can actually see: visible and not fully transparent. */
   onScreen(): string[];
 }
+
+const START_CAMERA: Camera = { lng: -121.0725, lat: 38.8965, zoom: 13 };
 
 let mapsBuilt = 0;
 
@@ -65,15 +86,23 @@ function buildMap(layerIds: string[]): FakeMap {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   const visibility: Record<string, string> = {};
   const opacity: Record<string, number> = {};
+  const tiles: Record<string, string[]> = {};
+  // The style ships the first edition visible at zero opacity: it is loading, not shown.
   for (const [index, id] of layerIds.entries()) {
     visibility[id] = index === 0 ? "visible" : "none";
-    opacity[id] = 1;
+    opacity[id] = 0;
   }
   const map = {
     calls,
     visibility,
     opacity,
+    tiles,
+    camera: { ...START_CAMERA },
     onScreen: () => layerIds.filter((id) => visibility[id] === "visible" && opacity[id] > 0),
+    setSourceTiles(sourceId: string, next: string[]) {
+      calls.push({ method: "setSourceTiles", args: [sourceId, next] });
+      tiles[sourceId] = next;
+    },
     setLayoutProperty(layerId: string, name: string, value: unknown) {
       calls.push({ method: "setLayoutProperty", args: [layerId, name, value] });
       if (name === "visibility") {
@@ -90,15 +119,43 @@ function buildMap(layerIds: string[]): FakeMap {
   for (const method of CAMERA_METHODS) {
     (map as unknown as Record<string, unknown>)[method] = (...args: unknown[]) => {
       calls.push({ method, args });
+      // A whole degree and a whole zoom level: any stray camera call fails the tolerance
+      // assertions loudly instead of hiding inside them.
+      map.camera = { lng: map.camera.lng + 1, lat: map.camera.lat + 1, zoom: 12 };
     };
   }
   return map;
 }
 
-function browserForRealManifest(): { browser: EditionBrowser; map: FakeMap } {
-  const manifest = realManifest();
+/**
+ * `ready` finishes the first edition's load, the state a user meets before touching a
+ * control, and clears the recorder so a test sees only the calls it makes itself.
+ */
+function browserFor(
+  manifest: PublicManifest,
+  options: { ready?: boolean } = {},
+): { browser: EditionBrowser; map: FakeMap } {
   const map = buildMap(manifest.edition_order.map(layerIdFor));
-  return { browser: new EditionBrowser({ manifest, map }), map };
+  const browser = new EditionBrowser({ manifest, map });
+  if (options.ready !== false) {
+    browser.confirmDisplayed(manifest.edition_order[0], browser.state.generation);
+    map.calls.length = 0;
+  }
+  return { browser, map };
+}
+
+function browserForRealManifest(options: { ready?: boolean } = {}): {
+  browser: EditionBrowser;
+  map: FakeMap;
+} {
+  return browserFor(realManifest(), options);
+}
+
+/** The camera tolerance the acceptance criteria name. */
+function expectSameCamera(before: Camera, after: Camera): void {
+  expect(Math.abs(after.lng - before.lng)).toBeLessThan(1e-7);
+  expect(Math.abs(after.lat - before.lat)).toBeLessThan(1e-7);
+  expect(Math.abs(after.zoom - before.zoom)).toBeLessThan(1e-6);
 }
 
 const SYNTHETIC: PublicManifest = {
@@ -200,16 +257,22 @@ describe("resamplingFor", () => {
 });
 
 describe("order and default", () => {
-  it("starts on the 1953 sheet with it displayed, not merely requested", () => {
-    const { browser } = browserForRealManifest();
+  it("requests the 1953 sheet first and displays nothing until its tiles load", () => {
+    const { browser, map } = browserForRealManifest({ ready: false });
     expect(browser.state.requestedId).toBe("auburn-1953");
+    expect(browser.state.displayedId).toBeNull();
+    expect(browser.state.status).toBe("loading");
+    expect(map.onScreen()).toEqual([]);
+
+    browser.confirmDisplayed("auburn-1953", browser.state.generation);
     expect(browser.state.displayedId).toBe("auburn-1953");
     expect(browser.state.status).toBe("displayed");
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
   });
 
   it("walks the fixed order forwards and back again", () => {
     const { browser } = browserForRealManifest();
-    const seen = [browser.state.requestedId];
+    const seen = [browser.state.displayedId];
     while (browser.canGoNext) {
       const generation = browser.next();
       browser.confirmDisplayed(browser.state.requestedId, generation);
@@ -274,7 +337,7 @@ describe("requested versus displayed state", () => {
     const { browser, map } = browserForRealManifest();
     browser.select("auburn-1975");
     expect(browser.requestedEdition.id).toBe("auburn-1975");
-    expect(browser.displayedEdition.id).toBe("auburn-1953");
+    expect(browser.displayedEdition?.id).toBe("auburn-1953");
     // The requested layer is loading at zero opacity; only 1953 is on screen.
     expect(map.visibility[layerIdFor("auburn-1975")]).toBe("visible");
     expect(map.opacity[layerIdFor("auburn-1975")]).toBe(0);
@@ -287,7 +350,7 @@ describe("requested versus displayed state", () => {
     expect(browser.failRequest("auburn-1973", generation, "tiles unavailable")).toBe(true);
     expect(browser.state.status).toBe("error");
     expect(browser.state.errorMessage).toBe("tiles unavailable");
-    expect(browser.displayedEdition.id).toBe("auburn-1953");
+    expect(browser.displayedEdition?.id).toBe("auburn-1953");
     expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
   });
 
@@ -297,15 +360,14 @@ describe("requested versus displayed state", () => {
     browser.failRequest("auburn-1973", generation, "tiles unavailable");
 
     expect(browser.confirmDisplayed("auburn-1973", generation)).toBe(false);
-    expect(browser.displayedEdition.id).toBe("auburn-1953");
+    expect(browser.displayedEdition?.id).toBe("auburn-1953");
     expect(browser.state.status).toBe("error");
     expect(browser.state.errorMessage).toBe("tiles unavailable");
     expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
   });
 
   it("ignores a late result from a superseded request", () => {
-    const map = buildMap(SYNTHETIC.edition_order.map(layerIdFor));
-    const browser = new EditionBrowser({ manifest: SYNTHETIC, map });
+    const { browser, map } = browserFor(SYNTHETIC);
     const stale = browser.select("fixture-b");
     const current = browser.select("fixture-a");
     expect(stale).not.toBe(current);
@@ -480,5 +542,185 @@ describe("source card content", () => {
       ].join("\n");
       expect(text).not.toMatch(forbidden);
     }
+  });
+});
+
+describe("first load with no prior valid edition", () => {
+  it("keeps the map empty and names no edition when the first load fails", () => {
+    const { browser, map } = browserForRealManifest({ ready: false });
+    const before = { ...map.camera };
+
+    expect(browser.failRequest("auburn-1953", browser.state.generation, "HTTP 404")).toBe(true);
+    expect(browser.state.status).toBe("error");
+    expect(browser.state.displayedId).toBeNull();
+    expect(browser.displayedEdition).toBeNull();
+    expect(map.onScreen()).toEqual([]);
+    expect(noticeFor(browser.state, browser)).toContain("No edition is on screen yet");
+    expect(noticeFor(browser.state, browser)).toContain("HTTP 404");
+    expectSameCamera(before, map.camera);
+  });
+
+  it("recovers on retry from a failed first load", () => {
+    const { browser, map } = browserForRealManifest({ ready: false });
+    browser.failRequest("auburn-1953", browser.state.generation, "HTTP 404");
+
+    const generation = browser.retry();
+    expect(browser.state.status).toBe("loading");
+    expect(browser.state.errorMessage).toBeNull();
+    // The retry asks for tiles the browser cache has not already failed on.
+    expect(map.tiles["edition-auburn-1953"]).toEqual([
+      "tiles/auburn-1953/{z}/{x}/{y}.png?reload=1",
+    ]);
+    expect(browser.confirmDisplayed("auburn-1953", generation)).toBe(true);
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
+    expect(noticeFor(browser.state, browser)).toBe(
+      `Showing ${browser.edition("auburn-1953").label}.`,
+    );
+  });
+});
+
+describe("viewport changes during a load", () => {
+  it("rejects readiness measured before the camera moved and accepts it afterwards", () => {
+    const { browser, map } = browserForRealManifest();
+    const before = { ...map.camera };
+    const generation = browser.select("auburn-1975");
+    const staleToken = browser.state.viewportToken;
+
+    const token = browser.noteCameraMove();
+    expect(token).toBeGreaterThan(staleToken);
+    expect(browser.confirmDisplayed("auburn-1975", generation, staleToken)).toBe(false);
+    expect(browser.state.status).toBe("loading");
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
+
+    expect(browser.confirmDisplayed("auburn-1975", generation, token)).toBe(true);
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1975")]);
+    expectSameCamera(before, map.camera);
+  });
+
+  it("keeps the selection and its generation across a camera move", () => {
+    const { browser } = browserForRealManifest();
+    const generation = browser.select("auburn-1981");
+    browser.noteCameraMove();
+    expect(browser.state.requestedId).toBe("auburn-1981");
+    expect(browser.state.generation).toBe(generation);
+  });
+});
+
+describe("rapid switching", () => {
+  it("lets the last choice win and rejects every superseded result", () => {
+    const { browser, map } = browserForRealManifest();
+    const first = browser.select("auburn-1973");
+    const second = browser.select("auburn-1975");
+    const third = browser.select("auburn-1981");
+
+    expect(browser.confirmDisplayed("auburn-1973", first)).toBe(false);
+    expect(browser.failRequest("auburn-1975", second, "late error")).toBe(false);
+    expect(browser.confirmDisplayed("auburn-1981", third)).toBe(true);
+    expect(browser.state.displayedId).toBe("auburn-1981");
+    expect(browser.state.errorMessage).toBeNull();
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1981")]);
+    for (const abandoned of ["auburn-1973", "auburn-1975"]) {
+      expect(map.visibility[layerIdFor(abandoned)]).toBe("none");
+    }
+  });
+
+  it("stops loading an edition the user switched back away from", () => {
+    const { browser, map } = browserForRealManifest();
+    browser.select("auburn-1975");
+    const back = browser.select("auburn-1953");
+    expect(browser.state.status).toBe("displayed");
+    expect(browser.state.displayedId).toBe("auburn-1953");
+    expect(map.visibility[layerIdFor("auburn-1975")]).toBe("none");
+    expect(browser.confirmDisplayed("auburn-1975", back)).toBe(false);
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
+  });
+});
+
+describe("tile failures after a settled switch", () => {
+  it("warns without unsetting the layer, and survives a later pan", () => {
+    const { browser, map } = browserForRealManifest();
+    browser.confirmDisplayed("auburn-1973", browser.select("auburn-1973"));
+
+    browser.noteTileWarning("HTTP 404");
+    expect(browser.state.status).toBe("displayed");
+    expect(browser.state.displayedId).toBe("auburn-1973");
+    expect(map.onScreen()).toEqual([layerIdFor("auburn-1973")]);
+    const notice = noticeFor(browser.state, browser);
+    expect(notice).toContain(browser.edition("auburn-1973").label);
+    expect(notice).toContain("HTTP 404");
+    expect(notice).toContain("blank area");
+
+    browser.noteCameraMove();
+    expect(browser.state.warningMessage).toBe("HTTP 404");
+  });
+
+  it("keeps the warning until the user retries or the displayed edition changes", () => {
+    const { browser, map } = browserForRealManifest();
+    browser.confirmDisplayed("auburn-1973", browser.select("auburn-1973"));
+    browser.noteTileWarning("HTTP 404");
+
+    // No number of settled viewports retires it: MapLibre caches the errored tiles.
+    browser.noteCameraMove();
+    browser.noteCameraMove();
+    expect(browser.state.warningMessage).toBe("HTTP 404");
+
+    browser.retry();
+    expect(browser.state.status).toBe("displayed");
+    expect(browser.state.displayedId).toBe("auburn-1973");
+    expect(browser.state.warningMessage).toBeNull();
+    // The refetch is the point of the retry: cached failures need a fresh URL.
+    expect(map.tiles[sourceIdFor("auburn-1973")]).toEqual([
+      "tiles/auburn-1973/{z}/{x}/{y}.png?reload=1",
+    ]);
+  });
+
+  it("says nothing about failures when a bounded pyramid is simply empty here", () => {
+    const { browser } = browserForRealManifest();
+    browser.confirmDisplayed("auburn-1975", browser.select("auburn-1975"));
+    browser.noteCameraMove();
+    // A transparent tile loads normally: blank is not an error and gets no warning.
+    expect(browser.state.warningMessage).toBeNull();
+    expect(noticeFor(browser.state, browser)).toBe(
+      `Showing ${browser.edition("auburn-1975").label}.`,
+    );
+  });
+
+  it("retires the warning when a different edition reaches the screen", () => {
+    const { browser } = browserForRealManifest();
+    browser.noteTileWarning("HTTP 404");
+    browser.confirmDisplayed("auburn-1981", browser.select("auburn-1981"));
+    expect(browser.state.warningMessage).toBeNull();
+  });
+
+  it("keeps the failed switch's error separate from a warning", () => {
+    const { browser } = browserForRealManifest();
+    const generation = browser.select("auburn-1981");
+    browser.failRequest("auburn-1981", generation, "HTTP 503");
+    expect(browser.state.warningMessage).toBeNull();
+    expect(noticeFor(browser.state, browser)).toBe(
+      `Could not load ${browser.edition("auburn-1981").label}: HTTP 503. ` +
+        `Still showing ${browser.edition("auburn-1953").label}.`,
+    );
+  });
+});
+
+describe("camera preservation across settled switches", () => {
+  it("leaves centre and zoom untouched by every switch, failure and retry", () => {
+    const { browser, map } = browserForRealManifest();
+    const before = { ...map.camera };
+
+    for (const id of ["auburn-1973", "auburn-1975", "auburn-1981", "auburn-1953"]) {
+      const generation = browser.select(id);
+      browser.noteCameraMove();
+      browser.confirmDisplayed(id, generation, browser.state.viewportToken);
+      expectSameCamera(before, map.camera);
+    }
+
+    const failing = browser.select("auburn-1975");
+    browser.failRequest("auburn-1975", failing, "HTTP 404");
+    expectSameCamera(before, map.camera);
+    browser.confirmDisplayed("auburn-1975", browser.retry());
+    expectSameCamera(before, map.camera);
+    expect(map.calls.some((call) => CAMERA_METHODS.includes(call.method as never))).toBe(false);
   });
 });
