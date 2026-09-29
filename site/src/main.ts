@@ -86,6 +86,7 @@ function renderCard(browser: EditionBrowser): void {
     `<p class="card-citation"><a href="${escapeHtml(card.sourceUrl)}" rel="noreferrer">` +
       `Original source record</a></p>`,
     `<p class="card-attribution">${escapeHtml(card.attribution)}</p>`,
+    `<p class="card-caveat">${escapeHtml(CAVEAT)}</p>`,
   ].join("");
 }
 
@@ -96,6 +97,11 @@ function escapeHtml(value: string): string {
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!,
   );
 }
+
+/* The card describes what the sheet depicts. It asserts no right and no access. */
+const CAVEAT =
+  "These sheets record what the survey depicted on its stated dates. A line on a map " +
+  "is not a statement about who may use it today.";
 
 function noticeFor(state: BrowserState, browser: EditionBrowser): string {
   if (state.status === "error") {

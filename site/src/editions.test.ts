@@ -454,4 +454,19 @@ describe("source card content", () => {
     expect(rows).not.toHaveProperty("Revision");
     expect(rows["Field check"]).toBe("base field checked 1953");
   });
+
+  it("asserts nothing about present-day access", () => {
+    const manifest = realManifest();
+    const forbidden = /right of way|public access|easement|prescriptive|trespass|you may use/i;
+    for (const edition of manifest.editions) {
+      const card = cardRows(edition);
+      const text = [
+        card.citation,
+        card.dateNote,
+        card.attribution,
+        ...card.rows.map((r) => r.value),
+      ].join("\n");
+      expect(text).not.toMatch(forbidden);
+    }
+  });
 });
