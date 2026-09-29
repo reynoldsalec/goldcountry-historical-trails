@@ -7,12 +7,16 @@ import {
   NavigationControl,
   ScaleControl,
   addProtocol,
+  setWorkerUrl,
   type RasterLayerSpecification,
   type RasterSourceSpecification,
   type RasterTileSource,
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+// MapLibre's own default resolves the worker next to its ESM bundle, which no bundler
+// emits; the built page then 404s on assets/maplibre-gl-worker.mjs (PR #53 review).
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
 import {
   EditionBrowser,
@@ -130,6 +134,8 @@ function registerTileProtocol(): void {
 }
 
 async function start(): Promise<void> {
+  // Same-origin and relative to the page, so the build works from a subpath too.
+  setWorkerUrl(maplibreWorkerUrl);
   registerTileProtocol();
   const response = await fetch("./editions.json", { cache: "no-store" });
   if (!response.ok) {
