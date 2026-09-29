@@ -5,7 +5,9 @@ on:
     branches: ["**"]
   pull_request:
 
-# A failing validation is a stop condition (AGENTS.md §5.3).
+# A failing validation is a stop condition (AGENTS.md §5.3). The runner has no raw scans,
+# so every demo suite here runs on synthetic fixtures; the real four-source build and its
+# acceptance evidence are local only (docs/demo-acceptance.md).
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -19,6 +21,24 @@ jobs:
 
       - name: Install Python and dependencies
         run: uv sync --frozen
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install frontend dependencies
+        run: make site-deps
+
+      # Chromium's shared libraries are not preinstalled; 'make site-browsers' fetches the
+      # browser itself but not the OS packages it links against.
+      - name: Install browser system libraries
+        run: cd site && npx --no-install playwright install-deps chromium
+
+      - name: Install Playwright browser
+        run: make site-browsers
 
       - name: Lint
         run: make lint
@@ -34,3 +54,19 @@ jobs:
 
       - name: Coverage inventory tests
         run: make test-coverage
+
+      # Fixture-only: manifest, raster, build-boundary, Make/CI wiring, unit and browser
+      # suites. It proves the code paths, not the real editions.
+      - name: Demo suites on synthetic fixtures
+        run: make demo-test
+
+      # Traces are kept only on failure (playwright.config.ts), so this is the only way to
+      # see why a browser test failed on the runner.
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: site/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
