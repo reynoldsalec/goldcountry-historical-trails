@@ -950,17 +950,17 @@ def run_cogs(
                 )
             except WarpError as exc:
                 fail(f"{eid}: {exc}")
-        # Nothing reaches build/rasters/ until every edition has been warped.
+        for eid in manifest["edition_order"]:
+            # Raw bytes must be exactly what they were before the warp (AGENTS.md §2.2).
+            check_record(resolved[eid]["record"], raw_root)
+        # Nothing reaches build/rasters/ until every edition has been warped and
+        # every source has been re-verified.
         for edition in manifest["editions"]:
             staged = incoming / f"{edition['id']}.tif"
             if staged.is_file():
                 os.replace(staged, raster_root / f"{edition['id']}.tif")
     finally:
         shutil.rmtree(incoming, ignore_errors=True)
-
-    for eid in manifest["edition_order"]:
-        # Raw bytes must be exactly what they were before the warp (AGENTS.md §2.2).
-        check_record(resolved[eid]["record"], raw_root)
 
     payload = {
         "version": 1,

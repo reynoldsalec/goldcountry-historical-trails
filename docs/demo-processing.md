@@ -152,7 +152,8 @@ Output form: 4 bands of uint8 (RGB plus alpha), 256 px tiles, DEFLATE, overview 
 ## 6. Atomic writes and content-aware reuse
 
 A run warps into `build/rasters/.incoming/` and moves the finished files into
-`build/rasters/` only after every edition has succeeded. The record is written last,
+`build/rasters/` only after every edition has succeeded and every source's raw bytes have
+hashed to their receipt a second time. The record is written last,
 through a temporary file and `os.replace`. A run that fails part way publishes no COG and
 no record. `write_cog` stages the plain GeoTIFF and the COG in a scratch directory it
 removes on either outcome, so an interrupted write leaves no partial file behind.
@@ -209,5 +210,6 @@ zoom outside the manifest range; a geometric mask that keeps white pixels, an em
 the alpha band and its absence of colour keying; the record's versions, hashes, transform,
 crops and digests, and one source per COG; reruns that reuse, a deleted output, an output
 whose bytes changed, and a changed grid; a failure part way through publishing nothing, a
+failed post-warp source re-check leaving the published run and its record intact, a
 corrupt source, a non-raster source, a missing source, and `write_cog` leaving no partial
 file; and that a run changes no raw byte, no receipt and nothing outside the build root.

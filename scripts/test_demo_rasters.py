@@ -7,6 +7,7 @@ the same synthetic sources. Nothing here reads data/raw/ or the committed receip
 import hashlib
 import json
 
+import click
 import demo
 import numpy as np
 import pytest
@@ -461,6 +462,36 @@ def test_a_failure_part_way_through_publishes_nothing(tree, tmp_path, monkeypatc
     assert "disk full" in result.output
     assert cog_paths(build_root) == []
     assert not (build_root / demo.RASTER_DIRNAME / demo.PROCESSING_FILENAME).exists()
+    assert not (build_root / demo.RASTER_DIRNAME / demo.INCOMING_DIRNAME).exists()
+
+
+def test_a_failed_post_warp_source_recheck_leaves_the_published_run_intact(
+    tree, tmp_path, monkeypatch
+):
+    build_root = tmp_path / "build"
+    assert run_cogs(tree, build_root).exit_code == 0
+    published = {path: path.read_bytes() for path in cog_paths(build_root)}
+    record_bytes = (build_root / demo.RASTER_DIRNAME / demo.PROCESSING_FILENAME).read_bytes()
+
+    real_run_check = demo.run_check
+
+    def refuse_after_the_warp(*args, **kwargs):
+        checked = real_run_check(*args, **kwargs)
+
+        def refuse(record, root):
+            raise click.ClickException("Checksum mismatch; left unchanged")
+
+        monkeypatch.setattr(demo, "check_record", refuse)
+        return checked
+
+    monkeypatch.setattr(demo, "run_check", refuse_after_the_warp)
+    # A different grid forces all four warps, so all four would have been promoted.
+    result = run_cogs(tree, build_root, "--grid-zoom", str(TEST_ZOOM - 1))
+    assert result.exit_code != 0
+    assert {path: path.read_bytes() for path in cog_paths(build_root)} == published
+    assert (
+        build_root / demo.RASTER_DIRNAME / demo.PROCESSING_FILENAME
+    ).read_bytes() == record_bytes
     assert not (build_root / demo.RASTER_DIRNAME / demo.INCOMING_DIRNAME).exists()
 
 
