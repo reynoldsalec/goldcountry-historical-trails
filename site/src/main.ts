@@ -227,6 +227,31 @@ async function start(): Promise<void> {
   });
 
   render(browser.state);
+  exposeTestProbe(map, browser);
+}
+
+/**
+ * Camera readout for the Playwright suite (issue #44). Nothing in the page needs a global,
+ * so this is guarded by `import.meta.env.DEV`: the constant is inlined as `false` in
+ * `vite build`, so the production bundle carries neither the probe nor its name.
+ */
+function exposeTestProbe(map: MapLibreMap, browser: EditionBrowser): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  (window as unknown as Record<string, unknown>).__demoTestProbe = {
+    camera: () => {
+      const center = map.getCenter();
+      return {
+        lng: center.lng,
+        lat: center.lat,
+        zoom: map.getZoom(),
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      };
+    },
+    resetViewCalls: () => browser.resetViewCalls,
+  };
 }
 
 // A rejection here would otherwise be unhandled and the page would sit silent (issue #43).

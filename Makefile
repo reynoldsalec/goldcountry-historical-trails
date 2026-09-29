@@ -15,7 +15,7 @@ export TRAIL_ARCHIVE_ROOT
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup \
         demo-check demo-inspect demo-test demo-cogs demo-rasters \
-        demo-dev site-deps demo-frontend-test
+        demo-dev site-deps demo-frontend-test site-browsers demo-browser-test
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -138,7 +138,22 @@ demo-dev: site-deps
 	  echo 'demo-dev: no tiles in build/tiles/demo; run "make demo-rasters" first.'; exit 1; }
 	cd $(SITE) && $(NPM) run dev
 
-demo-test: demo-frontend-test
+## install the headless browser Playwright drives; idempotent once the cache is populated
+site-browsers: site-deps
+	cd $(SITE) && $(NPM) run browsers
+
+## Playwright checks for paging, camera, failures, layout and accessibility (D3c)
+# Offline: the dev server is pointed at generated fixtures, never at data/sources or
+# build/tiles. DEMO_TEST_PORT (default 5274) is this suite's own port, separate from
+# 'make demo-dev'. Bundled Chromium only. See docs/demo-browser-tests.md.
+DEMO_TEST_PORT ?= 5274
+export DEMO_TEST_PORT
+demo-browser-test: site-browsers
+	cd $(SITE) && $(NPM) run build
+	cd $(SITE) && node tests/assert-no-test-probe.mjs
+	cd $(SITE) && $(NPM) run test:browser
+
+demo-test: demo-frontend-test demo-browser-test
 	$(RUN) pytest -q scripts/test_demo.py scripts/test_demo_rasters.py
 
 # Files are listed explicitly so a deleted or renamed regression module fails loudly
