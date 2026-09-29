@@ -13,7 +13,8 @@ export TRAIL_ARCHIVE_ROOT
         fetch-topo-selected coverage-grid coverage-refresh validate-coverage \
         coverage-ready coverage-report \
         catalog-sources verify-sources \
-        backup-sources restore-sources verify-backup
+        backup-sources restore-sources verify-backup \
+        demo-check demo-inspect demo-test
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -89,6 +90,23 @@ verify-backup:
 
 # Files are listed explicitly so a deleted or renamed regression module fails loudly
 # instead of silently shrinking the glob.
+## Auburn map-browser demo (docs/implementation-plan.md, D1)
+# DEMO_RAW_ROOT points the preflight at the raw scans when they are not in this checkout
+# (data/raw is gitignored, so a worktree usually has none).
+DEMO_RAW_ROOT ?= data/raw
+export DEMO_RAW_ROOT
+
+## verify the four-edition manifest against its schema, the index, receipts and scans
+demo-check:
+	$(RUN) python scripts/demo.py check
+
+## print the neatline locators and derived geometry that demo-check compares against
+demo-inspect:
+	$(RUN) python scripts/demo.py inspect
+
+demo-test:
+	$(RUN) pytest -q scripts/test_demo.py
+
 test-validation:
 	$(RUN) pytest -q scripts/test_validate.py scripts/test_validate_dates.py scripts/test_validate_leaks.py
 
