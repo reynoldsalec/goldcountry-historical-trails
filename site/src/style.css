@@ -134,6 +134,11 @@ button:disabled {
   font-weight: 600;
 }
 
+/* A tile failure after a settled switch: the sheet on screen is still the one named. */
+.notice[data-warning="true"] {
+  color: var(--warn);
+}
+
 .card {
   border-top: 1px solid var(--edge);
   padding-top: 0.6rem;

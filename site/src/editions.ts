@@ -91,6 +91,14 @@ export function publicManifestFrom(source: unknown): PublicManifest {
   };
 }
 
+/**
+ * Retry appends a reload counter so the request misses the browser's cached failure. The
+ * dev server and a static host both ignore the query string when resolving the file.
+ */
+export function tileUrlFor(edition: PublicEdition, reload: number): string {
+  return reload === 0 ? edition.tile_url : `${edition.tile_url}?reload=${reload}`;
+}
+
 export function layerIdFor(editionId: string): string {
   return `edition-${editionId}`;
 }
@@ -186,11 +194,39 @@ export function cardRows(edition: PublicEdition): SourceCard {
   };
 }
 
+/**
+ * The status line. It says what is on screen and what is only requested, never merging the
+ * two, and it never names a blank stretch of map as empty ground (issue #43).
+ */
+export function noticeFor(state: BrowserState, browser: EditionBrowser): string {
+  const displayed = browser.displayedEdition;
+  const requested = browser.requestedEdition.label;
+
+  if (state.status === "error") {
+    const reason = state.errorMessage ?? "unknown error";
+    return displayed === null
+      ? `Could not load ${requested}: ${reason}. No edition is on screen yet.`
+      : `Could not load ${requested}: ${reason}. Still showing ${displayed.label}.`;
+  }
+  if (state.status === "loading") {
+    return displayed === null
+      ? `Loading ${requested}.`
+      : `Loading ${requested}; still showing ${displayed.label}.`;
+  }
+  const label = displayed === null ? requested : displayed.label;
+  return state.warningMessage === null
+    ? `Showing ${label}.`
+    : `Showing ${label}. Some tiles did not load: ${state.warningMessage}. ` +
+        `A blank area here may be a missing tile rather than a blank sheet.`;
+}
+
 /** The subset of the MapLibre Map the browser is allowed to use for a switch. */
 export interface MapLike {
   setLayoutProperty(layerId: string, name: string, value: unknown): void;
   setPaintProperty(layerId: string, name: string, value: unknown): void;
   fitBounds(bounds: [number, number, number, number], options?: unknown): void;
+  /** Re-point a raster source at fresh tile URLs. Retry needs it; see `retry` (issue #43). */
+  setSourceTiles(sourceId: string, tiles: string[]): void;
 }
 
 export type RequestStatus = "displayed" | "loading" | "error";
@@ -198,12 +234,16 @@ export type RequestStatus = "displayed" | "loading" | "error";
 export interface BrowserState {
   /** The edition the user asked for. May differ from what is on screen. */
   readonly requestedId: string;
-  /** The edition whose tiles and card are actually shown. */
-  readonly displayedId: string;
+  /** The edition whose tiles and card are shown. Null before any edition has loaded. */
+  readonly displayedId: string | null;
   /** Monotonic id so a late load or error from an older request cannot win. */
   readonly generation: number;
+  /** Monotonic id of the camera position readiness was measured against. */
+  readonly viewportToken: number;
   readonly status: RequestStatus;
   readonly errorMessage: string | null;
+  /** A tile failure that arrived after a settled switch. It never unsets the layer. */
+  readonly warningMessage: string | null;
 }
 
 export interface EditionBrowserOptions {
@@ -214,9 +254,9 @@ export interface EditionBrowserOptions {
 }
 
 /**
- * Edition order, endpoint limits, direct selection and the separate reset live here.
- * Detecting real tile readiness, retry and pan-during-load restart are issue #43; this
- * shell only records the requested/displayed split and waits to be told the outcome.
+ * Edition order, endpoint limits, direct selection, the separate reset, and the
+ * requested/displayed split with its generation and viewport gating. The browser is told
+ * about tile outcomes; `tileWatcher.ts` translates MapLibre events into those calls.
  */
 export class EditionBrowser {
   readonly manifest: PublicManifest;
@@ -226,6 +266,8 @@ export class EditionBrowser {
   private readonly listeners = new Set<(state: BrowserState) => void>();
   private current: BrowserState;
   private resetCount = 0;
+  /** Reload counter per edition; a retry needs a URL the browser cache has not failed on. */
+  private readonly reloads = new Map<string, number>();
 
   constructor(options: EditionBrowserOptions) {
     const { manifest, map } = options;
@@ -235,13 +277,17 @@ export class EditionBrowser {
     this.manifest = manifest;
     this.map = map;
     this.resetPadding = options.resetPadding ?? 16;
-    const first = manifest.edition_order[0];
+    // Nothing is displayed until tiles have actually loaded, so the first edition starts
+    // loading with no card. The style ships its layer visible at zero opacity: the
+    // constructor must not call the map, whose style may not be ready yet (issue #43).
     this.current = {
-      requestedId: first,
-      displayedId: first,
+      requestedId: manifest.edition_order[0],
+      displayedId: null,
       generation: 0,
-      status: "displayed",
+      viewportToken: 0,
+      status: "loading",
       errorMessage: null,
+      warningMessage: null,
     };
   }
 
@@ -266,9 +312,9 @@ export class EditionBrowser {
     return found;
   }
 
-  /** The card and layer always belong to the edition actually on screen. */
-  get displayedEdition(): PublicEdition {
-    return this.edition(this.current.displayedId);
+  /** The card and layer always belong to the edition actually on screen, if any. */
+  get displayedEdition(): PublicEdition | null {
+    return this.current.displayedId === null ? null : this.edition(this.current.displayedId);
   }
 
   get requestedEdition(): PublicEdition {
@@ -304,8 +350,8 @@ export class EditionBrowser {
     }
     const generation = this.current.generation + 1;
     this.commit({
+      ...this.current,
       requestedId: id,
-      displayedId: this.current.displayedId,
       generation,
       status: id === this.current.displayedId ? "displayed" : "loading",
       errorMessage: null,
@@ -329,13 +375,25 @@ export class EditionBrowser {
     return this.select(this.manifest.edition_order[this.indexOf(this.current.requestedId) + 1]);
   }
 
-  /** Re-request the edition that failed, under a fresh generation. */
+  /**
+   * Re-request the edition that failed, under a fresh generation. The tile URLs get a new
+   * reload counter: without it the browser replays its cached failure and the retry never
+   * settles, which is the gap PR #50's review left open.
+   */
   retry(): number {
+    const id = this.current.requestedId;
+    const displayed = id === this.current.displayedId;
+    if (!displayed) {
+      const reload = (this.reloads.get(id) ?? 0) + 1;
+      this.reloads.set(id, reload);
+      this.map.setSourceTiles(sourceIdFor(id), [tileUrlFor(this.edition(id), reload)]);
+      this.beginLoading(id);
+    }
     const generation = this.current.generation + 1;
     this.commit({
       ...this.current,
       generation,
-      status: this.current.requestedId === this.current.displayedId ? "displayed" : "loading",
+      status: displayed ? "displayed" : "loading",
       errorMessage: null,
     });
     return generation;
@@ -355,35 +413,75 @@ export class EditionBrowser {
     });
   }
 
-  /** Swap layer opacity and card together once the request is ready. */
-  confirmDisplayed(id: string, generation: number): boolean {
+  /**
+   * Swap layer opacity and card together once the request's visible-viewport tiles are in.
+   * `viewportToken` is the camera the readiness was measured against: a signal from before
+   * a pan says nothing about what is on screen now.
+   */
+  confirmDisplayed(id: string, generation: number, viewportToken?: number): boolean {
     // A failed request keeps its generation, so readiness only counts while still loading:
     // otherwise a later idle event would reveal the edition that never loaded (PR #50).
     if (!this.owns(id, generation) || this.current.status !== "loading") {
       return false;
     }
+    if (viewportToken !== undefined && viewportToken !== this.current.viewportToken) {
+      return false;
+    }
     if (this.current.displayedId !== id) {
       // Reveal first, then hide: no third edition is ever uncovered in between.
       this.map.setPaintProperty(layerIdFor(id), "raster-opacity", 1);
-      this.map.setLayoutProperty(layerIdFor(this.current.displayedId), "visibility", "none");
+      if (this.current.displayedId !== null) {
+        this.map.setLayoutProperty(layerIdFor(this.current.displayedId), "visibility", "none");
+      }
     }
     this.commit({
-      requestedId: id,
+      ...this.current,
       displayedId: id,
-      generation,
       status: "displayed",
       errorMessage: null,
+      // The warning belonged to the edition leaving the screen.
+      warningMessage: null,
     });
     return true;
   }
 
-  /** A failure leaves the last valid layer and its card on screen. */
+  /** A failure leaves the last valid layer and its card on screen, and the camera alone. */
   failRequest(id: string, generation: number, message: string): boolean {
     if (!this.owns(id, generation)) {
       return false;
     }
     this.commit({ ...this.current, status: "error", errorMessage: message });
     return true;
+  }
+
+  /**
+   * A tile failure that arrives once a switch has settled: the pixels on screen are still
+   * the edition the card names, so this warns instead of unsetting the layer. It survives
+   * later pans and zooms, because the gap it reports is still on screen.
+   */
+  noteTileWarning(message: string): void {
+    if (this.current.warningMessage === message) {
+      return;
+    }
+    this.commit({ ...this.current, warningMessage: message });
+  }
+
+  /**
+   * The camera moved, so any readiness measured against the old viewport is void and the
+   * request waits for tiles covering the new one. The selection and its generation stand.
+   */
+  noteCameraMove(): number {
+    const viewportToken = this.current.viewportToken + 1;
+    this.commit({ ...this.current, viewportToken });
+    return viewportToken;
+  }
+
+  /** The displayed edition covered the current viewport with no failures: drop the warning. */
+  clearTileWarning(): void {
+    if (this.current.warningMessage === null) {
+      return;
+    }
+    this.commit({ ...this.current, warningMessage: null });
   }
 
   /**
@@ -401,6 +499,11 @@ export class EditionBrowser {
       return;
     }
     this.map.setLayoutProperty(layerIdFor(id), "visibility", "none");
+  }
+
+  /** The tile template currently in use, reload counter included. */
+  tileUrl(id: string): string {
+    return tileUrlFor(this.edition(id), this.reloads.get(id) ?? 0);
   }
 
   private owns(id: string, generation: number): boolean {

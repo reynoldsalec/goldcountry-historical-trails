@@ -1,6 +1,6 @@
-// The D3a shell: one MapLibre map, four raster layers, edition controls and source cards.
-// Tile-readiness detection, retry behaviour and pan-during-load restart are only sketched
-// here; issue #43 finishes them. Nothing on this page reads or writes browser storage.
+// One MapLibre map, four raster layers, edition controls and source cards. Readiness,
+// failure and retry are decided by EditionBrowser; tileWatcher.ts feeds it map events
+// (issues #42, #43). Nothing on this page reads or writes browser storage.
 
 import {
   Map as MapLibreMap,
@@ -8,6 +8,7 @@ import {
   ScaleControl,
   type RasterLayerSpecification,
   type RasterSourceSpecification,
+  type RasterTileSource,
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -15,12 +16,15 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import {
   EditionBrowser,
   type BrowserState,
+  type MapLike,
   type PublicManifest,
   cardRows,
   layerIdFor,
+  noticeFor,
   resamplingFor,
   sourceIdFor,
 } from "./editions.ts";
+import { attachTileWatcher, type TileEventSource } from "./tileWatcher.ts";
 
 const BACKGROUND_LAYER_ID = "outside-coverage";
 
@@ -32,7 +36,7 @@ function element<T extends HTMLElement>(id: string): T {
   return found as T;
 }
 
-/** Only the first edition is visible; a switch flips visibility, never the camera. */
+/** Only the first edition is loading; a switch flips visibility, never the camera. */
 function buildStyle(manifest: PublicManifest): StyleSpecification {
   const sources: Record<string, RasterSourceSpecification> = {};
   const layers: (RasterLayerSpecification | StyleSpecification["layers"][number])[] = [
@@ -61,7 +65,9 @@ function buildStyle(manifest: PublicManifest): StyleSpecification {
       paint: {
         "raster-resampling": resamplingFor(edition.kind),
         "raster-fade-duration": 0,
-        "raster-opacity": 1,
+        // The first edition loads at zero opacity too: no pixels appear before the card
+        // that names them, and MapLibre fetches no tiles for a hidden layer (issue #43).
+        "raster-opacity": 0,
         // No cross-fade: the swap is instant, so two editions are never blended.
         "raster-opacity-transition": { duration: 0, delay: 0 },
       },
@@ -73,7 +79,15 @@ function buildStyle(manifest: PublicManifest): StyleSpecification {
 }
 
 function renderCard(browser: EditionBrowser): void {
-  const card = cardRows(browser.displayedEdition);
+  const displayed = browser.displayedEdition;
+  if (displayed === null) {
+    // No sheet is on screen, so no card may claim one is (issue #43).
+    element("card").innerHTML =
+      `<p class="card-note">No edition is on screen yet. The card appears once a sheet's ` +
+      `tiles have loaded.</p>`;
+    return;
+  }
+  const card = cardRows(displayed);
   const facts = card.rows
     .map((row) => `<dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.value)}</dd>`)
     .join("");
@@ -102,19 +116,6 @@ function escapeHtml(value: string): string {
 const CAVEAT =
   "These sheets record what the survey depicted on its stated dates. A line on a map " +
   "is not a statement about who may use it today.";
-
-function noticeFor(state: BrowserState, browser: EditionBrowser): string {
-  if (state.status === "error") {
-    return (
-      `Could not load ${browser.requestedEdition.label}: ${state.errorMessage ?? "unknown error"}. ` +
-      `Still showing ${browser.displayedEdition.label}.`
-    );
-  }
-  if (state.status === "loading") {
-    return `Loading ${browser.requestedEdition.label}; still showing ${browser.displayedEdition.label}.`;
-  }
-  return `Showing ${browser.displayedEdition.label}.`;
-}
 
 async function start(): Promise<void> {
   const response = await fetch("./editions.json", { cache: "no-store" });
@@ -148,7 +149,21 @@ async function start(): Promise<void> {
   map.addControl(new NavigationControl({ showCompass: false }), "top-left");
   map.addControl(new ScaleControl({ unit: "imperial" }), "bottom-left");
 
-  const browser = new EditionBrowser({ manifest, map, resetPadding: 16 });
+  // The browser only ever sees these four methods, so it cannot move the camera by
+  // accident and `setSourceTiles` is the one path that refetches a failed pyramid.
+  // MapLibre types each property name as a literal union; MapLike is deliberately the
+  // narrower, string-keyed surface, so the two setters are adapted once here.
+  type PropertySetter = (layerId: string, name: string, value: unknown) => void;
+  const controls: MapLike = {
+    setLayoutProperty: (map.setLayoutProperty as unknown as PropertySetter).bind(map),
+    setPaintProperty: (map.setPaintProperty as unknown as PropertySetter).bind(map),
+    fitBounds: (bounds, options) => map.fitBounds(bounds, options as never),
+    setSourceTiles: (sourceId, tiles) =>
+      (map.getSource(sourceId) as RasterTileSource | undefined)?.setTiles(tiles),
+  };
+
+  const browser = new EditionBrowser({ manifest, map: controls, resetPadding: 16 });
+  attachTileWatcher(browser, map as unknown as TileEventSource);
 
   const select = element<HTMLSelectElement>("edition-select");
   select.append(
@@ -172,44 +187,18 @@ async function start(): Promise<void> {
     const notice = element("notice");
     notice.textContent = noticeFor(state, browser);
     notice.dataset.status = state.status;
+    notice.dataset.warning = String(state.warningMessage !== null);
     renderCard(browser);
   }
 
   browser.subscribe(render);
 
-  // Minimal readiness proxy for the shell: MapLibre reports idle once the tiles for the
-  // current viewport are loaded and drawn. Issue #43 replaces this with per-request
-  // viewport tracking, real retry and restart-on-camera-move.
-  function awaitReady(generation: number): void {
-    const id = browser.state.requestedId;
-    if (browser.state.status !== "loading") {
-      return;
-    }
-
-    function stopWaiting(): void {
-      map.off("idle", onIdle);
-      unwatch();
-    }
-
-    function onIdle(): void {
-      stopWaiting();
-      browser.confirmDisplayed(id, generation);
-    }
-
-    // Once this request fails or is superseded, an idle from a later pan must not confirm
-    // it: that would label a blank map with the edition that never loaded (PR #50).
-    const unwatch = browser.subscribe((state) => {
-      if (state.generation !== generation || state.status !== "loading") {
-        stopWaiting();
-      }
-    });
-    map.on("idle", onIdle);
-  }
-
-  previous.addEventListener("click", () => awaitReady(browser.previous()));
-  next.addEventListener("click", () => awaitReady(browser.next()));
-  select.addEventListener("change", () => awaitReady(browser.select(select.value)));
-  retry.addEventListener("click", () => awaitReady(browser.retry()));
+  // No per-click waiter: the watcher is attached for the page's life and reads the
+  // generation and viewport token off the state each time an event arrives.
+  previous.addEventListener("click", () => browser.previous());
+  next.addEventListener("click", () => browser.next());
+  select.addEventListener("change", () => browser.select(select.value));
+  retry.addEventListener("click", () => browser.retry());
   element("reset-view").addEventListener("click", () => browser.resetView());
 
   const toggle = element<HTMLButtonElement>("detail-toggle");
@@ -221,21 +210,15 @@ async function start(): Promise<void> {
     toggle.textContent = nowHidden ? "Show source details" : "Hide source details";
   });
 
-  // Only a failure that belongs to an in-flight switch is surfaced here. Warning on tile
-  // errors that arrive during later pan and zoom is issue #43.
-  map.on("error", (event) => {
-    const state = browser.state;
-    if (state.status !== "loading") {
-      return;
-    }
-    browser.failRequest(
-      state.requestedId,
-      state.generation,
-      String(event.error?.message ?? event),
-    );
-  });
-
   render(browser.state);
 }
 
-void start();
+// A rejection here would otherwise be unhandled and the page would sit silent (issue #43).
+start().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  const notice = document.getElementById("notice");
+  if (notice) {
+    notice.textContent = `Could not start the viewer: ${message}`;
+    notice.dataset.status = "error";
+  }
+});
