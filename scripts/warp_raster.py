@@ -46,8 +46,10 @@ RESAMPLING_BY_KIND = {"topo": "nearest", "orthophotoquad": "cubic"}
 OVERVIEW_RESAMPLING = {"nearest": "NEAREST", "cubic": "CUBIC"}
 
 # GDAL samples the source outline at a coarse step when it suggests a warp extent, so its
-# answer and a densified pyproj answer differ by a fraction of a pixel, not by a datum.
+# answer and a densified pyproj answer differ by a fraction of a pixel, not by a datum. The
+# limit grows to one source pixel for the coarser regional sheets (#57).
 PIPELINE_AGREEMENT_METRES = 5.0
+PIPELINE_AGREEMENT_PX = 1.0
 OUTLINE_SAMPLES = 128
 
 # The tile pyramid is XYZ: y counts down from the north edge of the world, the opposite of
@@ -302,10 +304,12 @@ def verify_pipeline(dataset, pipeline: str) -> dict:
     px, py = Transformer.from_pipeline(pipeline).transform(outline_x, outline_y)
     expected = np.array([px.min(), py.min(), px.max(), py.max()])
     pinned_residual = float(np.abs(pinned - expected).max())
-    if pinned_residual > PIPELINE_AGREEMENT_METRES:
+    pixel = math.hypot(dataset.transform.a, dataset.transform.d)
+    limit = max(PIPELINE_AGREEMENT_METRES, PIPELINE_AGREEMENT_PX * pixel)
+    if pinned_residual > limit:
         raise WarpError(
             f"GDAL warped extent is {pinned_residual:.3f} m from the pinned pipeline, over the "
-            f"{PIPELINE_AGREEMENT_METRES} m limit: GDAL {rasterio.__proj_version__} did not "
+            f"{limit:g} m limit: GDAL {rasterio.__proj_version__} did not "
             f"honour COORDINATE_OPERATION. Nothing was written."
         )
     return {
@@ -664,6 +668,107 @@ def cut_pyramid(
         "digest": digest,
         "transparent_tiles": sum(level["transparent_tiles"] for level in levels),
     }
+
+
+# Registration offsets between two editions are measured by phase correlation over square
+# patches this many EPSG:3857 metres wide (#57). A peak this many times the next-highest one,
+# outside a small neighbourhood, counts as distinct; anything less establishes no offset.
+PATCH_METRES = 4000.0
+DISTINCT_PEAK_RATIO = 2.0
+PEAK_NEIGHBOURHOOD_PX = 3
+
+
+def warp_patch(dataset, pipeline: str, transform: Affine, size: int) -> np.ndarray:
+    """Darkness (255 minus the band mean) of one source over a small EPSG:3857 patch."""
+    bands = np.zeros((dataset.count, size, size), dtype="uint8")
+    for index in range(dataset.count):
+        reproject(
+            source=rasterio.band(dataset, index + 1),
+            destination=bands[index],
+            dst_transform=transform,
+            dst_crs=f"EPSG:{TILE_CRS_EPSG}",
+            resampling=Resampling.bilinear,
+            COORDINATE_OPERATION=pipeline,
+        )
+    return 255.0 - bands.astype("float64").mean(axis=0)
+
+
+def _parabolic(minus: float, centre: float, plus: float) -> float:
+    denominator = minus - 2 * centre + plus
+    return 0.0 if denominator == 0 else 0.5 * (minus - plus) / denominator
+
+
+def phase_correlation(reference: np.ndarray, moving: np.ndarray) -> dict:
+    """Shift of `moving` against `reference`, in pixels (+x east, +y down), with its peak.
+
+    Both patches are windowed so the patch edges do not correlate with each other.
+    """
+    if reference.shape != moving.shape or reference.shape[0] != reference.shape[1]:
+        raise WarpError("Phase correlation needs two square patches of one size.")
+    size = reference.shape[0]
+    window = np.outer(np.hanning(size), np.hanning(size))
+    a = (reference - reference.mean()) * window
+    b = (moving - moving.mean()) * window
+    cross = np.fft.fft2(b) * np.conj(np.fft.fft2(a))
+    surface = np.fft.ifft2(cross / (np.abs(cross) + 1e-12)).real
+    row, col = np.unravel_index(int(surface.argmax()), surface.shape)
+    peak = float(surface[row, col])
+    dy = row + _parabolic(surface[(row - 1) % size, col], peak, surface[(row + 1) % size, col])
+    dx = col + _parabolic(surface[row, (col - 1) % size], peak, surface[row, (col + 1) % size])
+    dy = dy - size if dy > size / 2 else dy
+    dx = dx - size if dx > size / 2 else dx
+    rest = surface.copy()
+    near = np.arange(-PEAK_NEIGHBOURHOOD_PX, PEAK_NEIGHBOURHOOD_PX + 1)
+    rest[np.ix_((row + near) % size, (col + near) % size)] = -np.inf
+    second = float(rest.max())
+    ratio = peak / second if second > 0 else float("inf")
+    return {
+        "dx_px": round(float(dx), 2),
+        "dy_px": round(float(dy), 2),
+        "peak": round(peak, 4),
+        "peak_ratio": round(ratio, 2) if math.isfinite(ratio) else None,
+        "distinct": ratio >= DISTINCT_PEAK_RATIO,
+    }
+
+
+def patch_offsets(
+    reference, reference_pipeline: str, dataset, pipeline: str, points: dict, resolution: float
+) -> list[dict]:
+    """Offset of `dataset` against `reference` at each named WGS84 point, in ground metres.
+
+    A machine measurement of shared linework, not a human registration review. Where the
+    two maps share too little drawn content the peak is not distinct and no offset is given.
+    """
+    size = max(64, round(PATCH_METRES / resolution))
+    forward = Transformer.from_crs(4326, TILE_CRS_EPSG, always_xy=True)
+    results = []
+    for name, (lon, lat) in points.items():
+        x, y = forward.transform(lon, lat)
+        half = size * resolution / 2
+        transform = Affine(resolution, 0.0, x - half, 0.0, -resolution, y + half)
+        measured = phase_correlation(
+            warp_patch(reference, reference_pipeline, transform, size),
+            warp_patch(dataset, pipeline, transform, size),
+        )
+        # EPSG:3857 metres shrink to ground metres by cos(latitude).
+        ground = resolution * math.cos(math.radians(lat))
+        results.append(
+            {
+                "name": name,
+                "lon": lon,
+                "lat": lat,
+                "patch_px": size,
+                "patch_ground_metres": round(size * ground, 1),
+                **measured,
+                "east_m": round(measured["dx_px"] * ground, 2)
+                if measured["distinct"]
+                else None,
+                "north_m": round(-measured["dy_px"] * ground, 2)
+                if measured["distinct"]
+                else None,
+            }
+        )
+    return results
 
 
 def sha256_file(path: Path) -> tuple[str, int]:

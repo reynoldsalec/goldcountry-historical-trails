@@ -142,13 +142,18 @@ make validate
 claim an independent backup without verifying real archive storage. The new selected
 preflight requires only the four MVP inputs.
 
-Expansion sources (E1):
+Expansion sources and staged rasters (E1–E3):
 
 ```sh
 make expansion-test                      # offline unit tests
 make expansion-fetch                     # download the two US Topo PDFs once
-make expansion-check                     # offline full-file SHA-256 check of all five
+make expansion-check                     # source hashes, then the staged nine-edition manifest
+make expansion-pdf                       # the two PDFs -> georeferenced COGs (E2)
+make expansion-rasters                   # five added pyramids -> build/expansion/ only (E3)
 ```
+
+The staged manifest is `data/sources/demo-editions-expanded.json` (schema version 2);
+the live browser still reads `data/sources/demo-editions.json` (version 1).
 
 Both `expansion-*` source targets use `DEMO_RAW_ROOT` (default `data/raw`). A worktree
 points it at the primary checkout's raw root. **PDF backup is not verified:**

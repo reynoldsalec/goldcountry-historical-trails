@@ -1,13 +1,14 @@
 """Edition contract and selected-source preflight for the Auburn map-browser demo.
 
-Reads only the four allowlisted inputs; the other indexed sheets are irrelevant to this
-build. Nothing here writes to data/raw/ or to the receipt ledger (AGENTS.md 2.2), and
-nothing here dates a mapped feature: every value describes a source sheet.
+Reads only the allowlisted inputs of the manifest version it is given: the live four
+editions (version 1) or the staged nine (version 2, #57). Nothing here writes to data/raw/
+or to a receipt ledger (AGENTS.md 2.2), and no value dates a mapped feature.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import tempfile
@@ -16,8 +17,10 @@ from datetime import date
 from pathlib import Path
 
 import click
+import demo_sources
 import numpy as np
 import rasterio
+import shapely
 import warp_raster
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
@@ -27,6 +30,7 @@ from pyproj.transformer import TransformerGroup
 from rasterio.transform import rowcol
 from rasterio.windows import Window
 from shapely.geometry import LineString, Polygon, shape
+from shapely.geometry.polygon import orient
 from source_archive import check_record, load_receipts
 from warp_raster import WarpError
 
@@ -157,6 +161,146 @@ EXPECTED_EDITIONS = {
     },
 }
 
+# --- the staged nine-edition contract (version 2, #57) --------------------------------------
+# Only `check --manifest ...expanded.json` and scripts/demo_expansion.py read it. The live
+# cogs/rasters/build pipeline refuses any manifest but version 1.
+EXPANDED_MANIFEST_PATH = REPO_ROOT / "data/sources/demo-editions-expanded.json"
+EXPANSION_ROOT = BUILD_ROOT / "expansion"
+PDF_RECORD_NAME = "demo-pdf-processing.json"
+EXPANDED_EDITION_ORDER = list(demo_sources.EXPANSION_ORDER)
+INITIAL_EDITION_ID = BASE_EDITION_ID
+US_TOPO_ENTRY_ID = "usgs-us-topo"
+ENTRY_BY_SOURCE_KIND = {
+    "historical_geotiff": SOURCE_ENTRY_ID,
+    "us_topo_pdf": US_TOPO_ENTRY_ID,
+}
+# Index columns a component date is read from, per manifest field.
+COMPONENT_COLUMNS = {
+    "survey_year": "survey_year",
+    "edit_year": "edit_year",
+    "imprint_year": "imprint_year",
+}
+# A source that maps less of the camera footprint than this is the wrong sheet.
+MIN_VIEW_COVERAGE = 0.95
+NO_COMPONENT_DATES = {"survey_year": None, "edit_year": None, "imprint_year": None}
+
+
+def _single_edition_dates(map_year: int, base_year: int | None, base_photography=None) -> dict:
+    """Dates of a sheet that is neither a photorevision nor an orthophotoquad."""
+    return {
+        "map_year": map_year,
+        "base_year": base_year,
+        "revision_year": None,
+        "base_photography": base_photography,
+        "revision_photography": None,
+        "photography": None,
+        "base_field_check_year": None,
+        "revision_field_checked": None,
+    }
+
+
+def _historical(eid: str, **extra) -> dict:
+    """A version-1 edition's contract plus the fields version 2 makes explicit."""
+    return {
+        **EXPECTED_EDITIONS[eid],
+        "source_kind": "historical_geotiff",
+        "sheet_name": "Auburn",
+        "scale": 24000,
+        "native_max_zoom": 16,
+        "publication_date": None,
+        **extra,
+    }
+
+
+# `lineage_column` names the index column that shows a sheet was mapped, not photographed:
+# the regional sheets record a survey or an edit year where the 7.5-minute ones record a
+# field check. Zoom limits are derived from the measured pixel size; `check` re-derives them.
+EXPANDED_EXPECTED_EDITIONS = {
+    "sacramento-1891": {
+        "source_id": "CA_Sacramento_299588_1891_125000",
+        "kind": "topo",
+        "source_kind": "historical_geotiff",
+        "sheet_name": "Sacramento",
+        "scale": 125000,
+        "native_max_zoom": 14,
+        "lineage_column": "survey_year",
+        "publication_date": None,
+        "component_dates": {"survey_year": 1888, "edit_year": None, "imprint_year": None},
+        "dates": _single_edition_dates(1891, 1891),
+    },
+    "auburn-1944": {
+        "source_id": "CA_Auburn_296741_1944_62500",
+        "kind": "topo",
+        "source_kind": "historical_geotiff",
+        "sheet_name": "Auburn",
+        "scale": 62500,
+        "native_max_zoom": 15,
+        "lineage_column": "survey_year",
+        "publication_date": None,
+        "component_dates": {"survey_year": 1941, "edit_year": None, "imprint_year": None},
+        "dates": _single_edition_dates(1944, 1944),
+    },
+    "auburn-1953": _historical(
+        "auburn-1953",
+        lineage_column="field_check_year",
+        component_dates={"survey_year": None, "edit_year": None, "imprint_year": 1955},
+    ),
+    "auburn-1973": _historical(
+        "auburn-1973",
+        lineage_column="field_check_year",
+        component_dates={"survey_year": None, "edit_year": None, "imprint_year": 1977},
+    ),
+    "auburn-1975": _historical(
+        "auburn-1975",
+        lineage_column=None,
+        component_dates={"survey_year": None, "edit_year": None, "imprint_year": 1981},
+    ),
+    "auburn-1981": _historical(
+        "auburn-1981",
+        lineage_column="field_check_year",
+        component_dates={"survey_year": None, "edit_year": 1981, "imprint_year": 1981},
+    ),
+    "sacramento-1994": {
+        "source_id": "CA_Sacramento_299157_1994_100000",
+        "kind": "topo",
+        "source_kind": "historical_geotiff",
+        "sheet_name": "Sacramento",
+        "scale": 100000,
+        "native_max_zoom": 14,
+        "lineage_column": "edit_year",
+        "publication_date": None,
+        "component_dates": {"survey_year": None, "edit_year": 1994, "imprint_year": 1994},
+        "dates": _single_edition_dates(1994, 1994, "1987"),
+    },
+    "auburn-2018": {
+        "source_id": "5d3aeb27e4b01d82ce8d133b",
+        "kind": "topo",
+        "source_kind": "us_topo_pdf",
+        "sheet_name": "Auburn",
+        "scale": 24000,
+        "native_max_zoom": 16,
+        "publication_date": "2018-09-24",
+        "component_dates": NO_COMPONENT_DATES,
+        "dates": _single_edition_dates(2018, None),
+    },
+    "auburn-2021": {
+        "source_id": "61d7a9e2d34ed79294005276",
+        "kind": "topo",
+        "source_kind": "us_topo_pdf",
+        "sheet_name": "Auburn",
+        "scale": 24000,
+        "native_max_zoom": 16,
+        "publication_date": "2021-12-30",
+        "component_dates": NO_COMPONENT_DATES,
+        "dates": _single_edition_dates(2021, None),
+    },
+}
+
+CONTRACTS = {
+    1: {"order": EDITION_ORDER, "expected": EXPECTED_EDITIONS},
+    2: {"order": EXPANDED_EDITION_ORDER, "expected": EXPANDED_EXPECTED_EDITIONS},
+}
+
 
 def fail(message: str) -> None:
     raise click.ClickException(message)
@@ -211,15 +355,23 @@ def check_schema(manifest: dict, schema_path: Path) -> None:
         fail(f"Manifest fails schema at {where}: {first.message}")
 
 
+def contract_for(manifest: dict) -> dict:
+    contract = CONTRACTS.get(manifest.get("version"))
+    if contract is None:
+        fail(f"No edition contract for manifest version {manifest.get('version')!r}")
+    return contract
+
+
 def check_editions_present(manifest: dict) -> list[dict]:
+    order = contract_for(manifest)["order"]
     editions = manifest["editions"]
     ids = [edition["id"] for edition in editions]
     if len(set(ids)) != len(ids):
         fail(f"Duplicate edition id in the manifest: {sorted(ids)}")
     if ids != manifest["edition_order"]:
         fail(f"editions are not in edition_order: {ids} != {manifest['edition_order']}")
-    if ids != EDITION_ORDER:
-        fail(f"Edition set or order differs from the fixed contract: {ids} != {EDITION_ORDER}")
+    if ids != order:
+        fail(f"Edition set or order differs from the fixed contract: {ids} != {order}")
     source_ids = [edition["source_id"] for edition in editions]
     if len(set(source_ids)) != len(source_ids):
         fail(f"Duplicate source_id in the manifest: {sorted(source_ids)}")
@@ -259,13 +411,13 @@ def check_bounds_shape(manifest: dict) -> None:
             )
 
 
-def check_dates(edition: dict, row: dict, base_row: dict) -> None:
+def check_dates(edition: dict, row: dict, base_row: dict, contract: dict | None = None) -> None:
     eid = edition["id"]
     dates = edition["dates"]
     for field in ("base_photography", "revision_photography", "photography"):
         parse_photography(dates[field], f"{eid}.dates.{field}")
 
-    expected = EXPECTED_EDITIONS[eid]["dates"]
+    expected = (contract or EXPECTED_EDITIONS[eid])["dates"]
     if dates != expected:
         differing = sorted(k for k in expected if dates.get(k) != expected[k])
         fail(f"{eid}: dates differ from the fixed contract for {', '.join(differing)}")
@@ -315,17 +467,20 @@ def check_dates(edition: dict, row: dict, base_row: dict) -> None:
         )
 
 
-def check_kind(edition: dict, row: dict) -> None:
+def check_kind(edition: dict, row: dict, contract: dict | None = None) -> None:
     eid = edition["id"]
-    expected = EXPECTED_EDITIONS[eid]
+    expected = contract or EXPECTED_EDITIONS[eid]
     if edition["source_id"] != expected["source_id"]:
         fail(f"{eid}: source_id {edition['source_id']} is not the allowlisted scan variant")
     if edition["kind"] != expected["kind"]:
         fail(f"{eid}: kind {edition['kind']!r} differs from the contract {expected['kind']!r}")
-    # Field-checked lineage is what separates the topo sheets from the orthophotoquad.
+    # Field-checked lineage is what separates the topo sheets from the orthophotoquad; the
+    # regional sheets record a survey or edit year instead.
+    lineage = expected.get("lineage_column") or "field_check_year"
+    if edition["kind"] == "topo" and not row[lineage]:
+        what = "field check" if lineage == "field_check_year" else lineage
+        fail(f"{eid}: index records no {what}, so it is not a topo sheet")
     checked = bool(row["field_check_year"])
-    if edition["kind"] == "topo" and not checked:
-        fail(f"{eid}: index records no field check, so it is not a topo sheet")
     if edition["kind"] == "orthophotoquad":
         if checked:
             fail(f"{eid}: index records a field check, so it is not an orthophotoquad")
@@ -333,29 +488,107 @@ def check_kind(edition: dict, row: dict) -> None:
             fail(f"{eid}: index records no aerial photography year for an orthophotoquad")
 
 
-def check_rights(edition: dict, row: dict, entry: dict) -> None:
+def check_rights(
+    edition: dict, row: dict, entry: dict, entry_id: str = SOURCE_ENTRY_ID
+) -> None:
     eid = edition["id"]
     if row["rights"] != "public_domain":
         fail(f"{eid}: index rights {row['rights']!r} is not public_domain")
     if edition["rights"] != entry["rights"]:
         fail(f"{eid}: rights {edition['rights']!r} != sources.yml {entry['rights']!r}")
     if edition["attribution"] != entry["attribution"]:
-        fail(f"{eid}: attribution does not match sources.yml for {SOURCE_ENTRY_ID}")
+        fail(f"{eid}: attribution does not match sources.yml for {entry_id}")
     if edition["source_url"] != row["sciencebase_url"]:
         fail(f"{eid}: source_url does not match the index sciencebase_url")
     if edition["source_id"] not in edition["citation"]:
         fail(f"{eid}: citation does not name the source ID")
 
 
-def source_entry(path: Path) -> dict:
+def source_entry(path: Path, entry_id: str = SOURCE_ENTRY_ID) -> dict:
     try:
         document = yaml.safe_load(path.read_text(encoding="utf-8"))
     except OSError as exc:
         fail(f"Cannot read {path}: {exc}")
     for entry in document.get("sources", []):
-        if entry.get("id") == SOURCE_ENTRY_ID:
+        if entry.get("id") == entry_id:
             return entry
-    fail(f"{path} has no {SOURCE_ENTRY_ID} entry to take rights and attribution from")
+    fail(f"{path} has no {entry_id} entry to take rights and attribution from")
+
+
+def check_contract_fields(edition: dict, expected: dict) -> None:
+    """The version-2 fields that the allowlist fixes outright."""
+    eid = edition["id"]
+    for field in (
+        "source_kind",
+        "sheet_name",
+        "scale",
+        "native_max_zoom",
+        "publication_date",
+        "component_dates",
+    ):
+        if edition[field] != expected[field]:
+            fail(
+                f"{eid}: {field} {edition[field]!r} differs from the contract "
+                f"{expected[field]!r}"
+            )
+    scale = f"1:{edition['scale']:,}"
+    if edition["sheet_name"] not in edition["citation"] or scale not in edition["citation"]:
+        fail(f"{eid}: citation must name the {edition['sheet_name']} sheet and {scale}")
+    # A regional or 15-minute sheet must never read as a detailed Auburn 7.5-minute map.
+    if (edition["sheet_name"], edition["scale"]) != ("Auburn", 24000) and (
+        edition["sheet_name"] not in edition["label"] or scale not in edition["label"]
+    ):
+        fail(f"{eid}: label must show the {edition['sheet_name']} sheet name and {scale}")
+
+
+def check_historical_fields(edition: dict, row: dict) -> None:
+    """Version-2 fields of a topoView scan, against its own index row."""
+    eid = edition["id"]
+    if edition["scale"] != int(row["scale"]):
+        fail(f"{eid}: scale {edition['scale']} != index scale {row['scale']}")
+    if edition["sheet_name"] != row["map_name"]:
+        fail(f"{eid}: sheet_name {edition['sheet_name']!r} != index map_name")
+    for field, column in COMPONENT_COLUMNS.items():
+        indexed = int(row[column]) if row[column] else None
+        if edition["component_dates"][field] != indexed:
+            fail(f"{eid}: component_dates.{field} disagrees with index {column} {indexed!r}")
+    if edition["printed_credit_note"] is not None:
+        fail(f"{eid}: no printed credit note has been transcribed from this scan; use null")
+
+
+def check_pdf_fields(edition: dict, expected: dict, catalog: dict, entry: dict) -> None:
+    """A US Topo edition against demo-pdf-sources.json and sources.yml usgs-us-topo."""
+    eid = edition["id"]
+    item = catalog.get(edition["source_id"])
+    if item is None or item["edition_id"] != eid:
+        fail(f"{eid}: {edition['source_id']} is not catalogued for this edition")
+    if edition["source_id"] != expected["source_id"]:
+        fail(f"{eid}: source_id {edition['source_id']} is not the allowlisted product")
+    if edition["kind"] != expected["kind"]:
+        fail(f"{eid}: kind {edition['kind']!r} differs from the contract {expected['kind']!r}")
+    if item["rights"]["status"] != "public_domain":
+        fail(f"{eid}: catalog rights {item['rights']['status']!r} is not public_domain")
+    if edition["rights"] != entry["rights"]:
+        fail(f"{eid}: rights {edition['rights']!r} != sources.yml {entry['rights']!r}")
+    if edition["attribution"] != entry["attribution"]:
+        fail(f"{eid}: attribution does not match sources.yml for {US_TOPO_ENTRY_ID}")
+    if edition["source_url"] != item["sciencebase_url"]:
+        fail(f"{eid}: source_url does not match the catalog sciencebase_url")
+    if edition["source_id"] not in edition["citation"]:
+        fail(f"{eid}: citation does not name the source ID")
+    if edition["publication_date"] != item["publication_date"]:
+        fail(f"{eid}: publication_date disagrees with the catalog {item['publication_date']}")
+    if edition["scale"] != item["scale"] or edition["sheet_name"] not in item["title"]:
+        fail(f"{eid}: sheet or scale disagrees with the catalog title and scale")
+    if edition["printed_credit_note"] != item["rights"]["credit_note"]:
+        fail(f"{eid}: printed_credit_note is not the catalog credit note verbatim")
+    if edition["dates"] != expected["dates"]:
+        differing = sorted(
+            k for k in expected["dates"] if edition["dates"][k] != expected["dates"][k]
+        )
+        fail(f"{eid}: dates differ from the fixed contract for {', '.join(differing)}")
+    if edition["dates"]["map_year"] != int(item["publication_date"][:4]):
+        fail(f"{eid}: map_year is not the catalog publication year")
 
 
 def check_metadata(
@@ -363,25 +596,49 @@ def check_metadata(
     schema_path: Path,
     index_path: Path,
     sources_path: Path,
+    catalog_path: Path | None = None,
 ) -> dict[str, Polygon]:
     """Everything verifiable without opening a raster."""
     check_schema(manifest, schema_path)
     if manifest["area_id"] != AREA_ID or manifest["tile_zoom"] != TILE_ZOOM:
         fail("area_id or tile_zoom differs from the fixed contract")
+    expected = contract_for(manifest)["expected"]
     editions = check_editions_present(manifest)
     check_bounds_shape(manifest)
+    if manifest["version"] == 2 and manifest["initial_edition"] != INITIAL_EDITION_ID:
+        fail(f"initial_edition must stay {INITIAL_EDITION_ID}")
     rows = read_index(index_path)
-    entry = source_entry(sources_path)
-    missing = [e["source_id"] for e in editions if e["source_id"] not in rows]
+    entries = {
+        kind: source_entry(sources_path, entry_id)
+        for kind, entry_id in ENTRY_BY_SOURCE_KIND.items()
+        if kind == "historical_geotiff" or manifest["version"] == 2
+    }
+    catalog = {}
+    if manifest["version"] == 2:
+        catalog = demo_sources.load_catalog(catalog_path or demo_sources.CATALOG_PATH)
+    scans = [
+        e
+        for e in editions
+        if e.get("source_kind", "historical_geotiff") == "historical_geotiff"
+    ]
+    missing = [e["source_id"] for e in scans if e["source_id"] not in rows]
     if missing:
         fail(f"Selected source(s) absent from {index_path}: {', '.join(missing)}")
     base_row = rows[EXPECTED_EDITIONS[BASE_EDITION_ID]["source_id"]]
     crops = {}
     for edition in editions:
-        row = rows[edition["source_id"]]
-        check_kind(edition, row)
-        check_rights(edition, row, entry)
-        check_dates(edition, row, base_row)
+        contract = expected[edition["id"]]
+        if manifest["version"] == 2:
+            check_contract_fields(edition, contract)
+        if edition.get("source_kind") == "us_topo_pdf":
+            check_pdf_fields(edition, contract, catalog, entries["us_topo_pdf"])
+        else:
+            row = rows[edition["source_id"]]
+            check_kind(edition, row, contract)
+            check_rights(edition, row, entries["historical_geotiff"])
+            check_dates(edition, row, base_row, contract)
+            if manifest["version"] == 2:
+                check_historical_fields(edition, row)
         crops[edition["id"]] = check_ring(edition)
     return crops
 
@@ -493,11 +750,14 @@ def _graticule_edges(dataset, forward: Transformer, seed: tuple) -> dict[str, di
     return edges
 
 
-def _verify_edges(dataset, edges: dict[str, dict], search: int, path: Path) -> dict:
+def _verify_edges(
+    dataset, edges: dict[str, dict], search: int, path: Path, enforced: set[str] | None
+) -> dict:
     """Check the drawn neatline against the projected graticule at both ends of each edge.
 
     An axis-aligned crop passes a mid-edge check and still cuts metres of map content at
-    the south corners, because the meridians converge (PR #47).
+    the south corners, because the meridians converge (PR #47). With `enforced` set, the
+    limit applies only to those edges and the others are measured and marked (#57).
     """
     locators = {}
     for label, edge in edges.items():
@@ -520,7 +780,9 @@ def _verify_edges(dataset, edges: dict[str, dict], search: int, path: Path) -> d
                 window = Window(band_start, centre - search, band_span, 2 * search + 1)
             measured = _locate(dataset, window, edge["axis"], centre - search, label, end, path)
             residual = measured["pixel"] - graticule
-            if abs(residual) > NEATLINE_TOLERANCE_PX:
+            if abs(residual) > NEATLINE_TOLERANCE_PX and (
+                enforced is None or label in enforced
+            ):
                 fail(
                     f"{path.name}: the drawn {label} neatline is {residual:+.2f} px from the "
                     f"labelled graticule at the {end} end, over the {NEATLINE_TOLERANCE_PX} px "
@@ -532,16 +794,19 @@ def _verify_edges(dataset, edges: dict[str, dict], search: int, path: Path) -> d
         found["max_abs_residual_px"] = max(
             abs(value["residual_px"]) for value in found.values()
         )
+        if enforced is not None:
+            found["enforced"] = label in enforced
         locators[label] = found
     return locators
 
 
-def inspect_source(path: Path, row: dict) -> dict:
+def inspect_source(path: Path, row: dict, enforced: set[str] | None = None) -> dict:
     """Derive the crop from the labelled graticule and verify the drawn neatline against it.
 
     The crop is the graticule quadrilateral, not a rectangle in the source projection: the
     east and west neatlines are meridians and they converge. The scan is read to verify
-    that the drawn line really sits on that quadrilateral at both ends of every edge.
+    that the drawn line really sits on that quadrilateral at both ends of every edge, or
+    of the `enforced` edges only, for a regional sheet whose far edges bound no crop.
     """
     with rasterio.open(path) as dataset:
         if dataset.crs is None:
@@ -577,7 +842,7 @@ def inspect_source(path: Path, row: dict) -> dict:
                 "falls outside the scan."
             )
 
-        locators = _verify_edges(dataset, edges, search, path)
+        locators = _verify_edges(dataset, edges, search, path, enforced)
 
         inverse = Transformer.from_crs(crs, geodetic, always_xy=True)
         shift, datum_note = datum_transformer(geodetic, seed)
@@ -602,7 +867,19 @@ def inspect_source(path: Path, row: dict) -> dict:
             "graticule_labels_source_datum": list(seed),
             "neatline_locators_px": locators,
             "max_abs_neatline_residual_px": max(
-                edge["max_abs_residual_px"] for edge in locators.values()
+                edge["max_abs_residual_px"]
+                for label, edge in locators.items()
+                if enforced is None or label in enforced
+            ),
+            **(
+                {}
+                if enforced is None
+                else {
+                    "enforced_edges": sorted(enforced),
+                    "max_abs_neatline_residual_px_all_edges": max(
+                        edge["max_abs_residual_px"] for edge in locators.values()
+                    ),
+                }
             ),
             "inspection_method": (
                 f"automated: crop = the labelled graticule quadrilateral, {EDGE_SAMPLES + 1} "
@@ -697,6 +974,297 @@ def check_georeferencing(
     return reports
 
 
+# topo_index.csv projection names and the PROJ method each should embed.
+INDEX_PROJECTION_METHODS = {
+    "Polyconic": "American Polyconic",
+    "Lambert Conformal Conic": "Lambert Conic Conformal (2SP)",
+    "Universal Transverse Mercator": "Transverse Mercator",
+}
+UTM_SCALE_FACTOR = 0.9996
+UTM_FALSE_EASTING = 500000.0
+
+
+def seed_of(row: dict) -> tuple[float, float, float, float]:
+    return (float(row["west"]), float(row["south"]), float(row["east"]), float(row["north"]))
+
+
+def bounding_edges(sheet: tuple, view: tuple) -> set[str]:
+    """The sheet's graticule edges that are also edges of the view's graticule.
+
+    Only these bound a crop clipped to the view, so only these must pass the neatline limit.
+    """
+    west, south, east, north = sheet
+    v_west, v_south, v_east, v_north = view
+    lon_span = west <= v_west and v_east <= east
+    lat_span = south <= v_south and v_north <= north
+    edges = set()
+    if west == v_west and lat_span:
+        edges.add("west")
+    if east == v_east and lat_span:
+        edges.add("east")
+    if south == v_south and lon_span:
+        edges.add("south")
+    if north == v_north and lon_span:
+        edges.add("north")
+    return edges
+
+
+def compare_index_crs(row: dict, crs_wkt: str) -> dict:
+    """The index's datum/projection columns against the CRS the scan embeds.
+
+    Positioning always uses the embedded CRS; a disagreement is recorded, not resolved.
+    """
+    crs = CRS.from_wkt(crs_wkt)
+    operation = crs.coordinate_operation
+    parameters = {param.name: param.value for param in operation.params} if operation else {}
+    method = operation.method_name if operation else None
+    datum = crs.geodetic_crs.name if crs.geodetic_crs else None
+    datum_agrees = row["datum"] == "NAD27" and datum == "NAD27"
+    projection_agrees = INDEX_PROJECTION_METHODS.get(row["projection"]) == method
+    if projection_agrees and row["projection"] == "Universal Transverse Mercator":
+        origin = parameters.get("Longitude of natural origin")
+        projection_agrees = (
+            parameters.get("Scale factor at natural origin") == UTM_SCALE_FACTOR
+            and parameters.get("False easting") == UTM_FALSE_EASTING
+            and origin is not None
+            and (origin + 183) % 6 == 0
+        )
+    return {
+        "index_datum": row["datum"],
+        "index_projection": row["projection"],
+        "embedded_datum": datum,
+        "embedded_projection": method,
+        "embedded_parameters": {name: round(value, 6) for name, value in parameters.items()},
+        "agrees": datum_agrees and projection_agrees,
+    }
+
+
+def native_max_zoom(pixel_metres: float, latitude: float) -> int:
+    """The coarsest XYZ zoom whose ground pixel at `latitude` is no larger than a source pixel.
+
+    Tiling finer than this adds no source detail; a camera beyond it overzooms this level.
+    For the 2.03 m Auburn scans it gives 16, the live pyramid's top zoom.
+    """
+    ground = (
+        2 * warp_raster._mercator_origin() * math.cos(math.radians(latitude))
+    ) / warp_raster.TILE_SIZE
+    return math.ceil(math.log2(ground / pixel_metres))
+
+
+def clip_to_view(face: Polygon, view: Polygon) -> dict:
+    """The part of a source's verified map face inside the camera footprint, as GeoJSON.
+
+    Where the face covers the whole view to within the crop tolerance, the crop is the view
+    itself, so a regional sheet shows exactly the area the Auburn editions show.
+    """
+    if view.within(face.buffer(POSITION_TOLERANCE_DEG)):
+        clipped = view
+    else:
+        clipped = view.intersection(face)
+    clipped = shapely.set_precision(clipped, 10.0**-COORD_DECIMALS)
+    if clipped.is_empty or clipped.geom_type != "Polygon":
+        fail("The source face does not overlap the view footprint in one polygon.")
+    ring = [[q6(x), q6(y)] for x, y in orient(clipped, sign=1.0).exterior.coords]
+    return {"type": "Polygon", "coordinates": [ring]}
+
+
+def resolve_pdf_sources(
+    selection: dict[str, str],
+    ledger_path: Path,
+    raw_root: Path,
+    expansion_root: Path,
+) -> dict[str, dict]:
+    """Each US Topo edition's COG, traced to its receipted PDF through the E2 record (#56).
+
+    The PDF is re-hashed in place; the COG must be the one the record says that PDF made.
+    """
+    record_path = expansion_root / PDF_RECORD_NAME
+    if not record_path.is_file():
+        fail(f"No {PDF_RECORD_NAME} at {record_path}; run make expansion-pdf first.")
+    record = read_json(record_path)
+    rendered = {entry["edition_id"]: entry for entry in record.get("sources", [])}
+    receipts = demo_sources.load_ledger(ledger_path)
+    resolved = {}
+    for edition_id, source_id in selection.items():
+        receipt = receipts.get(source_id)
+        if receipt is None:
+            fail(f"{edition_id}: no PDF receipt for {source_id}; run make expansion-fetch")
+        try:
+            pdf_path = demo_sources.verify_receipted(receipt, raw_root)
+        except FileNotFoundError:
+            fail(f"{edition_id}: receipted PDF bytes are missing at {receipt['path']}")
+        except click.ClickException as exc:
+            fail(f"{edition_id}: {exc.format_message()}")
+        source = rendered.get(edition_id)
+        if source is None:
+            fail(f"{edition_id}: {PDF_RECORD_NAME} has no render; run make expansion-pdf")
+        if source["source_id"] != source_id or (
+            source["source"]["sha256"],
+            source["source"]["size_bytes"],
+        ) != (receipt["sha256"], receipt["size_bytes"]):
+            fail(f"{edition_id}: the recorded render is not of the receipted PDF bytes")
+        if source.get("neatline") is None:
+            fail(f"{edition_id}: the recorded render has no measured neatline to crop to")
+        cog = expansion_root / "pdf" / f"{edition_id}.tif"
+        if not cog.is_file():
+            fail(f"{edition_id}: rendered COG missing at {cog}; run make expansion-pdf")
+        if warp_raster.sha256_file(cog) != (
+            source["raster"]["sha256"],
+            source["raster"]["byte_count"],
+        ):
+            fail(f"{edition_id}: {cog.name} differs from {PDF_RECORD_NAME}; rerun it")
+        resolved[edition_id] = {
+            "path": cog,
+            "pdf_path": pdf_path,
+            "pdf_receipt": receipt,
+            "pdf_source": source,
+        }
+    return resolved
+
+
+def _projected_ring(corners: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """A closed ring through `corners`, densified along straight edges between them."""
+    points = []
+    for (x0, y0), (x1, y1) in zip(corners, corners[1:] + corners[:1], strict=True):
+        for step in range(EDGE_SAMPLES + 1):
+            t = step / (EDGE_SAMPLES + 1)
+            points.append((x0 + t * (x1 - x0), y0 + t * (y1 - y0)))
+    points.append(points[0])
+    return points
+
+
+def inspect_pdf_cog(path: Path, source: dict) -> dict:
+    """The rendered US Topo page's map face and extent in WGS84, from its drawn neatline.
+
+    make expansion-pdf measured the neatline corners from the PDF's vector content. The page
+    is affine in its UTM CRS, so the face's edges are straight in that CRS.
+    """
+    with rasterio.open(path) as dataset:
+        crs = CRS.from_user_input(dataset.crs)
+        if crs.to_epsg() != source["georeferencing"]["epsg"]:
+            fail(
+                f"{path.name}: CRS is not the recorded EPSG:{source['georeferencing']['epsg']}"
+            )
+        transform = dataset.transform
+        width, height = dataset.width, dataset.height
+    c, a, b, f, d, e = source["georeferencing"]["geotransform"]
+    if not np.allclose(transform[:6], (a, b, c, d, e, f), rtol=0, atol=1e-6):
+        fail(f"{path.name}: geotransform differs from the recorded PDF georeferencing")
+    geodetic = crs.geodetic_crs
+    box = source["nominal_box"]
+    seed = (box["west"], box["south"], box["east"], box["north"])
+    shift, datum_note = datum_transformer(geodetic, seed)
+    inverse = Transformer.from_crs(crs, geodetic, always_xy=True)
+
+    def to_wgs84(pixels: list[tuple[float, float]]) -> list[list[float]]:
+        projected = [transform * point for point in pixels]
+        lons, lats = inverse.transform(*zip(*projected, strict=True))
+        lons, lats = shift.transform(lons, lats)
+        return [[float(lon), float(lat)] for lon, lat in zip(lons, lats, strict=True)]
+
+    corners = source["neatline"]["corners"]
+    # Counterclockwise on the ground, the order `_ring` gives the scan crops.
+    face = [
+        tuple(corners[name]["pixel"])
+        for name in ("lower_left", "lower_right", "upper_right", "upper_left")
+    ]
+    extent = [(0.0, float(height)), (float(width), float(height)), (float(width), 0.0), (0, 0)]
+    return {
+        "path": path.name,
+        "crs_wkt": crs.to_wkt(),
+        "projection": crs.coordinate_operation.method_name,
+        "datum": geodetic.name,
+        "size_px": [width, height],
+        "pixel_size_metres": round(math.hypot(transform.a, transform.d), 4),
+        "graticule_labels_source_datum": list(seed),
+        "datum_transformation": datum_note,
+        "inspection_method": (
+            "automated: face = the drawn Map Frame neatline that make expansion-pdf measured, "
+            f"{EDGE_SAMPLES + 1} points per straight edge in the page's UTM CRS, through the "
+            "named datum operation"
+        ),
+        "neatline_offset_from_nominal_m": source["nominal_offset"]["max_distance_m"],
+        "gpts_max_residual_m": source["georeferencing"]["max_residual_m"],
+        "face_wgs84": {"type": "Polygon", "coordinates": [to_wgs84(_projected_ring(face))]},
+        "source_footprint_wgs84": {
+            "type": "Polygon",
+            "coordinates": [to_wgs84(_projected_ring(extent))],
+        },
+    }
+
+
+def check_expanded_georeferencing(
+    manifest: dict,
+    index_path: Path,
+    resolved: dict[str, dict],
+    crops: dict[str, Polygon],
+) -> dict[str, dict]:
+    """Version 2: the four view editions as in version 1, then each added source's face."""
+    rows = read_index(index_path)
+    view_manifest = {
+        "editions": [e for e in manifest["editions"] if e["id"] in EDITION_ORDER],
+        "view_bounds_wgs84": manifest["view_bounds_wgs84"],
+    }
+    reports = check_georeferencing(view_manifest, index_path, resolved, crops)
+    view = common_footprint(view_manifest)
+    view_seed = seed_of(rows[EXPECTED_EDITIONS[BASE_EDITION_ID]["source_id"]])
+    _, south, _, north = manifest["view_bounds_wgs84"]
+    latitude = (south + north) / 2
+    zoom = manifest["tile_zoom"]
+    for edition in manifest["editions"]:
+        eid = edition["id"]
+        if eid in reports:
+            report = reports[eid]
+            report["index_crs"] = compare_index_crs(
+                rows[edition["source_id"]], report["crs_wkt"]
+            )
+        elif edition["source_kind"] == "historical_geotiff":
+            row = rows[edition["source_id"]]
+            enforced = bounding_edges(seed_of(row), view_seed)
+            if not enforced:
+                fail(f"{eid}: no neatline of the sheet bounds the view; the crop is unverified")
+            report = inspect_source(resolved[eid]["path"], row, enforced)
+            report["face_wgs84"] = report["crop_wgs84"]
+            report["index_crs"] = compare_index_crs(row, report["crs_wkt"])
+        else:
+            report = inspect_pdf_cog(resolved[eid]["path"], resolved[eid]["pdf_source"])
+        if eid not in EDITION_ORDER:
+            face = shape(report["face_wgs84"])
+            expected = shape(clip_to_view(face, view))
+            drift = expected.hausdorff_distance(crops[eid])
+            if drift > POSITION_TOLERANCE_DEG:
+                fail(
+                    f"{eid}: crop_wgs84 is {drift:.6f} deg off the source face clipped to the "
+                    "view; re-derive it with demo.py inspect-expanded"
+                )
+            if not crops[eid].within(view.buffer(POSITION_TOLERANCE_DEG)):
+                fail(f"{eid}: crop_wgs84 extends past the view footprint")
+            report["crop_wgs84"] = edition["crop_wgs84"]
+        if not crops[eid].within(shape(report["source_footprint_wgs84"])):
+            fail(f"{eid}: crop_wgs84 falls outside the georeferenced source footprint")
+        coverage = crops[eid].intersection(view).area / view.area
+        if coverage < MIN_VIEW_COVERAGE:
+            fail(
+                f"{eid}: the source maps {coverage:.1%} of the view footprint, under the "
+                f"{MIN_VIEW_COVERAGE:.0%} floor; it is not a sheet of this area"
+            )
+        pixel = report["pixel_size_metres"]
+        if edition["native_resolution_metres"] != round(pixel, 2):
+            fail(f"{eid}: native_resolution_metres is not the measured {pixel} m pixel")
+        derived = native_max_zoom(pixel, latitude)
+        if edition["native_max_zoom"] != derived:
+            fail(
+                f"{eid}: native_max_zoom {edition['native_max_zoom']} is not the {derived} "
+                f"that its measured {pixel} m pixel supports"
+            )
+        if not zoom["min"] <= derived <= zoom["max"]:
+            fail(f"{eid}: native zoom {derived} is outside tile_zoom {zoom}")
+        report["view_coverage_fraction"] = round(coverage, 6)
+        report["native_max_zoom"] = derived
+        reports[eid] = report
+    return reports
+
+
 def run_check(
     manifest_path: Path,
     schema_path: Path,
@@ -704,12 +1272,30 @@ def run_check(
     receipts_path: Path,
     sources_path: Path,
     raw_root: Path,
+    catalog_path: Path | None = None,
+    ledger_path: Path | None = None,
+    expansion_root: Path | None = None,
 ) -> dict:
     manifest = read_json(manifest_path)
-    crops = check_metadata(manifest, schema_path, index_path, sources_path)
-    selection = {e["id"]: e["source_id"] for e in manifest["editions"]}
-    resolved = resolve_selected(selection, receipts_path, raw_root)
-    reports = check_georeferencing(manifest, index_path, resolved, crops)
+    crops = check_metadata(manifest, schema_path, index_path, sources_path, catalog_path)
+    if manifest["version"] == 1:
+        selection = {e["id"]: e["source_id"] for e in manifest["editions"]}
+        resolved = resolve_selected(selection, receipts_path, raw_root)
+        reports = check_georeferencing(manifest, index_path, resolved, crops)
+        return {"manifest": manifest, "resolved": resolved, "reports": reports}
+    by_kind = {kind: {} for kind in ENTRY_BY_SOURCE_KIND}
+    for edition in manifest["editions"]:
+        by_kind[edition["source_kind"]][edition["id"]] = edition["source_id"]
+    resolved = resolve_selected(by_kind["historical_geotiff"], receipts_path, raw_root)
+    resolved.update(
+        resolve_pdf_sources(
+            by_kind["us_topo_pdf"],
+            ledger_path or demo_sources.LEDGER_PATH,
+            raw_root,
+            expansion_root or EXPANSION_ROOT,
+        )
+    )
+    reports = check_expanded_georeferencing(manifest, index_path, resolved, crops)
     return {"manifest": manifest, "resolved": resolved, "reports": reports}
 
 
@@ -913,6 +1499,11 @@ def run_cogs(
     zoom: int | None = None,
 ) -> dict:
     """Warp the four verified sources onto one EPSG:3857 grid and record how it was done."""
+    if read_json(manifest_path).get("version") != 1:
+        fail(
+            "demo-cogs and demo-rasters build only the live version-1 manifest; the staged "
+            "nine-edition manifest is built by make expansion-rasters into build/expansion/."
+        )
     checked = run_check(
         manifest_path, schema_path, index_path, receipts_path, sources_path, raw_root
     )
@@ -1282,27 +1873,91 @@ def _common_options(command):
     return command
 
 
+def _expansion_options(command):
+    """Inputs only a version-2 manifest reads: the PDF catalog, its ledger and the E2 output."""
+    options = [
+        click.option(
+            "--catalog",
+            "catalog_path",
+            type=click.Path(path_type=Path),
+            default=demo_sources.CATALOG_PATH,
+            show_default=False,
+        ),
+        click.option(
+            "--ledger",
+            "ledger_path",
+            type=click.Path(path_type=Path),
+            default=demo_sources.LEDGER_PATH,
+            show_default=False,
+        ),
+        click.option(
+            "--expansion-root",
+            "expansion_root",
+            type=click.Path(path_type=Path),
+            default=EXPANSION_ROOT,
+            show_default=False,
+        ),
+    ]
+    for option in reversed(options):
+        command = option(command)
+    return command
+
+
+def describe_source(resolved: dict) -> str:
+    """One line of byte lineage for a checked edition, either source kind."""
+    if "pdf_receipt" in resolved:
+        receipt, raster = resolved["pdf_receipt"], resolved["pdf_source"]["raster"]
+        return (
+            f"{receipt['source_id']} pdf sha256={receipt['sha256']} "
+            f"bytes={receipt['size_bytes']}"
+            f" -> cog sha256={raster['sha256']}"
+        )
+    record = resolved["record"]
+    return f"{record['topo_id']} sha256={record['sha256']} bytes={record['byte_count']}"
+
+
 @cli.command()
 @_common_options
+@_expansion_options
 def check(
-    manifest_path, schema_path, index_path, receipts_path, sources_path, raw_root
+    manifest_path,
+    schema_path,
+    index_path,
+    receipts_path,
+    sources_path,
+    raw_root,
+    catalog_path,
+    ledger_path,
+    expansion_root,
 ) -> None:
-    """Verify the manifest contract and the four selected sources. Writes nothing."""
+    """Verify the manifest contract and its selected sources. Writes nothing."""
     result = run_check(
-        manifest_path, schema_path, index_path, receipts_path, sources_path, raw_root
+        manifest_path,
+        schema_path,
+        index_path,
+        receipts_path,
+        sources_path,
+        raw_root,
+        catalog_path,
+        ledger_path,
+        expansion_root,
     )
     for eid in result["manifest"]["edition_order"]:
-        record = result["resolved"][eid]["record"]
         report = result["reports"][eid]
+        extra = ""
+        if result["manifest"]["version"] == 2:
+            extra = (
+                f"; {report['pixel_size_metres']} m/px -> native zoom "
+                f"{report['native_max_zoom']}; view coverage {report['view_coverage_fraction']}"
+            )
         click.echo(
-            f"{eid}: {record['topo_id']} sha256={record['sha256']} "
-            f"bytes={record['byte_count']} {report['datum']}/"
-            f"{report['projection']} -> {report['datum_transformation']['description']}"
+            f"{eid}: {describe_source(result['resolved'][eid])} {report['datum']}/"
+            f"{report['projection']} -> {report['datum_transformation']['description']}{extra}"
         )
     west, south, east, north = result["manifest"]["view_bounds_wgs84"]
     click.echo(
-        f"demo-check: 4 public editions verified; common footprint "
-        f"{west}, {south}, {east}, {north}; zoom "
+        f"demo-check: {len(result['manifest']['editions'])} public editions verified; "
+        f"common footprint {west}, {south}, {east}, {north}; zoom "
         f"{result['manifest']['tile_zoom']['min']}-{result['manifest']['tile_zoom']['max']}"
     )
 
@@ -1561,6 +2216,96 @@ def inspect(index_path, receipts_path, raw_root) -> None:
             sort_keys=True,
         )
     )
+
+
+def derive_added_editions(
+    view_manifest: dict,
+    index_path: Path,
+    receipts_path: Path,
+    raw_root: Path,
+    ledger_path: Path,
+    expansion_root: Path,
+) -> dict[str, dict]:
+    """Geometry, pixel size and zoom limit of the five added sources, from the allowlist.
+
+    `view_manifest` supplies the verified crops of the four view editions. `check` recomputes
+    every value here and compares it with the committed version-2 manifest.
+    """
+    rows = read_index(index_path)
+    view = common_footprint(view_manifest)
+    view_seed = seed_of(rows[EXPECTED_EDITIONS[BASE_EDITION_ID]["source_id"]])
+    _, south, _, north = view_manifest["view_bounds_wgs84"]
+    added = [eid for eid in EXPANDED_EDITION_ORDER if eid not in EDITION_ORDER]
+    scans = {
+        eid: EXPANDED_EXPECTED_EDITIONS[eid]["source_id"]
+        for eid in added
+        if EXPANDED_EXPECTED_EDITIONS[eid]["source_kind"] == "historical_geotiff"
+    }
+    pdfs = {
+        eid: EXPANDED_EXPECTED_EDITIONS[eid]["source_id"] for eid in added if eid not in scans
+    }
+    resolved = resolve_selected(scans, receipts_path, raw_root)
+    resolved.update(resolve_pdf_sources(pdfs, ledger_path, raw_root, expansion_root))
+    payload = {}
+    for eid in added:
+        if eid in scans:
+            row = rows[scans[eid]]
+            report = inspect_source(
+                resolved[eid]["path"], row, bounding_edges(seed_of(row), view_seed)
+            )
+            report["face_wgs84"] = report["crop_wgs84"]
+            report["index_crs"] = compare_index_crs(row, report["crs_wkt"])
+        else:
+            report = inspect_pdf_cog(resolved[eid]["path"], resolved[eid]["pdf_source"])
+        report["crop_wgs84"] = clip_to_view(shape(report["face_wgs84"]), view)
+        report["view_coverage_fraction"] = round(
+            shape(report["crop_wgs84"]).area / view.area, 6
+        )
+        report["native_resolution_metres"] = round(report["pixel_size_metres"], 2)
+        report["native_max_zoom"] = native_max_zoom(
+            report["pixel_size_metres"], (south + north) / 2
+        )
+        payload[eid] = report
+    return payload
+
+
+@cli.command("inspect-expanded")
+@click.option(
+    "--manifest", "manifest_path", type=click.Path(path_type=Path), default=MANIFEST_PATH
+)
+@click.option("--index", "index_path", type=click.Path(path_type=Path), default=INDEX_PATH)
+@click.option(
+    "--receipts", "receipts_path", type=click.Path(path_type=Path), default=RECEIPTS_PATH
+)
+@click.option(
+    "--raw-root",
+    "raw_root",
+    type=click.Path(path_type=Path),
+    envvar="DEMO_RAW_ROOT",
+    default=RAW_ROOT,
+)
+@click.option(
+    "--ledger", "ledger_path", type=click.Path(path_type=Path), default=demo_sources.LEDGER_PATH
+)
+@click.option(
+    "--expansion-root",
+    "expansion_root",
+    type=click.Path(path_type=Path),
+    default=EXPANSION_ROOT,
+)
+def inspect_expanded(
+    manifest_path, index_path, receipts_path, raw_root, ledger_path, expansion_root
+) -> None:
+    """Print the derived crop, pixel size and zoom limit of each added edition.
+
+    The view comes from the live manifest's verified crops, so this can author the version-2
+    manifest that `check` later verifies.
+    """
+    manifest = read_json(manifest_path)
+    payload = derive_added_editions(
+        manifest, index_path, receipts_path, raw_root, ledger_path, expansion_root
+    )
+    click.echo(json.dumps({"editions": payload}, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

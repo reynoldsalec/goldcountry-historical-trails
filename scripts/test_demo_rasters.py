@@ -359,7 +359,8 @@ def test_the_record_holds_versions_hashes_transform_crop_and_digests(tree, tmp_p
     assert record["tool_versions"]["proj_gdal"] == rasterio.__proj_version__
     assert record["tool_versions"]["proj_pyproj"]
     assert record["grid"]["transform"]
-    assert [entry["id"] for entry in record["editions"]] == list(demo.EDITION_ORDER)
+    assert [entry["id"] for entry in record["editions"]] == tree.manifest["edition_order"]
+    assert tree.manifest["edition_order"] == demo.contract_for(tree.manifest)["order"]
     manifest_crops = {e["id"]: e["crop_wgs84"] for e in tree.manifest["editions"]}
     for entry in record["editions"]:
         output = build_root / demo.RASTER_DIRNAME / f"{entry['id']}.tif"
@@ -909,7 +910,7 @@ def test_all_four_pyramids_are_produced_over_the_manifest_zoom_range(tree, tmp_p
     tiles = tiles_record(build_root)
     assert tiles["scheme"] == "xyz"
     assert tiles["zoom"] == {"min": tree.manifest["tile_zoom"]["min"], "max": TEST_ZOOM}
-    assert [entry["id"] for entry in tiles["editions"]] == list(demo.EDITION_ORDER)
+    assert [entry["id"] for entry in tiles["editions"]] == tree.manifest["edition_order"]
     grid = record_of(build_root)["grid"]
     for entry in tiles["editions"]:
         root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR / entry["id"]
