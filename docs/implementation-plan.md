@@ -51,6 +51,56 @@ also cites other source data; its imagery year must not be presented as universa
 Source card wording must distinguish base versus revision and say revisions were not
 field checked where applicable. Preserve the existing legal-framing safeguards.
 
+### Nine-edition expansion (owner-approved 2026-09-29, issue #55)
+
+The owner approved nine editions in this display order: sacramento-1891, auburn-1944,
+auburn-1953, auburn-1973, auburn-1975, auburn-1981, sacramento-1994, auburn-2018,
+auburn-2021. The 1953 edition stays the initial selection and the four IDs above stay
+unchanged. This replaces the four-edition cap and the 1950 start date for raster display
+only. It does not change evidence, privacy or legal-copy rules or expand trail-data claims.
+
+| Edition ID | Exact source | Product | Note |
+| --- | --- | --- | --- |
+| sacramento-1891 | `CA_Sacramento_299588_1891_125000` | historical topo GeoTIFF | Regional Sacramento sheet, 1:125,000 |
+| auburn-1944 | `CA_Auburn_296741_1944_62500` | historical topo GeoTIFF | Auburn 15-minute sheet, 1:62,500 |
+| sacramento-1994 | `CA_Sacramento_299157_1994_100000` | historical topo GeoTIFF | Regional Sacramento sheet, 1:100,000 |
+| auburn-2018 | ScienceBase `5d3aeb27e4b01d82ce8d133b` | US Topo geospatial PDF | 1:24,000, published 2018-09-24 |
+| auburn-2021 | ScienceBase `61d7a9e2d34ed79294005276` | US Topo geospatial PDF | 1:24,000, published 2021-12-30 |
+
+Label the 1891 and 1994 editions as regional Sacramento sheets with their original
+names and scales. Never present them as detailed Auburn 7.5-minute editions. Keep the
+shared Auburn camera bounds. A source date is a publication or revision date, never the
+date of every feature. No 2012 or 2015 US Topo product; their metadata warns of
+commercial road data.
+
+**E1 (issue #55) — acquire and catalog.** `scripts/demo_sources.py` owns this step:
+
+- The three TIFFs are verified and reused through their `existing_file` receipts in
+  `retrievals.jsonl` (`retrieved_at: null`). `data/sources/demo-expansion-topo.json`
+  names them in the `fetch_topoview.py --selection` format. No new TIFF receipt.
+- The two PDFs are cataloged in `data/sources/demo-pdf-sources.json`
+  (`schema/demo-pdf-source.schema.json`): title, publication date, scale, ScienceBase,
+  download and metadata URLs, the metadata hash and retrieval time, the metadata
+  bounding box as published, verbatim `useconst` and `srcinfo` statements for roads,
+  trails and orthoimagery, and the printed credit note.
+- `make expansion-fetch` writes each PDF once to
+  `<raw root>/us-topo/sha256/<first two hex>/<sha256>.pdf` through a temporary file and
+  link, then appends one receipt to `data/sources/demo-pdf-retrievals.jsonl`
+  (`schema/demo-pdf-retrieval.schema.json`) under the shared `.retrievals.lock`. It
+  rejects HTML, missing or short Content-Length, missing `%PDF-` or `%%EOF`, and any
+  mismatch with an earlier receipt. It never replaces bytes.
+- `make expansion-check` is offline. It reports full-file SHA-256 and byte count for
+  each of the five against its receipt, or a precise blocked status, and lists open
+  processing blockers separately. It fails if any of the five is in the live manifest.
+- Rights for 2018 and 2021 are resolved: each printed credit note reads "Roads ... U.S.
+  Census Bureau, 2016" with no copyright notice. See the catalog `rights.resolution`.
+- PDF backup is not verified. `backup-sources` and `verify-backup` cover only
+  `retrievals.jsonl`.
+
+Later expansion steps own georeferencing extraction with a PDF-capable GDAL, layer
+selection, registration review, crops, per-edition native zoom limits and the manifest
+change. They fail on absent geo metadata, unsupported projections or unresolved rights.
+
 ### Manifest contract (to implement, not an existing file)
 
 Create `data/sources/demo-editions.json`, checked by

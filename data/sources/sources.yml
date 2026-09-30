@@ -66,6 +66,28 @@ sources:
       The derived content_year is a sorting aid, not a feature observation date.
       See docs/topo-editions.md.
 
+  - id: usgs-us-topo
+    title: USGS US Topo 7.5-minute layered geospatial PDF maps
+    url: https://www.usgs.gov/programs/national-geospatial-program/us-topo-maps-america
+    rights: public_domain
+    sensitivity: public
+    attribution: "US Topo maps: U.S. Geological Survey"
+    used_for: >-
+      Expansion candidates only (issue #55): the 2018 and 2021 Auburn, CA US Topo
+      PDFs, ScienceBase 5d3aeb27e4b01d82ce8d133b and 61d7a9e2d34ed79294005276.
+      Catalog in data/sources/demo-pdf-sources.json, receipts in
+      data/sources/demo-pdf-retrievals.jsonl, bytes under data/raw/us-topo/. Fetch
+      with `make expansion-fetch`, verify with `make expansion-check`. Not yet in
+      data/sources/demo-editions.json.
+    caution: >-
+      The metadata useconst says US Topo maps dated 2010-2015 may contain copyrighted
+      commercial road data. Both selected maps print "Roads ... U.S. Census Bureau,
+      2016" in their credit note, so that caveat does not apply to them; 2012 and 2015
+      products stay out of scope. Each map's printed credit note must travel with any
+      published tile as source-card attribution. A US Topo layer is a compilation of
+      modern GIS data, not a field-checked historical observation; recreational
+      trails on it do not establish public access.
+
   - id: usgs-earthexplorer-aerials
     title: USGS EarthExplorer — Aerial Photo Single Frames
     url: https://earthexplorer.usgs.gov/

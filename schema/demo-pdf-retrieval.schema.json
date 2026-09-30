@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "US Topo geospatial PDF retrieval receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "source_id",
+    "source_url",
+    "retrieval_url",
+    "retrieved_at",
+    "sha256",
+    "size_bytes",
+    "path",
+    "metadata_url"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "source_id": { "type": "string", "pattern": "^[0-9a-f]{24}$" },
+    "source_url": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "retrieval_url": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "retrieved_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "size_bytes": { "type": "integer", "minimum": 1 },
+    "path": {
+      "type": "string",
+      "pattern": "^us-topo/sha256/[0-9a-f]{2}/[0-9a-f]{64}\\.pdf$"
+    },
+    "metadata_url": { "type": "string", "format": "uri", "pattern": "^https://" }
+  }
+}
