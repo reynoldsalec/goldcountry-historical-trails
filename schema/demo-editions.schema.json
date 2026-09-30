@@ -1,26 +1,85 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Auburn map-browser edition manifest",
-  "description": "Display metadata and verified crop footprint for the four selected Auburn editions. Dates describe the source sheet, never the age of an individual mapped feature.",
+  "description": "Display metadata and verified crop footprint for the allowlisted Auburn editions. Version 1 is the live four-edition manifest; version 2 is the staged nine-edition manifest. Dates describe the source sheet, never the age of an individual mapped feature.",
   "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "version",
-    "area_id",
-    "edition_order",
-    "view_bounds_wgs84",
-    "tile_zoom",
-    "editions"
-  ],
+  "required": ["version"],
   "properties": {
-    "version": {
-      "const": 1
+    "version": { "enum": [1, 2] }
+  },
+  "if": { "properties": { "version": { "const": 1 } } },
+  "then": { "$ref": "#/$defs/manifest_v1" },
+  "else": { "$ref": "#/$defs/manifest_v2" },
+  "$defs": {
+    "manifest_v1": {
+      "description": "The live four-edition manifest (data/sources/demo-editions.json).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "area_id",
+        "edition_order",
+        "view_bounds_wgs84",
+        "tile_zoom",
+        "editions"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "area_id": { "const": "auburn" },
+        "edition_order": {
+          "const": ["auburn-1953", "auburn-1973", "auburn-1975", "auburn-1981"]
+        },
+        "view_bounds_wgs84": { "$ref": "#/$defs/view_bounds_wgs84" },
+        "tile_zoom": { "$ref": "#/$defs/tile_zoom" },
+        "editions": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/edition_v1" }
+        }
+      }
     },
-    "area_id": {
-      "const": "auburn"
-    },
-    "edition_order": {
-      "const": ["auburn-1953", "auburn-1973", "auburn-1975", "auburn-1981"]
+    "manifest_v2": {
+      "description": "The staged nine-edition manifest (data/sources/demo-editions-expanded.json). Camera bounds and zoom are those of version 1.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "area_id",
+        "edition_order",
+        "initial_edition",
+        "view_bounds_wgs84",
+        "tile_zoom",
+        "editions"
+      ],
+      "properties": {
+        "version": { "const": 2 },
+        "area_id": { "const": "auburn" },
+        "edition_order": {
+          "const": [
+            "sacramento-1891",
+            "auburn-1944",
+            "auburn-1953",
+            "auburn-1973",
+            "auburn-1975",
+            "auburn-1981",
+            "sacramento-1994",
+            "auburn-2018",
+            "auburn-2021"
+          ]
+        },
+        "initial_edition": { "const": "auburn-1953" },
+        "view_bounds_wgs84": { "$ref": "#/$defs/view_bounds_wgs84" },
+        "tile_zoom": { "$ref": "#/$defs/tile_zoom" },
+        "editions": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/edition_v2" }
+        }
+      }
     },
     "view_bounds_wgs84": {
       "description": "[west, south, east, north] of the common mapped footprint, after datum transformation to WGS84.",
@@ -44,28 +103,124 @@
         "max": { "const": 16 }
       }
     },
-    "editions": {
-      "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
-      "uniqueItems": true,
-      "items": { "$ref": "#/$defs/edition" }
-    }
-  },
-  "$defs": {
     "year": {
       "type": "integer",
       "minimum": 1800,
       "maximum": 2100
+    },
+    "nullable_year": {
+      "oneOf": [{ "$ref": "#/$defs/year" }, { "type": "null" }]
     },
     "photography_date": {
       "description": "YYYY or YYYY-MM-DD. Calendar validity is enforced by scripts/demo.py.",
       "type": ["string", "null"],
       "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$"
     },
-    "edition": {
+    "edition_v1": {
+      "description": "An edition of the live four-edition manifest.",
+      "$ref": "#/$defs/edition_fields",
+      "properties": {
+        "id": {
+          "enum": ["auburn-1953", "auburn-1973", "auburn-1975", "auburn-1981"]
+        },
+        "source_id": {
+          "enum": [
+            "CA_Auburn_288101_1953_24000",
+            "CA_Auburn_288103_1953_24000",
+            "CA_Auburn_288104_1975_24000",
+            "CA_Auburn_288105_1953_24000"
+          ]
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "edition_v2": {
+      "description": "An edition of the staged nine-edition manifest. Source kind, sheet, scale and zoom limit are explicit, never inferred from the ID.",
+      "$ref": "#/$defs/edition_fields",
+      "required": [
+        "source_kind",
+        "sheet_name",
+        "scale",
+        "publication_date",
+        "component_dates",
+        "printed_credit_note",
+        "native_resolution_metres",
+        "native_max_zoom"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "sacramento-1891",
+            "auburn-1944",
+            "auburn-1953",
+            "auburn-1973",
+            "auburn-1975",
+            "auburn-1981",
+            "sacramento-1994",
+            "auburn-2018",
+            "auburn-2021"
+          ]
+        },
+        "source_id": {
+          "enum": [
+            "CA_Sacramento_299588_1891_125000",
+            "CA_Auburn_296741_1944_62500",
+            "CA_Auburn_288101_1953_24000",
+            "CA_Auburn_288103_1953_24000",
+            "CA_Auburn_288104_1975_24000",
+            "CA_Auburn_288105_1953_24000",
+            "CA_Sacramento_299157_1994_100000",
+            "5d3aeb27e4b01d82ce8d133b",
+            "61d7a9e2d34ed79294005276"
+          ]
+        },
+        "source_kind": {
+          "description": "historical_geotiff: a topoView scan with a retrievals.jsonl receipt. us_topo_pdf: a US Topo geospatial PDF with a demo-pdf-retrievals.jsonl receipt, rendered by make expansion-pdf.",
+          "enum": ["historical_geotiff", "us_topo_pdf"]
+        },
+        "sheet_name": { "type": "string", "minLength": 1 },
+        "scale": {
+          "description": "Denominator of the printed map scale.",
+          "enum": [24000, 62500, 100000, 125000]
+        },
+        "publication_date": {
+          "description": "The publisher's full date for the product, or null where only a year is known.",
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "component_dates": {
+          "description": "Per-sheet index years not carried in dates; null where the index has none.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["survey_year", "edit_year", "imprint_year"],
+          "properties": {
+            "survey_year": { "$ref": "#/$defs/nullable_year" },
+            "edit_year": { "$ref": "#/$defs/nullable_year" },
+            "imprint_year": { "$ref": "#/$defs/nullable_year" }
+          }
+        },
+        "printed_credit_note": {
+          "description": "The publisher's credit note, verbatim from the source catalog, or null where none has been transcribed.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "native_resolution_metres": {
+          "description": "Measured source pixel size, to 0.01 m.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "native_max_zoom": {
+          "description": "The coarsest XYZ zoom whose ground pixel is no larger than the measured source pixel. No tile is cut above it; a finer camera zoom overzooms this level.",
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 16
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "edition_fields": {
+      "description": "Fields every edition carries in both manifest versions.",
       "type": "object",
-      "additionalProperties": false,
       "required": [
         "id",
         "source_id",
@@ -80,17 +235,8 @@
         "crop_wgs84"
       ],
       "properties": {
-        "id": {
-          "enum": ["auburn-1953", "auburn-1973", "auburn-1975", "auburn-1981"]
-        },
-        "source_id": {
-          "enum": [
-            "CA_Auburn_288101_1953_24000",
-            "CA_Auburn_288103_1953_24000",
-            "CA_Auburn_288104_1975_24000",
-            "CA_Auburn_288105_1953_24000"
-          ]
-        },
+        "id": { "type": "string" },
+        "source_id": { "type": "string" },
         "kind": {
           "enum": ["topo", "orthophotoquad"]
         },
@@ -119,23 +265,17 @@
           ],
           "properties": {
             "map_year": { "$ref": "#/$defs/year" },
-            "base_year": {
-              "oneOf": [{ "$ref": "#/$defs/year" }, { "type": "null" }]
-            },
-            "revision_year": {
-              "oneOf": [{ "$ref": "#/$defs/year" }, { "type": "null" }]
-            },
+            "base_year": { "$ref": "#/$defs/nullable_year" },
+            "revision_year": { "$ref": "#/$defs/nullable_year" },
             "base_photography": { "$ref": "#/$defs/photography_date" },
             "revision_photography": { "$ref": "#/$defs/photography_date" },
             "photography": { "$ref": "#/$defs/photography_date" },
-            "base_field_check_year": {
-              "oneOf": [{ "$ref": "#/$defs/year" }, { "type": "null" }]
-            },
+            "base_field_check_year": { "$ref": "#/$defs/nullable_year" },
             "revision_field_checked": { "type": ["boolean", "null"] }
           }
         },
         "crop_wgs84": {
-          "description": "Closed single-ring Polygon on the inspected source neatline; excludes the decorative scan margin only.",
+          "description": "Closed single-ring Polygon: the inspected source face, clipped to the common view footprint. Excludes the decorative scan margin only.",
           "type": "object",
           "additionalProperties": false,
           "required": ["type", "coordinates"],
