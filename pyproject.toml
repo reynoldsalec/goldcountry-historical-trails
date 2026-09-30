@@ -12,6 +12,9 @@ dependencies = [
     "jsonschema>=4.21",
     "pyyaml>=6.0",
     "click>=8.1",
+    "pymupdf==1.28.2",
+    "pypdf==6.1.1",
+    "pypdfium2==5.13.0",
 ]
 
 [dependency-groups]
