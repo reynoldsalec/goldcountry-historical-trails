@@ -1,8 +1,13 @@
 # Auburn Historical Map Browser
 
-**Current MVP:** page through four historical map editions of the same Auburn area,
+**Current MVP:** page through historical map editions of the same Auburn area,
 keeping the map position and zoom unchanged. Display original cartography and aerial
 imagery with honest source dates—not reconstructed trail history.
+
+**Expansion approved 2026-09-29 (issue #55):** the owner authorized growing the browser
+from four to nine editions, including pre-1950 sheets as raster display context. The
+live manifest still holds the four D1–D4 editions until the expansion steps (E1 onward)
+land. The expansion changes no evidence, privacy or legal-copy safeguard in AGENTS.md §2.
 
 **Scope decision: 2026-09-28.** The Nevada/Placer countywide trail atlas remains a
 long-term direction, not this first-release gate. This is a planning revision, not a
@@ -19,8 +24,15 @@ switching; provide a separate **Reset view** button. Show a source card with bas
 revision, photography and field-check dates, the source identifier, USGS attribution
 and an original-source link. Disable Previous/Next at endpoints; do not wrap.
 
-Order: **1953 base → 1973 revision → 1975 aerial → 1981 revision**. These are source
-editions, not a continuous timeline. A revision year does not date every mapped feature.
+Current order: **1953 base → 1973 revision → 1975 aerial → 1981 revision**. These are
+source editions, not a continuous timeline. A revision year does not date every mapped
+feature.
+
+Approved nine-edition order: **sacramento-1891 → auburn-1944 → auburn-1953 →
+auburn-1973 → auburn-1975 → auburn-1981 → sacramento-1994 → auburn-2018 → auburn-2021**.
+The 1953 edition stays the initial selection. The 1891 and 1994 editions are regional
+Sacramento sheets at 1:125,000 and 1:100,000, not Auburn 7.5-minute maps; their labels
+and source cards must show the original sheet name and scale.
 
 ## 2. Four existing sources
 
@@ -41,6 +53,24 @@ dates or file stamps as universal feature dates.
 from actual georeferencing; nominal NAD27 corners are not exact WGS84 values. The
 original sheet includes context outside Placer County. Displaying it does not expand
 future trail-data scope or claim countywide coverage. Colfax is deferred.
+
+### Five expansion sources (E1, issue #55)
+
+| Edition | Exact source ID | What it is |
+| --- | --- | --- |
+| sacramento-1891 | `CA_Sacramento_299588_1891_125000` | Regional Sacramento sheet, 1:125,000, 30′ × 30′. Reused local GeoTIFF. |
+| auburn-1944 | `CA_Auburn_296741_1944_62500` | Auburn 15-minute sheet, 1:62,500. Reused local GeoTIFF. |
+| sacramento-1994 | `CA_Sacramento_299157_1994_100000` | Regional Sacramento sheet, 1:100,000, 30′ × 60′. Reused local GeoTIFF. |
+| auburn-2018 | ScienceBase `5d3aeb27e4b01d82ce8d133b` | US Topo 7.5-minute geospatial PDF, published 2018-09-24. |
+| auburn-2021 | ScienceBase `61d7a9e2d34ed79294005276` | US Topo 7.5-minute geospatial PDF, published 2021-12-30. |
+
+The three TIFFs already have `existing_file` receipts with `retrieved_at: null` in
+`data/sources/retrievals.jsonl`; they are verified and reused, not downloaded again.
+The two PDFs are cataloged in `data/sources/demo-pdf-sources.json` with their metadata
+URL, verbatim use constraints and source statements, and printed credit note. Their
+receipts are in `data/sources/demo-pdf-retrievals.jsonl`. None of the five is in
+`data/sources/demo-editions.json` yet. Registration, crops, zoom limits and the PDF
+rendering are later steps; open items are in `docs/open-questions.md`.
 
 ## 3. Required versus deferred
 
@@ -89,8 +119,10 @@ performance claim is made here. PMTiles is a separately approved optimization if
 | D2 | Raster/XYZ preparation | Common CRS/crop, readable tiles, registration review, unchanged raw bytes |
 | D3 | Static edition browser | Four layers work; camera and source cards stay correct |
 | D4 | Tests, public build and handoff | Automated checks and manual runbook pass on actual output |
+| E1 | Acquire and catalog five expansion sources | Full-file hashes against receipts, verbatim rights evidence, no live-manifest change |
 
 D1–D4 are new plan identifiers, not GitHub issue numbers or renamed M0–M5 milestones.
+E1 onward are the nine-edition expansion steps; E1 is issue #55.
 See [worker contracts](docs/implementation-plan.md) and
 [the MVP testing runbook](docs/mvp-runbook.md). This document does not launch workers.
 
@@ -109,6 +141,20 @@ make validate
 `make verify-sources` requires all receipted sources locally. Keep backup tooling; never
 claim an independent backup without verifying real archive storage. The new selected
 preflight requires only the four MVP inputs.
+
+Expansion sources (E1):
+
+```sh
+make expansion-test                      # offline unit tests
+make expansion-fetch                     # download the two US Topo PDFs once
+make expansion-check                     # offline full-file SHA-256 check of all five
+```
+
+Both `expansion-*` source targets use `DEMO_RAW_ROOT` (default `data/raw`). A worktree
+points it at the primary checkout's raw root. **PDF backup is not verified:**
+`make backup-sources`, `restore-sources` and `verify-backup` read only
+`retrievals.jsonl`, so they do not cover `data/raw/us-topo/`. The PDFs are
+hash-pinned by their receipts and can be downloaded again, but no archive copy exists.
 
 **Planned, not yet available:** `make demo-check`, `make demo-rasters`, `make demo-test`,
 `make demo-build`, `make demo-dev`, `make demo-accept`. Build output before leak checks;
