@@ -1109,6 +1109,20 @@ def test_neatline_off_the_graticule_is_rejected(tmp_path, scans):
         demo.inspect_source(shifted, index_row("CA_Auburn_288101_1953_24000"))
 
 
+def test_an_unenforced_edge_off_the_graticule_is_measured_not_rejected(tmp_path, scans):
+    """An east shift moves only the west and east lines, so only they exceed the limit."""
+    paths, _ = scans
+    shifted = write_shifted_scan(paths["auburn-1953"], tmp_path / "unenforced_geo.tif", 4)
+    row = index_row("CA_Auburn_288101_1953_24000")
+    report = demo.inspect_source(shifted, row, enforced={"north", "south"})
+    assert report["neatline_locators_px"]["west"]["enforced"] is False
+    assert report["max_abs_neatline_residual_px_all_edges"] > demo.NEATLINE_TOLERANCE_PX
+    assert report["max_abs_neatline_residual_px"] <= demo.NEATLINE_TOLERANCE_PX
+    assert report["enforced_edges"] == ["north", "south"]
+    with pytest.raises(Exception, match=r"over the 3\.0 px limit"):
+        demo.inspect_source(shifted, row, enforced={"east"})
+
+
 def test_neatline_within_the_residual_limit_is_accepted(tmp_path, scans):
     """Pins the other side of the limit, so the rejection above is not a blanket failure."""
     paths, _ = scans

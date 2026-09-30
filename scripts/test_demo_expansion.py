@@ -17,6 +17,7 @@ import rasterio
 import test_demo
 import warp_raster
 from click.testing import CliRunner
+from pyproj import CRS
 from shapely.geometry import shape
 from test_demo import by_id, failure
 
@@ -242,6 +243,38 @@ def test_native_zoom_follows_the_measured_pixel():
     assert demo.native_max_zoom(8.4667, latitude) == 14
     assert demo.native_max_zoom(10.5833, latitude) == 14
     assert demo.native_max_zoom(20.0, latitude) == 13
+
+
+@pytest.mark.parametrize(
+    ("edition_id", "passes"), [("sacramento-1891", True), ("auburn-1953", False)]
+)
+def test_pipeline_agreement_limit_scales_with_the_source_pixel(
+    monkeypatch, scans, added_scans, edition_id, passes
+):
+    """An 8 m extent drift is under one 10.58 m pixel but over the 5 m floor at 2.03 m."""
+    paths = {**scans[0], **added_scans[0]}
+    topo_id = demo.EXPANDED_EXPECTED_EDITIONS[edition_id]["source_id"]
+    real = warp_raster.calculate_default_transform
+
+    def drift_the_pinned_extent(*args, **kwargs):
+        transform, width, height = real(*args, **kwargs)
+        if "COORDINATE_OPERATION" in kwargs:
+            transform = rasterio.Affine.translation(8, 0) * transform
+        return transform, width, height
+
+    with rasterio.open(paths[edition_id]) as dataset:
+        pipeline = warp_raster.select_operation(
+            CRS.from_user_input(dataset.crs),
+            demo.seed_of(test_demo.index_row(topo_id)),
+            [],
+        )["pipeline"]
+        monkeypatch.setattr(warp_raster, "calculate_default_transform", drift_the_pinned_extent)
+        if passes:
+            record = warp_raster.verify_pipeline(dataset, pipeline)
+            assert 5.0 < record["pinned_vs_pyproj_metres"] <= dataset.transform.a
+        else:
+            with pytest.raises(warp_raster.WarpError, match="over the 5 m limit"):
+                warp_raster.verify_pipeline(dataset, pipeline)
 
 
 def test_a_misstated_resolution_is_rejected(expanded_tree):
