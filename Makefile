@@ -16,7 +16,7 @@ export TRAIL_ARCHIVE_ROOT
         backup-sources restore-sources verify-backup \
         demo-check demo-inspect demo-test demo-cogs demo-rasters demo-build \
         demo-dev site-deps demo-frontend-test site-browsers demo-browser-test \
-        expansion-check expansion-fetch expansion-test
+        expansion-check expansion-fetch expansion-pdf expansion-test
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -126,8 +126,14 @@ expansion-check:
 expansion-fetch:
 	$(RUN) python scripts/demo_sources.py fetch
 
+## the two receipted US Topo PDFs -> georeferenced COGs under build/expansion/pdf/ (#56)
+# Position comes from each PDF's /VP /Measure dictionary; publisher-default layers only.
+# Record: build/expansion/demo-pdf-processing.json. See docs/demo-pdf-import.md.
+expansion-pdf:
+	$(RUN) python scripts/demo_pdf.py run
+
 expansion-test:
-	$(RUN) pytest -q scripts/test_demo_sources.py
+	$(RUN) pytest -q scripts/test_demo_sources.py scripts/test_demo_pdf.py
 
 NPM ?= npm
 SITE := site
