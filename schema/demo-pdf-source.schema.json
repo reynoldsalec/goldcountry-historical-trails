@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Expansion US Topo geospatial PDF source catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "sources"],
+  "properties": {
+    "version": { "const": 1 },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 },
+    "https": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "edition_id",
+        "title",
+        "product",
+        "publication_date",
+        "scale",
+        "sciencebase_url",
+        "download_url",
+        "metadata_url",
+        "metadata_evidence",
+        "nominal_bounds",
+        "rights"
+      ],
+      "properties": {
+        "source_id": { "type": "string", "pattern": "^[0-9a-f]{24}$" },
+        "edition_id": { "type": "string", "pattern": "^auburn-[0-9]{4}$" },
+        "title": { "$ref": "#/$defs/text" },
+        "product": { "$ref": "#/$defs/text" },
+        "publication_date": { "type": "string", "format": "date" },
+        "scale": { "type": "integer", "minimum": 1 },
+        "sciencebase_url": { "$ref": "#/$defs/https" },
+        "download_url": { "$ref": "#/$defs/https" },
+        "metadata_url": { "$ref": "#/$defs/https" },
+        "metadata_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["retrieved_at", "sha256", "size_bytes", "metadata_date"],
+          "properties": {
+            "retrieved_at": { "type": "string", "format": "date-time", "pattern": "Z$" },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "size_bytes": { "type": "integer", "minimum": 1 },
+            "metadata_date": { "type": "string", "pattern": "^[0-9]{8}$" }
+          }
+        },
+        "nominal_bounds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["westbc", "eastbc", "northbc", "southbc", "note"],
+          "properties": {
+            "westbc": { "type": "number" },
+            "eastbc": { "type": "number" },
+            "northbc": { "type": "number" },
+            "southbc": { "type": "number" },
+            "note": { "$ref": "#/$defs/text" }
+          }
+        },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "use_constraints",
+            "source_statements",
+            "credit_note",
+            "resolution"
+          ],
+          "properties": {
+            "status": { "enum": ["public_domain", "blocked"] },
+            "use_constraints": { "$ref": "#/$defs/text" },
+            "source_statements": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["srcinfo_title", "origin", "statement"],
+                "properties": {
+                  "srcinfo_title": { "$ref": "#/$defs/text" },
+                  "origin": { "$ref": "#/$defs/text" },
+                  "statement": { "$ref": "#/$defs/text" }
+                }
+              }
+            },
+            "credit_note": { "type": ["string", "null"], "minLength": 1 },
+            "resolution": { "$ref": "#/$defs/text" }
+          }
+        }
+      }
+    }
+  }
+}

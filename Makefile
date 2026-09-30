@@ -15,7 +15,8 @@ export TRAIL_ARCHIVE_ROOT
         catalog-sources verify-sources \
         backup-sources restore-sources verify-backup \
         demo-check demo-inspect demo-test demo-cogs demo-rasters demo-build \
-        demo-dev site-deps demo-frontend-test site-browsers demo-browser-test
+        demo-dev site-deps demo-frontend-test site-browsers demo-browser-test \
+        expansion-check expansion-fetch expansion-test
 
 ## validate build-public (AGENTS.md §4.3)
 all: validate build-public
@@ -114,6 +115,19 @@ demo-cogs:
 # pyramids are reused. See docs/demo-processing.md.
 demo-rasters:
 	$(RUN) python scripts/demo.py rasters
+
+## nine-edition expansion sources (issue #55); none are in demo-editions.json yet
+# Offline: full-file SHA-256 of the three reused historical TIFFs and two US Topo PDFs
+# against their receipts under DEMO_RAW_ROOT. Exits non-zero while any is blocked.
+expansion-check:
+	$(RUN) python scripts/demo_sources.py check
+
+## download the two US Topo PDFs into DEMO_RAW_ROOT/us-topo/sha256/; reruns are no-ops
+expansion-fetch:
+	$(RUN) python scripts/demo_sources.py fetch
+
+expansion-test:
+	$(RUN) pytest -q scripts/test_demo_sources.py
 
 NPM ?= npm
 SITE := site
