@@ -16,25 +16,34 @@ export TRAIL_ARCHIVE_ROOT
         backup-sources restore-sources verify-backup \
         demo-check demo-inspect demo-test demo-cogs demo-rasters demo-build \
         demo-dev site-deps demo-frontend-test site-browsers demo-browser-test \
+        demo-accept \
         expansion-check expansion-fetch expansion-pdf expansion-rasters expansion-test
 
-## validate build-public (AGENTS.md §4.3)
-all: validate build-public
+## build the public output, then validate the data and that output (AGENTS.md §4.3)
+# Sequential $(MAKE) lines, not prerequisites: the leak scan must read a tree that this
+# run built, which parallel make would not guarantee.
+all:
+	$(MAKE) build-public
+	$(MAKE) validate
 
 ## uv sync, and check for the external tools the pipeline needs
+# GDAL comes from the rasterio wheel and tippecanoe is deferred with the vector program,
+# so node is the only binary the Auburn demo needs beyond uv.
 setup:
 	$(UV) sync
 	@missing=""; \
-	for tool in gdalinfo tippecanoe node; do \
+	for tool in node; do \
 	  command -v $$tool >/dev/null 2>&1 || missing="$$missing $$tool"; \
 	done; \
 	if [ -n "$$missing" ]; then \
 	  echo "setup: missing external tool(s):$$missing"; \
-	  echo "setup: install with 'brew install gdal tippecanoe node' (macOS)."; \
-	  echo "setup: 'make validate' does not need them; the raster and tile targets do."; \
+	  echo "setup: install node 20+ (nodejs.org, nvm, or 'brew install node')."; \
+	  echo "setup: 'make validate' does not need it; the site and demo targets do."; \
 	else \
-	  echo "setup: gdal, tippecanoe and node present."; \
+	  echo "setup: node present; GDAL is bundled with rasterio."; \
 	fi
+	@echo "setup: tippecanoe and a gdal CLI are not required; both are deferred with the"
+	@echo "setup: countywide vector program (README.md §7, M4/M5)."
 
 ## schemas, referential integrity, temporal coherence, geometry, leak test
 validate:
@@ -197,7 +206,17 @@ demo-build: site-deps
 
 demo-test: demo-frontend-test demo-browser-test
 	$(RUN) pytest -q scripts/test_demo.py scripts/test_demo_rasters.py \
-	  scripts/test_demo_build.py
+	  scripts/test_demo_build.py scripts/test_demo_make.py
+
+## the local release gate: offline demo suites, the real build, then baseline validation (D4b)
+# Validation runs last and on purpose: scripts/validate.py scans the build/public tree this
+# run just published, so an empty or absent build cannot pass as a clean leak scan.
+# Needs the selected scans; point DEMO_RAW_ROOT at them. Never run in CI (docs/demo-acceptance.md).
+demo-accept:
+	$(MAKE) demo-test
+	$(MAKE) demo-build
+	$(MAKE) validate
+	@echo "demo-accept: built and validated build/public; human acceptance is issue #38."
 
 # Files are listed explicitly so a deleted or renamed regression module fails loudly
 # instead of silently shrinking the glob.
@@ -232,40 +251,32 @@ coverage-report:
 coverage-ready:
 	$(RUN) python scripts/coverage.py validate --release-ready
 
-## warp + COG everything with a GCP file, write to build/rasters/
+## warp + COG aerial frames from committed GCP files (countywide program)
 rasters:
-	@echo "make rasters: not implemented until M2 (raster pipeline)."
-	@echo "  Needs scripts/warp_raster.py and committed .points files in data/sources/gcp/."
-	@echo "  See README.md §7, M2."
+	@echo "make rasters: deferred with the countywide raster pipeline (M2)."
+	@echo "  Needs committed .points files in data/sources/gcp/ for raw aerial frames."
+	@echo "  The four already-georeferenced Auburn editions warp with 'make demo-cogs'."
 	@exit 1
 
 ## tippecanoe -> build/tiles/alignments.pmtiles
 tiles:
-	@echo "make tiles: not implemented until M4 (viewer)."
-	@echo "  Needs scripts/build_vector_tiles.py and tippecanoe on PATH."
-	@echo "  See README.md §7, M4."
+	@echo "make tiles: deferred with the countywide vector program (M4)."
+	@echo "  Needs digitized alignments and tippecanoe; the demo ships raster PNG tiles"
+	@echo "  from 'make demo-rasters' and no vector or PMTiles layer."
 	@exit 1
 
-## assemble the countywide build/public/ (restricted fields stripped)
-build-public:
-	@echo "make build-public: not implemented until M5 (countywide split builds and deploy)."
-	@echo "  The Auburn map-browser MVP publishes build/public with 'make demo-build'."
-	@echo "  See README.md §7, M5."
-	@exit 1
+## the public build: currently the Auburn map browser (alias of demo-build)
+build-public: demo-build
 
 ## assemble build/restricted/
 build-restricted:
-	@echo "make build-restricted: not implemented until M5 (split builds and deploy)."
-	@echo "  Needs scripts/build_site.py."
-	@echo "  See README.md §7, M5."
+	@echo "make build-restricted: deferred with the authenticated countywide build (M5)."
+	@echo "  The raster-only MVP has a public build only; its restricted-value scan"
+	@echo "  already runs in 'make validate'. See README.md §7, M5."
 	@exit 1
 
-## vite dev server against build/public/
-dev:
-	@echo "make dev: not implemented until M4 (viewer)."
-	@echo "  Needs the MapLibre viewer in site/."
-	@echo "  See README.md §7, M4."
-	@exit 1
+## dev server for the viewer: currently the Auburn map browser (alias of demo-dev)
+dev: demo-dev
 
 ## ruff format
 fmt:

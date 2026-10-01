@@ -1,8 +1,13 @@
 # Auburn Map Browser — MVP Testing Runbook
 
 **Status: acceptance instructions, not passed results.** This replaces the countywide
-research checklist as the next MVP's release gate. The viewer and demo Make targets are
-planned, not implemented by this document. Do not mark checks passed until exercised.
+research checklist as the next MVP's release gate. Do not mark a check passed until you
+have exercised it yourself.
+
+D1–D4 have landed, so the commands below now run. The automated half of this checklist
+has a recorded result in [demo-acceptance.md](demo-acceptance.md); that record is machine
+evidence, not a reviewer's decision, and it lists the checks here that a human still owes
+(issue #38).
 
 ## 1. What you are testing
 
@@ -39,24 +44,38 @@ make validate
 ```
 
 Stop on a genuine validation failure. A documented research gap is allowed; it is not
-an excuse to change inventory states. Current raster/viewer/public-build placeholders
-are not evidence of a runnable demo.
+an excuse to change inventory states.
 
-**After D1–D4 implement the targets**, run:
+The demo needs the four selected scans. They are not in the repository: point
+`DEMO_RAW_ROOT` at the directory holding them, or fetch them first with
+`make fetch-topo-selected SELECTION=<file>` (see
+[demo-acceptance.md](demo-acceptance.md) §8). The pipeline only reads them.
 
 ```sh
-make demo-check
-make demo-rasters
-make demo-test
-make demo-build
-make demo-accept
-make demo-dev
+export DEMO_RAW_ROOT=/path/to/data/raw   # unnecessary if data/raw is populated
+make demo-accept     # demo-test, then demo-build, then validation of the built tree
 ```
 
-These are future commands, not instructions to bypass today's missing implementation.
-`demo-accept` must validate real built output, not an absent public directory. Record the
-actual URL printed by the development server; do not assume a fixed port. A local HTTP
-server is required; opening the viewer with `file://` is not the acceptance test.
+`make demo-accept` is the whole gate: it runs the unit, browser and pipeline suites, does
+the real four-source build into `build/public/`, and only then runs `make validate`, whose
+restricted-value scan reads the tree that run just published. Bare `make` is the same
+build and validation without the test suites. The single steps still exist for
+diagnosis — `make demo-check`, `make demo-inspect`, `make demo-cogs`, `make demo-rasters`,
+`make demo-test`, `make demo-build`.
+
+Then serve the built output and open the URL you actually get:
+
+```sh
+cd build/public && python3 -m http.server 8317 --bind 127.0.0.1
+```
+
+A local HTTP server is required; opening the viewer with `file://` is not the acceptance
+test. `make demo-dev` serves the source app on port 5173 instead, which is useful for
+development but is not the published tree this checklist is about. Do not assume a port
+is free; record the URL you used.
+
+CI runs the same suites on synthetic fixtures only. It has no scans, so a green run says
+nothing about the real editions.
 
 ## 3. Source and raster checks
 
@@ -165,7 +184,9 @@ claim is made by accepting this map browser.
 
 ## 8. Blank acceptance worksheet
 
-Fill only after doing the work; placeholders are not evidence.
+Fill only after doing the work; placeholders are not evidence. The technical half is
+already filled in [demo-acceptance.md](demo-acceptance.md) §10 for one recorded run; the
+reviewer, the review time and the decision are deliberately empty there.
 
 ```text
 Code revision:
