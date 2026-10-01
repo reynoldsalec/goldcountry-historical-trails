@@ -16,7 +16,7 @@ export TRAIL_ARCHIVE_ROOT
         backup-sources restore-sources verify-backup \
         demo-check demo-inspect demo-test demo-cogs demo-rasters demo-build \
         demo-dev site-deps demo-frontend-test site-browsers demo-browser-test \
-        demo-accept
+        demo-accept \
         expansion-check expansion-fetch expansion-pdf expansion-rasters expansion-test
 
 ## build the public output, then validate the data and that output (AGENTS.md §4.3)
