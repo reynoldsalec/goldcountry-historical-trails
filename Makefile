@@ -17,6 +17,7 @@ export TRAIL_ARCHIVE_ROOT
         demo-check demo-inspect demo-test demo-cogs demo-rasters demo-build \
         demo-dev site-deps demo-frontend-test site-browsers demo-browser-test \
         demo-accept
+        expansion-check expansion-fetch expansion-pdf expansion-rasters expansion-test
 
 ## build the public output, then validate the data and that output (AGENTS.md §4.3)
 # Sequential $(MAKE) lines, not prerequisites: the leak scan must read a tree that this
@@ -123,6 +124,35 @@ demo-cogs:
 # pyramids are reused. See docs/demo-processing.md.
 demo-rasters:
 	$(RUN) python scripts/demo.py rasters
+
+## nine-edition expansion sources (issue #55); none are in demo-editions.json yet
+# Offline: full-file SHA-256 of the three reused historical TIFFs and two US Topo PDFs
+# against their receipts under DEMO_RAW_ROOT, then the staged version-2 manifest against
+# all nine sources (#57). The PDF editions need 'make expansion-pdf' to have run.
+EXPANDED_MANIFEST := data/sources/demo-editions-expanded.json
+expansion-check:
+	$(RUN) python scripts/demo_sources.py check
+	$(RUN) python scripts/demo.py check --manifest $(EXPANDED_MANIFEST)
+
+## download the two US Topo PDFs into DEMO_RAW_ROOT/us-topo/sha256/; reruns are no-ops
+expansion-fetch:
+	$(RUN) python scripts/demo_sources.py fetch
+
+## the two receipted US Topo PDFs -> georeferenced COGs under build/expansion/pdf/ (#56)
+# Position comes from each PDF's /VP /Measure dictionary; publisher-default layers only.
+# Record: build/expansion/demo-pdf-processing.json. See docs/demo-pdf-import.md.
+expansion-pdf:
+	$(RUN) python scripts/demo_pdf.py run
+
+## the five added editions -> COGs and bounded XYZ pyramids under build/expansion/ (#57)
+# Each edition is tiled from zoom 10 up to its own native_max_zoom only. Unchanged COGs and
+# pyramids are reused. Record: build/expansion/demo-expansion-processing.json.
+expansion-rasters: expansion-pdf
+	$(RUN) python scripts/demo_expansion.py rasters
+
+expansion-test:
+	$(RUN) pytest -q scripts/test_demo_sources.py scripts/test_demo_pdf.py \
+	  scripts/test_demo_expansion.py
 
 NPM ?= npm
 SITE := site

@@ -186,3 +186,109 @@ make demo-test      # scripts/test_demo.py
 All three read `data/raw` by default. Set `DEMO_RAW_ROOT` when the scans live in another
 checkout, as they do in a worktree (`data/raw` is gitignored). The tests that need real bytes
 skip when they are absent; the fixture cases run everywhere from synthetic scans.
+
+---
+
+## 8. The staged nine-edition manifest (version 2, issue #57)
+
+`data/sources/demo-editions-expanded.json` is a version-2 manifest. It adds five editions
+to the four above. It is staged only: `make demo-*` and `build/public` still use
+`demo-editions.json`, and `demo.py cogs/rasters` refuse a version-2 manifest. The same
+inspection caveat applies: every value here came from a script run on 2026-09-29. No
+human reviewed a sheet.
+
+- Commands: `make expansion-check` (runs `demo.py check --manifest
+  data/sources/demo-editions-expanded.json` after the source hash check) and
+  `demo.py inspect-expanded`, which printed the derived values that the manifest records.
+- Schema: `schema/demo-editions.schema.json` selects version 1 or version 2 with `if`/`then`.
+  Version 1 is unchanged. Version 2 fixes the nine IDs, their order and
+  `initial_edition: auburn-1953`. Every edition must also carry `source_kind`,
+  `sheet_name`, `scale`, `publication_date`, `component_dates`, `printed_credit_note`,
+  `native_resolution_metres` and `native_max_zoom`.
+- The four live editions keep their IDs, source IDs, dates, labels, notes and crops
+  unchanged. A test compares each of their fields with `demo-editions.json`.
+  `view_bounds_wgs84` and `tile_zoom` (10–16) are unchanged.
+
+### 8.1 Sources, kinds and credits
+
+| Edition | Source kind | Sheet, scale | Bytes verified (sha256) |
+| --- | --- | --- | --- |
+| sacramento-1891 | historical_geotiff | Sacramento 1:125,000 | `c0323977a7d5…` (4,379,097) |
+| auburn-1944 | historical_geotiff | Auburn 1:62,500 | `986b31a266a1…` (8,057,515) |
+| sacramento-1994 | historical_geotiff | Sacramento 1:100,000 | `4bd33df67082…` (20,019,247) |
+| auburn-2018 | us_topo_pdf | Auburn 1:24,000 | PDF `063afdbe7cb6…` → COG `649b33904073…` |
+| auburn-2021 | us_topo_pdf | Auburn 1:24,000 | PDF `6723d80faca1…` → COG `fe4c868b6523…` |
+
+The check traces a US Topo edition through three files. It reads the PDF receipt in
+`demo-pdf-retrievals.jsonl` and re-hashes the raw PDF. It then requires the
+`build/expansion/demo-pdf-processing.json` entry to name the same PDF bytes. Last, it
+requires the rendered COG to hash to the value in that entry. A regional or 15-minute
+sheet must name its own sheet and scale in its label. The check refuses a label such as
+"Auburn 1891 topographic map".
+
+`printed_credit_note` holds the catalog credit note verbatim for the two US Topo maps.
+It is `null` for the seven historical scans, because nobody has transcribed their printed
+credits. Their attribution comes from `sources.yml` (`usgs-historical-topo`). The US
+Topo attribution comes from `usgs-us-topo`.
+
+Dates: `map_year` comes from the index `date_on_map` or the catalog publication year.
+`component_dates` (`survey_year`, `edit_year`, `imprint_year`) comes from the index and
+is null where the index has no value. The US Topo maps carry their full publication
+date. The historical sheets carry `publication_date: null`, because ScienceBase gives
+only a `YYYY-01-01` placeholder for them. For a regional sheet, `kind: topo` needs the
+index column that shows the sheet was mapped: `survey_year` for 1891 and 1944, and
+`edit_year` for 1994.
+
+### 8.2 CRS: embedded versus indexed
+
+The embedded CRS is always used for positioning. A disagreement with the index is
+recorded under `index_crs`. It is not resolved.
+
+| Edition | Embedded | Index datum / projection | Agrees |
+| --- | --- | --- | --- |
+| sacramento-1891 | NAD27 American Polyconic, central meridian 121°15′W | Unstated / Unstated | no |
+| auburn-1944 | NAD27 American Polyconic, central meridian 121°07′30″W | NAD27 / Polyconic | yes |
+| sacramento-1994 | NAD27 Transverse Mercator, central meridian 121°30′W, scale factor 1, false easting 0 | NAD27 / Universal Transverse Mercator | no: not a UTM zone |
+| auburn-2018, auburn-2021 | NAD83 UTM zone 10N (EPSG:26910), from the PDF | not indexed | n/a |
+
+Datum operations: `NAD27 to WGS 84 (6)` (7 m) for the three scans, and
+`NAD83 to WGS 84 (1)` (4 m) for the PDFs.
+
+### 8.3 Neatlines and crops
+
+A regional sheet's crop is its verified graticule face clipped to the camera footprint.
+The camera footprint is the intersection of the four live crops. Only the sheet edges
+that bound that footprint are held to the 3.0 px neatline limit. For all three scans
+these are the east and north edges. The other edges are measured and recorded, but they
+bound nothing that is shown.
+
+| Edition | Worst residual, enforced edges | Worst residual, all edges | View coverage |
+| --- | --- | --- | --- |
+| sacramento-1891 | 2.76 px (29.2 m), east edge, south band | 4.32 px (45.7 m), west edge, south band | 100% |
+| auburn-1944 | 1.87 px (9.9 m) | 2.48 px (13.1 m) | 100% |
+| sacramento-1994 | 1.80 px (15.2 m) | 1.83 px | 100% |
+| auburn-2018 | neatline 1.37 m from nominal | – | 99.07% |
+| auburn-2021 | neatline 1.22 m from nominal | – | 99.08% |
+
+All three regional faces contain the whole view, so their crop is the view polygon
+itself. The US Topo neatline is the NAD83 7.5-minute graticule, which lies about 89 m
+east of the NAD27 one. That leaves an uncovered strip about 89 m wide on the west edge
+of the view and a thinner one on the south edge. These strips stay transparent. The
+camera is not moved or shrunk. The check fails if any source maps less than 95% of the
+view, or if a crop drifts more than 1e-5° from its re-derivation.
+
+### 8.4 Native zoom
+
+`native_max_zoom` is the coarsest XYZ zoom whose ground pixel at the view's centre
+latitude is no larger than the measured source pixel. The same rule gives zoom 16 for
+the live 2.03 m scans.
+
+| Edition | Measured pixel | native_max_zoom |
+| --- | --- | --- |
+| sacramento-1891 | 10.58 m | 14 |
+| auburn-1944 | 5.29 m | 15 |
+| sacramento-1994 | 8.47 m | 14 |
+| auburn-2018, auburn-2021 | 2.03 m (300 dpi render) | 16 |
+
+The check re-derives each value from the pixels and fails on any disagreement. Whether
+a sheet is legible at that zoom is a human judgement for issue #38.

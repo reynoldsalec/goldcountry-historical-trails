@@ -402,3 +402,76 @@ offset, so this is disclosed rather than silent.
 them will move the tiles by metres. Either way the caveat belongs on the demo's source
 information, and no alignment may be digitized against these rasters until the datum
 question is settled. See `docs/demo-source-review.md` §3.
+
+---
+
+## 2026-09-29 — Open items after acquiring the five expansion sources (issue #55)
+
+`make expansion-check` verifies all five candidates by full-file SHA-256 against their
+receipts. The items below are not resolved by that check.
+
+**PDF georeferencing was not read by GDAL.** The GDAL 3.10.3 inside the rasterio wheel
+has a PDF driver that cannot open PDFs (no Poppler or PDFium backend), so
+`expansion-check` lists "georeferencing not inspected" for auburn-2018 and auburn-2021.
+A byte scan of both PDFs found ISO 32000 `/Measure /Subtype /GEO` dictionaries. The
+visible ones use a World Mercator WGS 84 WKT and cover about 121.25°W–120.87°W,
+38.75°N–39.12°N, which is wider than the quadrangle, plus a state-scale locator. It is
+not known which dictionary registers the map body.
+
+*To resolve.* The next expansion step pins a PDF-capable GDAL (or a tested
+geospatial-preserving alternative), reads the map-body georeferencing and layer list,
+and fails if either is absent.
+
+**The 2018 metadata bounding box is transposed.** In
+`CA_Auburn_20180924_TM_geo.xml` `westbc` is -121.0 and `eastbc` is -121.125. The
+catalog records the values as published and marks them unusable as a crop.
+
+**Credit-note transcription needs human confirmation.** The `credit_note` values in
+`data/sources/demo-pdf-sources.json` come from PyMuPDF 1.28.2 text extraction of the
+lower-left collar, checked by the agent against a render. The tool was run ad hoc and
+is not a project dependency. Leader dots and justified spacing were collapsed.
+
+*To resolve.* A reviewer compares each printed credit note with the catalog and
+records the result in the runbook worksheet.
+
+**Embedded CRS of the reused TIFFs.** The 1891 Sacramento GeoTIFF carries NAD27
+polyconic georeferencing (central meridian 121°15′W), but `topo_index.csv` records its
+datum and projection as "Unstated". The 1994 Sacramento GeoTIFF carries NAD27
+transverse Mercator with central meridian 121°30′W, while the index says Universal
+Transverse Mercator. The NAD27 on an 1891 sheet is the georeferencer's choice, not a
+datum printed on the sheet.
+
+*To resolve.* Registration review in a later expansion step decides whether these
+sheets can share the Auburn camera and records any offset on the source card.
+
+**PDF backup is not verified.** `make backup-sources` and `make verify-backup` read only
+`retrievals.jsonl`. The two PDFs under `data/raw/us-topo/` have no archive copy.
+
+*To resolve.* Extend `scripts/source_archive.py` to include
+`demo-pdf-retrievals.jsonl`, or accept re-download by hash as the recovery path.
+
+**2026-09-29 (#57): registration of the 1891 and 1944 sheets against Auburn is not
+established.** `make expansion-rasters` ran a phase-correlation check against
+auburn-1953 over five dispersed 4 km patches. It found no distinct peak for either
+sheet (`docs/demo-processing.md` §10.3). Their only registration evidence is the
+neatline check. On 1891 the east and north edges, which bound the view, are within
+2.76 px (29 m). The far west edge is 4.32 px (46 m) off its graticule. The 1994 sheet
+and the two US Topo maps gave 3 and 1 distinct patches each, with offsets of 3–22 m.
+
+*To resolve.* A reviewer compares named stable features (for example river confluences
+or surveyed benchmarks) across the editions in the staged tiles and records the offsets
+and a verdict in the runbook worksheet (issue #38).
+
+**2026-09-29 (#57): printed credits of the historical scans are not transcribed.**
+`printed_credit_note` is `null` for all seven topoView scans in
+`data/sources/demo-editions-expanded.json`. Their attribution comes from `sources.yml`
+only. The two US Topo credit notes come from the catalog.
+
+*To resolve.* Transcribe the collar credit text of each scan, if the source card needs
+it, and cite the scan's sha256 as the source of the transcription.
+
+**2026-09-29 (#57), follow-up to "Embedded CRS of the reused TIFFs":** the version-2
+check now records these disagreements under `index_crs`, and positioning uses the
+embedded CRS. Both regional sheets pass the neatline check on the edges that bound the
+view (`docs/demo-source-review.md` §8.3). Whether the 1891 NAD27 assignment is right is
+still open.

@@ -6,6 +6,7 @@ import os
 import socket
 
 import demo
+import demo_sources
 import fetch_topoview as topo
 import numpy as np
 import pytest
@@ -87,10 +88,87 @@ INDEX_ROWS = {
         "aerial_photo_year": "1978",
         "photo_revision_year": "1981",
         "field_check_year": "1953",
+        "edit_year": "1981",
         "projection": "Polyconic",
         "size_bytes": "12427061",
         "source_id": "5a8a2905e4b00f54eb3c61d9",
     },
+}
+
+# The three regional sheets the version-2 manifest adds, transcribed from topo_index.csv.
+REGIONAL_ROWS = {
+    "CA_Sacramento_299588_1891_125000": {
+        "map_name": "Sacramento",
+        "scale": "125000",
+        "extent": "30 x 30 minute",
+        "date_on_map": "1891",
+        "content_year": "1891",
+        "survey_year": "1888",
+        "woodland_tint": "N",
+        "datum": "Unstated",
+        "projection": "Unstated",
+        "west": "-121.5",
+        "south": "38.5",
+        "east": "-121.0",
+        "north": "39.0",
+        "size_bytes": "4379097",
+        "source_id": "5a8a53d1e4b00f54eb4106c4",
+    },
+    "CA_Auburn_296741_1944_62500": {
+        "map_name": "Auburn",
+        "scale": "62500",
+        "extent": "15 x 15 minute",
+        "date_on_map": "1944",
+        "content_year": "1944",
+        "survey_year": "1941",
+        "projection": "Polyconic",
+        "west": "-121.25",
+        "south": "38.75",
+        "east": "-121.0",
+        "north": "39.0",
+        "size_bytes": "8057515",
+        "source_id": "5a8a3f95e4b00f54eb3ebcbc",
+    },
+    "CA_Sacramento_299157_1994_100000": {
+        "map_name": "Sacramento",
+        "scale": "100000",
+        "extent": "30 x 60 minute",
+        "date_on_map": "1994",
+        "content_year": "1994",
+        "imprint_year": "1994",
+        "aerial_photo_year": "1987",
+        "edit_year": "1994",
+        "projection": "Universal Transverse Mercator",
+        "west": "-122.0",
+        "south": "38.5",
+        "east": "-121.0",
+        "north": "39.0",
+        "size_bytes": "20019247",
+        "source_id": "5a8a4dcee4b00f54eb404976",
+    },
+}
+
+
+def regional_wkt(method: str, central_meridian: float) -> str:
+    """A NAD27 projected CRS like the one each regional scan embeds."""
+    return (
+        'PROJCS["unnamed",GEOGCS["NAD27",DATUM["North_American_Datum_1927",'
+        'SPHEROID["Clarke 1866",6378206.4,294.978698213898,AUTHORITY["EPSG","7008"]],'
+        'AUTHORITY["EPSG","6267"]],PRIMEM["Greenwich",0],'
+        'UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],'
+        f'AUTHORITY["EPSG","4267"]],PROJECTION["{method}"],'
+        f'PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",{central_meridian}],'
+        + ('PARAMETER["scale_factor",1],' if method == "Transverse_Mercator" else "")
+        + 'PARAMETER["false_easting",0],PARAMETER["false_northing",0],'
+        'UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'
+    )
+
+
+# Embedded CRS and measured pixel size of each real regional scan (docs/demo-source-review.md).
+REGIONAL_SCANS = {
+    "sacramento-1891": (regional_wkt("Polyconic", -121.25), 10.5833),
+    "auburn-1944": (regional_wkt("Polyconic", -121.125), 5.2917),
+    "sacramento-1994": (regional_wkt("Transverse_Mercator", -121.5), 8.4667),
 }
 
 DISPLAY = {
@@ -113,6 +191,28 @@ DISPLAY = {
 
 
 def index_row(topo_id):
+    if topo_id in REGIONAL_ROWS:
+        values = REGIONAL_ROWS[topo_id]
+        row = dict.fromkeys(topo.COLUMNS, "")
+        row.update(
+            topo_id=topo_id,
+            woodland_tint="Y",
+            scanner_resolution="600 PPI",
+            datum="NAD27",
+            in_tier1="true",
+            rights="public_domain",
+            geotiff_url=(
+                "https://prd-tnm.s3.amazonaws.com/StagedProducts/Maps/HistoricalTopo/"
+                f"GeoTIFF/CA/{topo_id}_geo.tif"
+            ),
+            metadata_url=(
+                "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/maps/historicaltopo/pdf/"
+                f"CA/{values['scale']}/{topo_id}_geo.xml"
+            ),
+            sciencebase_url=f"https://www.sciencebase.gov/catalog/item/{values['source_id']}",
+        )
+        row.update(values)
+        return row
     row = dict.fromkeys(topo.COLUMNS, "")
     row.update(
         topo_id=topo_id,
@@ -144,7 +244,7 @@ def index_row(topo_id):
     return row
 
 
-def write_fixture_scan(path, wkt, *, pixel_size=2.032, margin_px=120):
+def write_fixture_scan(path, wkt, *, pixel_size=2.032, margin_px=120, seed=SEED):
     """A synthetic scan: white map inside a drawn neatline, grey decorative collar.
 
     The neatline is rasterised along the projected graticule, so the east and west sides
@@ -156,10 +256,10 @@ def write_fixture_scan(path, wkt, *, pixel_size=2.032, margin_px=120):
     corner_xy = {
         name: forward.transform(lon, lat)
         for name, (lon, lat) in {
-            "nw": (SEED[0], SEED[3]),
-            "ne": (SEED[2], SEED[3]),
-            "sw": (SEED[0], SEED[1]),
-            "se": (SEED[2], SEED[1]),
+            "nw": (seed[0], seed[3]),
+            "ne": (seed[2], seed[3]),
+            "sw": (seed[0], seed[1]),
+            "se": (seed[2], seed[1]),
         }.items()
     }
     xs = [x for x, _ in corner_xy.values()]
@@ -181,12 +281,12 @@ def write_fixture_scan(path, wkt, *, pixel_size=2.032, margin_px=120):
         return np.asarray(row), np.asarray(col)
 
     samples = 512
-    lats = np.linspace(SEED[3], SEED[1], samples)
-    lons = np.linspace(SEED[0], SEED[2], samples)
-    west_rows, west_cols = edge(np.full(samples, SEED[0]), lats)
-    east_rows, east_cols = edge(np.full(samples, SEED[2]), lats)
-    north_rows, north_cols = edge(lons, np.full(samples, SEED[3]))
-    south_rows, south_cols = edge(lons, np.full(samples, SEED[1]))
+    lats = np.linspace(seed[3], seed[1], samples)
+    lons = np.linspace(seed[0], seed[2], samples)
+    west_rows, west_cols = edge(np.full(samples, seed[0]), lats)
+    east_rows, east_cols = edge(np.full(samples, seed[2]), lats)
+    north_rows, north_cols = edge(lons, np.full(samples, seed[3]))
+    south_rows, south_cols = edge(lons, np.full(samples, seed[1]))
 
     all_rows = np.arange(height, dtype=float)
     all_cols = np.arange(width, dtype=float)
@@ -282,7 +382,7 @@ def receipt(topo_id, path, root):
         "kind": "geotiff",
         "source": "usgs-historical-topo",
         "topo_id": topo_id,
-        "source_id": INDEX_ROWS[topo_id]["source_id"],
+        "source_id": index_row(topo_id)["source_id"],
         "indexed_url": index_row(topo_id)["geotiff_url"],
         "retrieval_url": None,
         "metadata_url": index_row(topo_id)["metadata_url"],
@@ -362,6 +462,9 @@ class Tree:
         self.receipts_path = base / "retrievals.jsonl"
         self.index_path = base / "topo_index.csv"
         self.sources_path = base / "sources.yml"
+        self.ledger_path = base / "demo-pdf-retrievals.jsonl"
+        self.expansion_root = base / "expansion"
+        self.index_rows = []
 
     def write_manifest(self, manifest=None):
         payload = self.manifest if manifest is None else manifest
@@ -372,26 +475,58 @@ class Tree:
             "".join(json.dumps(r, sort_keys=True) + "\n" for r in records), encoding="utf-8"
         )
 
-    def run(self, *args):
-        return CliRunner().invoke(
-            demo.cli,
-            [
-                "check",
-                "--manifest",
-                str(self.manifest_path),
-                "--schema",
-                str(demo.SCHEMA_PATH),
-                "--index",
-                str(self.index_path),
-                "--receipts",
-                str(self.receipts_path),
-                "--sources",
-                str(self.sources_path),
-                "--raw-root",
-                str(self.raw_root),
-                *args,
-            ],
+    def write_index(self, rows=None):
+        rows = self.index_rows if rows is None else rows
+        with self.index_path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=topo.COLUMNS)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    def write_sources(self):
+        self.sources_path.write_text(
+            yaml.safe_dump(
+                {
+                    "sources": [
+                        {
+                            "id": "usgs-historical-topo",
+                            "rights": "public_domain",
+                            "attribution": ATTRIBUTION,
+                        },
+                        {
+                            "id": "usgs-us-topo",
+                            "rights": "public_domain",
+                            "attribution": US_TOPO_ATTRIBUTION,
+                        },
+                    ]
+                }
+            ),
+            encoding="utf-8",
         )
+
+    def paths_args(self):
+        return [
+            "--manifest",
+            str(self.manifest_path),
+            "--schema",
+            str(demo.SCHEMA_PATH),
+            "--index",
+            str(self.index_path),
+            "--receipts",
+            str(self.receipts_path),
+            "--sources",
+            str(self.sources_path),
+            "--raw-root",
+            str(self.raw_root),
+            "--catalog",
+            str(demo_sources.CATALOG_PATH),
+            "--ledger",
+            str(self.ledger_path),
+            "--expansion-root",
+            str(self.expansion_root),
+        ]
+
+    def run(self, *args):
+        return CliRunner().invoke(demo.cli, ["check", *self.paths_args(), *args])
 
 
 @pytest.fixture
@@ -408,25 +543,206 @@ def tree(tmp_path, scans):
         records.append(receipt(topo_id, target, base / "raw"))
     fixture.write_receipts(records)
     fixture.write_manifest()
-    with fixture.index_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=topo.COLUMNS)
-        writer.writeheader()
-        writer.writerows(index_row(t) for t in INDEX_ROWS)
-    fixture.sources_path.write_text(
-        yaml.safe_dump(
-            {
-                "sources": [
-                    {
-                        "id": "usgs-historical-topo",
-                        "rights": "public_domain",
-                        "attribution": ATTRIBUTION,
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
+    fixture.index_rows = [index_row(t) for t in INDEX_ROWS]
+    fixture.write_index()
+    fixture.write_sources()
     return fixture
+
+
+# --- the staged nine-edition tree (version 2, #57) --------------------------------------
+
+US_TOPO_ATTRIBUTION = "US Topo maps: U.S. Geological Survey"
+# Coarser than the real 2.03 m render to keep the fixture small, and still native zoom 16.
+PDF_PIXEL_METRES = 3.5
+PDF_CORNERS = {
+    "upper_left": (SEED[0], SEED[3]),
+    "upper_right": (SEED[2], SEED[3]),
+    "lower_left": (SEED[0], SEED[1]),
+    "lower_right": (SEED[2], SEED[1]),
+}
+
+
+def write_fixture_pdf_cog(path, *, pixel_size=PDF_PIXEL_METRES, margin_px=60):
+    """A rendered US Topo page in NAD83 UTM 10N, with its neatline on the nominal box."""
+    crs = CRS.from_epsg(26910)
+    forward = Transformer.from_crs(CRS.from_epsg(4269), crs, always_xy=True)
+    xy = {name: forward.transform(*lonlat) for name, lonlat in PDF_CORNERS.items()}
+    xs = [x for x, _ in xy.values()]
+    ys = [y for _, y in xy.values()]
+    transform = Affine(
+        pixel_size,
+        0.0,
+        min(xs) - margin_px * pixel_size,
+        0.0,
+        -pixel_size,
+        max(ys) + margin_px * pixel_size,
+    )
+    width = round((max(xs) - min(xs)) / pixel_size) + 2 * margin_px
+    height = round((max(ys) - min(ys)) / pixel_size) + 2 * margin_px
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        width=width,
+        height=height,
+        count=1,
+        dtype="uint8",
+        crs="EPSG:26910",
+        transform=transform,
+        compress="deflate",
+    ) as dataset:
+        dataset.write(np.full((height, width), 250, dtype="uint8"), 1)
+    corners = {}
+    for name, (x, y) in xy.items():
+        col, row = ~transform * (x, y)
+        corners[name] = {"pixel": [round(col, 2), round(row, 2)]}
+    return path, transform, corners
+
+
+def pdf_render_record(edition_id, source_id, pdf_receipt, cog_path, transform, corners):
+    """The fields of an E2 demo-pdf-processing.json entry that the expansion reads."""
+    digest = hashlib.sha256(cog_path.read_bytes()).hexdigest()
+    a, b, c, d, e, f = transform[:6]
+    return {
+        "edition_id": edition_id,
+        "source_id": source_id,
+        "source": {
+            "path": pdf_receipt["path"],
+            "sha256": pdf_receipt["sha256"],
+            "size_bytes": pdf_receipt["size_bytes"],
+        },
+        "georeferencing": {
+            "epsg": 26910,
+            "geotransform": [c, a, b, f, d, e],
+            "max_residual_m": 0.0,
+        },
+        "neatline": {"corners": corners},
+        "nominal_box": {"west": SEED[0], "south": SEED[1], "east": SEED[2], "north": SEED[3]},
+        "nominal_offset": {"max_distance_m": 0.0},
+        "raster": {
+            "path": f"build/expansion/pdf/{edition_id}.tif",
+            "sha256": digest,
+            "byte_count": cog_path.stat().st_size,
+            "dpi": 300,
+        },
+    }
+
+
+@pytest.fixture(scope="session")
+def added_scans(tmp_path_factory):
+    """Synthetic regional scans and rendered US Topo pages for the five added editions."""
+    root = tmp_path_factory.mktemp("added")
+    paths, pdfs = {}, {}
+    for eid, (wkt, pixel) in REGIONAL_SCANS.items():
+        topo_id = demo.EXPANDED_EXPECTED_EDITIONS[eid]["source_id"]
+        paths[eid] = write_fixture_scan(
+            root / f"{topo_id}_geo.tif",
+            wkt,
+            pixel_size=pixel,
+            seed=demo.seed_of(index_row(topo_id)),
+        )
+    for eid in ("auburn-2018", "auburn-2021"):
+        pdfs[eid] = write_fixture_pdf_cog(root / f"{eid}.tif")
+    return paths, pdfs
+
+
+def build_expanded_tree(base, scans, added_scans, manifest=None):
+    """A version-2 tree: seven receipted scans, two receipted PDFs and their E2 renders."""
+    paths, reports = scans
+    regional, pdfs = added_scans
+    (base / "raw" / "topo").mkdir(parents=True)
+    fixture = Tree(base, manifest)
+    records = []
+    for eid in demo.EXPANDED_EDITION_ORDER:
+        contract = demo.EXPANDED_EXPECTED_EDITIONS[eid]
+        if contract["source_kind"] != "historical_geotiff":
+            continue
+        topo_id = contract["source_id"]
+        target = base / "raw" / "topo" / f"{topo_id}_geo.tif"
+        os.link(paths[eid] if eid in paths else regional[eid], target)
+        records.append(receipt(topo_id, target, base / "raw"))
+    fixture.write_receipts(records)
+    real_receipts = demo_sources.load_ledger()
+    ledger, rendered = [], []
+    (fixture.expansion_root / "pdf").mkdir(parents=True)
+    for eid, (cog, transform, corners) in pdfs.items():
+        source_id = demo.EXPANDED_EXPECTED_EDITIONS[eid]["source_id"]
+        data = f"%PDF-1.7\n% fixture stand-in for {eid}\n%%EOF\n".encode()
+        digest = hashlib.sha256(data).hexdigest()
+        target = base / "raw" / demo_sources.pdf_relative(digest)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        record = {
+            **real_receipts[source_id],
+            "sha256": digest,
+            "size_bytes": len(data),
+            "path": demo_sources.pdf_relative(digest),
+        }
+        ledger.append(record)
+        linked = fixture.expansion_root / "pdf" / f"{eid}.tif"
+        os.link(cog, linked)
+        rendered.append(pdf_render_record(eid, source_id, record, linked, transform, corners))
+    fixture.ledger_path.write_text(
+        "".join(json.dumps(r, sort_keys=True) + "\n" for r in ledger), encoding="utf-8"
+    )
+    (fixture.expansion_root / demo.PDF_RECORD_NAME).write_text(
+        json.dumps({"version": 1, "sources": rendered}, indent=2), encoding="utf-8"
+    )
+    fixture.index_rows = [index_row(t) for t in [*INDEX_ROWS, *REGIONAL_ROWS]]
+    fixture.write_index()
+    fixture.write_sources()
+    if manifest is None:
+        fixture.manifest = build_expanded_manifest(fixture, reports)
+    fixture.write_manifest()
+    return fixture
+
+
+def build_expanded_manifest(fixture, reports):
+    """The committed version-2 text, with every derived value re-derived from the fixture."""
+    view = build_manifest(reports)
+    derived = demo.derive_added_editions(
+        view,
+        fixture.index_path,
+        fixture.receipts_path,
+        fixture.raw_root,
+        fixture.ledger_path,
+        fixture.expansion_root,
+    )
+    manifest = demo.read_json(demo.EXPANDED_MANIFEST_PATH)
+    manifest["view_bounds_wgs84"] = view["view_bounds_wgs84"]
+    crops = {edition["id"]: edition["crop_wgs84"] for edition in view["editions"]}
+    for edition in manifest["editions"]:
+        if edition["id"] in crops:
+            edition["crop_wgs84"] = crops[edition["id"]]
+        else:
+            edition["crop_wgs84"] = derived[edition["id"]]["crop_wgs84"]
+            edition["native_resolution_metres"] = derived[edition["id"]][
+                "native_resolution_metres"
+            ]
+    return manifest
+
+
+@pytest.fixture(scope="session")
+def expanded_manifest(tmp_path_factory, scans, added_scans):
+    base = tmp_path_factory.mktemp("expanded-template") / "tree"
+    return build_expanded_tree(base, scans, added_scans).manifest
+
+
+@pytest.fixture
+def expanded_tree(tmp_path, scans, added_scans, expanded_manifest):
+    return build_expanded_tree(
+        tmp_path / "expanded", scans, added_scans, copy.deepcopy(expanded_manifest)
+    )
+
+
+@pytest.fixture(params=["four", "nine"])
+def contract_tree(request):
+    """The live four-edition tree and the staged nine-edition tree, for shared negatives."""
+    return request.getfixturevalue("tree" if request.param == "four" else "expanded_tree")
+
+
+def by_id(manifest, edition_id):
+    return next(e for e in manifest["editions"] if e["id"] == edition_id)
 
 
 def failure(tree, mutate, *, args=()):
@@ -499,113 +815,110 @@ def test_check_reads_only_the_selected_bytes(tree):
 # --- manifest shape ------------------------------------------------------------------
 
 
-def test_missing_edition_rejected(tree):
-    message = failure(tree, lambda m: m["editions"].pop())
+def test_missing_edition_rejected(contract_tree):
+    message = failure(contract_tree, lambda m: m["editions"].pop())
     assert "schema" in message.lower()
 
 
-def test_duplicate_edition_rejected(tree):
+def test_duplicate_edition_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][1]["id"] = manifest["editions"][0]["id"]
+        by_id(manifest, "auburn-1973")["id"] = by_id(manifest, "auburn-1953")["id"]
 
-    assert "Duplicate edition id" in failure(tree, mutate)
+    assert "Duplicate edition id" in failure(contract_tree, mutate)
 
 
-def test_extra_edition_rejected(tree):
+def test_extra_edition_rejected(contract_tree):
     def mutate(manifest):
         manifest["editions"].append(copy.deepcopy(manifest["editions"][0]))
 
-    assert "schema" in failure(tree, mutate).lower()
+    assert "schema" in failure(contract_tree, mutate).lower()
 
 
-def test_reordered_editions_rejected(tree):
+def test_reordered_editions_rejected(contract_tree):
     def mutate(manifest):
         manifest["editions"][0], manifest["editions"][1] = (
             manifest["editions"][1],
             manifest["editions"][0],
         )
 
-    assert "edition_order" in failure(tree, mutate)
+    assert "edition_order" in failure(contract_tree, mutate)
 
 
-def test_unknown_edition_field_rejected(tree):
+def test_unknown_edition_field_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][0]["access_right"] = "public may pass"
+        by_id(manifest, "auburn-1953")["access_right"] = "public may pass"
 
-    assert "access_right" in failure(tree, mutate)
+    assert "access_right" in failure(contract_tree, mutate)
 
 
-def test_unknown_top_level_field_rejected(tree):
+def test_unknown_top_level_field_rejected(contract_tree):
     def mutate(manifest):
         manifest["deploy_host"] = "example.test"
 
-    assert "deploy_host" in failure(tree, mutate)
+    assert "deploy_host" in failure(contract_tree, mutate)
 
 
-def test_unknown_date_field_rejected(tree):
+def test_unknown_date_field_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][0]["dates"]["start_year"] = 1953
+        by_id(manifest, "auburn-1953")["dates"]["start_year"] = 1953
 
-    assert "start_year" in failure(tree, mutate)
+    assert "start_year" in failure(contract_tree, mutate)
 
 
-def test_changed_tile_zoom_rejected(tree):
+def test_changed_tile_zoom_rejected(contract_tree):
     def mutate(manifest):
         manifest["tile_zoom"]["max"] = 18
 
-    assert "schema" in failure(tree, mutate).lower()
+    assert "schema" in failure(contract_tree, mutate).lower()
 
 
 # --- dates ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("value", ["1973-02-30", "1973-13-01", "1973-00-01"])
-def test_impossible_calendar_date_rejected(tree, value):
+def test_impossible_calendar_date_rejected(contract_tree, value):
     def mutate(manifest):
-        manifest["editions"][1]["dates"]["revision_photography"] = value
+        by_id(manifest, "auburn-1973")["dates"]["revision_photography"] = value
 
-    assert "calendar date" in failure(tree, mutate)
+    assert "calendar date" in failure(contract_tree, mutate)
 
 
-def test_photography_year_outside_range_rejected(tree):
+def test_photography_year_outside_range_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][2]["dates"]["photography"] = "1775"
+        by_id(manifest, "auburn-1975")["dates"]["photography"] = "1775"
 
-    assert "calendar date" in failure(tree, mutate)
+    assert "calendar date" in failure(contract_tree, mutate)
 
 
-def test_wrong_map_year_rejected(tree):
+def test_wrong_map_year_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][3]["dates"]["map_year"] = 1981
+        by_id(manifest, "auburn-1981")["dates"]["map_year"] = 1981
 
-    assert "differ from the fixed contract" in failure(tree, mutate)
+    assert "differ from the fixed contract" in failure(contract_tree, mutate)
 
 
-def test_revision_claimed_field_checked_rejected(tree):
+def test_revision_claimed_field_checked_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][1]["dates"]["revision_field_checked"] = True
+        by_id(manifest, "auburn-1973")["dates"]["revision_field_checked"] = True
 
-    assert "differ from the fixed contract" in failure(tree, mutate)
+    assert "differ from the fixed contract" in failure(contract_tree, mutate)
 
 
-def test_date_note_must_disclose_unchecked_revision(tree):
+def test_date_note_must_disclose_unchecked_revision(contract_tree):
     def mutate(manifest):
-        manifest["editions"][3]["date_note"] = "1953 base sheet, revised 1981."
+        by_id(manifest, "auburn-1981")["date_note"] = "1953 base sheet, revised 1981."
 
-    assert "not field checked" in failure(tree, mutate)
+    assert "not field checked" in failure(contract_tree, mutate)
 
 
-def test_index_date_disagreement_rejected(tree):
+def test_index_date_disagreement_rejected(contract_tree):
     """A manifest that matches the contract but not the per-sheet index still fails."""
-    rows = [index_row(t) for t in INDEX_ROWS]
+    rows = copy.deepcopy(contract_tree.index_rows)
     for row in rows:
         if row["topo_id"] == "CA_Auburn_288105_1953_24000":
             row["aerial_photo_year"] = "1979"
-    with tree.index_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=topo.COLUMNS)
-        writer.writeheader()
-        writer.writerows(rows)
-    result = tree.run()
+    contract_tree.write_index(rows)
+    result = contract_tree.run()
     assert result.exit_code != 0, result.output
     assert "aerial_photo_year" in result.output
 
@@ -613,51 +926,48 @@ def test_index_date_disagreement_rejected(tree):
 # --- kind and rights ------------------------------------------------------------------
 
 
-def test_orthophotoquad_kind_mismatch_rejected(tree):
+def test_orthophotoquad_kind_mismatch_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][2]["kind"] = "topo"
+        by_id(manifest, "auburn-1975")["kind"] = "topo"
 
-    assert "differs from the contract" in failure(tree, mutate)
+    assert "differs from the contract" in failure(contract_tree, mutate)
 
 
-def test_topo_kind_mismatch_rejected(tree):
+def test_topo_kind_mismatch_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][0]["kind"] = "orthophotoquad"
+        by_id(manifest, "auburn-1953")["kind"] = "orthophotoquad"
 
-    assert "differs from the contract" in failure(tree, mutate)
+    assert "differs from the contract" in failure(contract_tree, mutate)
 
 
-def test_nonpublic_rights_rejected(tree):
+def test_nonpublic_rights_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][0]["rights"] = "cc_by_nc_sa"
+        by_id(manifest, "auburn-1953")["rights"] = "cc_by_nc_sa"
 
-    assert "schema" in failure(tree, mutate).lower()
+    assert "schema" in failure(contract_tree, mutate).lower()
 
 
-def test_nonpublic_index_rights_rejected(tree):
-    rows = [index_row(t) for t in INDEX_ROWS]
+def test_nonpublic_index_rights_rejected(contract_tree):
+    rows = copy.deepcopy(contract_tree.index_rows)
     rows[0]["rights"] = "unknown"
-    with tree.index_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=topo.COLUMNS)
-        writer.writeheader()
-        writer.writerows(rows)
-    result = tree.run()
+    contract_tree.write_index(rows)
+    result = contract_tree.run()
     assert result.exit_code != 0, result.output
     assert "not public_domain" in result.output
 
 
-def test_attribution_must_match_sources_yml(tree):
+def test_attribution_must_match_sources_yml(contract_tree):
     def mutate(manifest):
-        manifest["editions"][0]["attribution"] = "Auburn Trails Council"
+        by_id(manifest, "auburn-1953")["attribution"] = "Auburn Trails Council"
 
-    assert "attribution" in failure(tree, mutate)
+    assert "attribution" in failure(contract_tree, mutate)
 
 
-def test_unknown_source_id_rejected(tree):
+def test_unknown_source_id_rejected(contract_tree):
     def mutate(manifest):
-        manifest["editions"][0]["source_id"] = "CA_Auburn_288100_1953_24000"
+        by_id(manifest, "auburn-1953")["source_id"] = "CA_Auburn_288100_1953_24000"
 
-    assert "schema" in failure(tree, mutate).lower()
+    assert "schema" in failure(contract_tree, mutate).lower()
 
 
 # --- bounds and crop ------------------------------------------------------------------
@@ -797,6 +1107,20 @@ def test_neatline_off_the_graticule_is_rejected(tmp_path, scans):
     shifted = write_shifted_scan(paths["auburn-1953"], tmp_path / "shifted_geo.tif", 4)
     with pytest.raises(Exception, match=r"over the 3\.0 px limit"):
         demo.inspect_source(shifted, index_row("CA_Auburn_288101_1953_24000"))
+
+
+def test_an_unenforced_edge_off_the_graticule_is_measured_not_rejected(tmp_path, scans):
+    """An east shift moves only the west and east lines, so only they exceed the limit."""
+    paths, _ = scans
+    shifted = write_shifted_scan(paths["auburn-1953"], tmp_path / "unenforced_geo.tif", 4)
+    row = index_row("CA_Auburn_288101_1953_24000")
+    report = demo.inspect_source(shifted, row, enforced={"north", "south"})
+    assert report["neatline_locators_px"]["west"]["enforced"] is False
+    assert report["max_abs_neatline_residual_px_all_edges"] > demo.NEATLINE_TOLERANCE_PX
+    assert report["max_abs_neatline_residual_px"] <= demo.NEATLINE_TOLERANCE_PX
+    assert report["enforced_edges"] == ["north", "south"]
+    with pytest.raises(Exception, match=r"over the 3\.0 px limit"):
+        demo.inspect_source(shifted, row, enforced={"east"})
 
 
 def test_neatline_within_the_residual_limit_is_accepted(tmp_path, scans):

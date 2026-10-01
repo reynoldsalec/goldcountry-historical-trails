@@ -15,6 +15,14 @@ photorevision while retaining the same map camera. README and
 `docs/implementation-plan.md` define this bounded release; `docs/mvp-runbook.md`
 is its acceptance checklist. These documents are plans, not proof of implementation.
 
+**Expansion authorized 2026-09-29 (issue #55):** the owner approved nine editions in
+this order: sacramento-1891, auburn-1944, auburn-1953, auburn-1973, auburn-1975,
+auburn-1981, sacramento-1994, auburn-2018, auburn-2021. The 1891 and 1994 editions
+are regional Sacramento sheets at 1:125,000 and 1:100,000; label them so, never as
+Auburn 7.5-minute maps. Pre-1950 sheets may be shown as raster display context. This
+replaces the four-edition cap and the 1950 start date for raster display only. It
+does not relax any §2 safeguard or expand trail-data claims.
+
 The countywide Nevada/Placer temporal foot-trail atlas remains a long-term program.
 Its preserved roadmap is `docs/countywide-roadmap.md`; it is not the current MVP gate.
 Do not require trail identification, digitizing, four county/era batches, new aerial
@@ -173,10 +181,13 @@ use existing regression targets and label future demo targets as unimplemented.
 
 ### 5.1 Scope discipline
 
-The owner selected the four-edition Auburn map browser as the next MVP. Implement
-D1–D4 from `docs/implementation-plan.md` only when authorized. Use an explicit source
+The owner selected the Auburn map browser as the next MVP: four editions in D1–D4,
+then the nine-edition expansion of §1. Implement D1–D4 and the expansion steps (E1
+onward) from `docs/implementation-plan.md` only when authorized. Use an explicit source
 allowlist, common mapped footprint and honest date cards. Existing raw bytes, receipts,
 research inventory and schemas remain intact. No synthetic trails reach the browser.
+The US Topo PDFs have their own receipt ledger, `data/sources/demo-pdf-retrievals.jsonl`;
+do not force them into `retrievals.jsonl`.
 
 The countywide atlas and its M0–M5 roadmap are deferred, not silently marked complete.
 `make coverage-ready` remains the old countywide release check; do not weaken it and

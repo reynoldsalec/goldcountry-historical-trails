@@ -24,6 +24,13 @@ Expected sequence:
 3. 1975 aerial orthophotoquad — `CA_Auburn_288104_1975_24000`.
 4. 1981 photorevision — `CA_Auburn_288105_1953_24000`.
 
+**Approved expansion (2026-09-29, issue #55):** nine editions in this order:
+sacramento-1891, auburn-1944, auburn-1953, auburn-1973, auburn-1975, auburn-1981,
+sacramento-1994, auburn-2018, auburn-2021. The 1891 and 1994 editions are regional
+Sacramento sheets at 1:125,000 and 1:100,000, not Auburn 7.5-minute maps. Until the
+expansion reaches the live manifest, the four-edition sequence above is what you test;
+the expansion source checks in §3 apply now.
+
 ## 2. Preparation and honest status
 
 From the repository root, the following existing baseline commands work today:
@@ -86,6 +93,21 @@ nothing about the real editions.
   registration limitations are disclosed. No arbitrary warping to align changed features.
 - [ ] Processing versions, selected hashes, tile counts and output bytes are recorded.
 - [ ] Rerunning preparation preserves raw hashes and produces equivalent map outputs.
+
+Expansion sources (E1). In a worktree, set `DEMO_RAW_ROOT` to the primary raw root.
+
+- [ ] `make expansion-test` passes.
+- [ ] `make expansion-fetch` run twice: the second run reports `present` for both PDFs
+  and appends no receipt.
+- [ ] `make expansion-check` reports all five as verified by full-file SHA-256. A range
+  probe or response header is never enough.
+- [ ] `retrievals.jsonl` is unchanged; the three reused TIFF receipts keep
+  `retrieved_at: null`. Hashes of existing files under `data/raw/topo/` are unchanged.
+- [ ] The printed credit note on each US Topo PDF matches `credit_note` in
+  `data/sources/demo-pdf-sources.json` (a human confirms the agent transcription).
+- [ ] Open processing blockers from `expansion-check` are listed in
+  `docs/open-questions.md`, not hidden.
+- [ ] PDF backup is not verified: `verify-backup` does not cover `data/raw/us-topo/`.
 
 ## 4. Main browser walkthrough
 

@@ -393,3 +393,114 @@ zoom range each forcing a re-cut; the fingerprint responding to every recorded p
 failure part way through publishing nothing; a later failure leaving the published pyramids
 and the record intact; an unexpected directory under the tile root; a `demo-cogs` run not
 invalidating a valid pyramid; and a tiling run changing no raw byte and no receipt.
+
+## 10. The five added editions (expansion E3, `make expansion-rasters`)
+
+`make expansion-rasters` first runs `make expansion-pdf`, which reuses its outputs when
+nothing changed. It then runs `scripts/demo_expansion.py rasters`, which checks the
+version-2 manifest (see `docs/demo-source-review.md` §8). It warps and tiles only the
+five added editions, and only into `build/expansion/`:
+
+- `rasters/<edition>.tif`: COG with an alpha band.
+- `tiles/<edition>/{z}/{x}/{y}.png`: XYZ tiles.
+- `demo-expansion-processing.json`: the record.
+
+The run does not read or write the four live COGs and pyramids, `build/tiles/demo` or
+`build/public`. The run date is 2026-09-29, with the tool versions of §1. Each result
+below is a machine check. No human reviewed any of them.
+
+### 10.1 Per-edition grid and zoom range
+
+Each edition is warped onto the XYZ-aligned grid of its own `native_max_zoom`, over the
+unchanged `view_bounds_wgs84`. It is tiled from zoom 10 up to that zoom and no further.
+The record stores the range per edition as `zoom.min`/`zoom.max`. A later public build
+checks each tree against its own range, not against a global 10–16. A camera zoom above
+`zoom.max` must overzoom that level. The number of tiles at each level equals the grid's
+tile range at that level, so no tile outside the view is written. Resampling is
+`nearest` for all five, because all five are map sheets. Only the 1975 orthophotoquad
+uses `cubic`, and this stage does not re-tile it.
+
+Two resampling-independent changes to shared code:
+
+- **Pipeline agreement limit.** `verify_pipeline` now allows the larger of 5 m and one
+  source pixel. On the 47 km-wide 1891 sheet, GDAL's coarse outline sampling gave
+  6.29 m, which is 0.6 of its 10.58 m pixel. The 2.03 m scans still get 5 m.
+- **Alpha band.** It is still source coverage intersected with the crop polygon only. No
+  pixel value is used.
+
+### 10.2 What was produced
+
+Record totals: **2,475 tiles, 132,917,652 bytes** of PNG.
+
+| Edition | Zooms | Grid (px) | COG bytes | Tiles (z10…top) | Tile bytes |
+| --- | --- | --- | --- | --- | --- |
+| sacramento-1891 | 10–14 | 1792 × 2048 at 9.555 m | 5,251,088 | 1, 4, 9, 20, 56 = 90 | 4,992,968 |
+| auburn-1944 | 10–15 | 3328 × 3840 at 4.777 m | 24,572,648 | 1, 4, 9, 20, 56, 195 = 285 | 23,457,155 |
+| sacramento-1994 | 10–14 | 1792 × 2048 at 9.555 m | 8,813,952 | 90 | 8,407,559 |
+| auburn-2018 | 10–16 | 6144 × 7680 at 2.389 m | 43,455,435 | …, 195, 720 = 1,005 | 47,904,484 |
+| auburn-2021 | 10–16 | 6144 × 7680 at 2.389 m | 43,765,295 | 1,005 | 48,155,486 |
+
+Grid resolution is in EPSG:3857 metres. The first run took 137 s. A second
+`make expansion-rasters` reused all five COGs and pyramids in 1.3 s and wrote the same
+record. A fresh warp after a change to the registration settings gave the same COG and tile
+byte counts per edition.
+Before and after each run, the stage re-hashes every raw TIFF, the two raw PDFs and the
+two rendered PDF COGs.
+
+### 10.3 Registration: machine checks only
+
+The record states for each edition:
+
+- the pinned datum operation and its accuracy;
+- the GDAL-versus-pyproj extent agreement;
+- the neatline residuals of §8.3 in `docs/demo-source-review.md`;
+- `offsets_vs_reference`, a phase-correlation measurement against auburn-1953.
+
+The offset check uses five dispersed patches: the crop centre, and 25%/75% of the crop's
+extent in each direction. Each patch is 4 km wide in EPSG:3857 (about 3.1 km on the
+ground). Both editions are warped to the added edition's grid for the check. An offset
+is reported only when the correlation peak is at least twice the next-highest peak
+outside a 3 px neighbourhood. Otherwise the patch records "not distinct" and gives no
+offset. No feature is named or surveyed, and no offset was corrected.
+
+| Edition | Distinct patches | Offsets found (east, north; ground m) |
+| --- | --- | --- |
+| sacramento-1891 | 0 of 5 | none established |
+| auburn-1944 | 0 of 5 | none established |
+| sacramento-1994 | 3 of 5 | NW (+2.8, −14.3), NE (+4.5, −6.5), SW (+7.4, −21.6) |
+| auburn-2018 | 1 of 5 | SE (−7.5, +3.7) |
+| auburn-2021 | 1 of 5 | SE (−7.2, +3.2) |
+
+Uncertainty of a distinct offset: about ±1 grid pixel (7.4 m at zoom 14, 1.9 m at
+zoom 16). That is on top of the 7 m and 4 m accuracies of the datum operations. The
+offsets are as large as those accuracies, so they show no gross misregistration. They
+do not establish sub-datum agreement. For 1891 and 1944 the maps share too little drawn
+linework with 1953 for this measurement to say anything. Their registration evidence is
+only the neatline check. See `docs/open-questions.md`.
+
+### 10.4 Tests
+
+`scripts/test_demo_expansion.py` (in `make expansion-test`) runs on synthetic sources
+from `scripts/test_demo.py`: three regional scans at their real pixel sizes and CRSs,
+and two NAD83 UTM pages standing in for the PDF renders. The tests cover:
+
+- the nine-edition allowlist and order;
+- a duplicate source, and a wrong or unknown source kind;
+- labels and scales of the regional sheets;
+- component dates against the index;
+- verbatim credits;
+- `initial_edition`;
+- zoom limits on the lower-resolution sheets: a claimed zoom 16 is refused, and the
+  pyramids stop at 14;
+- a shrunk crop and the coverage floor;
+- PDF, render and COG hash lineage;
+- the recorded index CRS disagreements;
+- bounded tile ranges and two-valued, crop-exact alpha;
+- output confined to the expansion root, reuse, and raw bytes left unchanged;
+- phase-correlation sign and refusal on unrelated patches;
+- compatibility of the four old editions with the live manifest.
+
+The negative tests in `scripts/test_demo.py` now run against both the four-edition and
+the nine-edition tree. They cover missing, duplicate, extra and reordered editions; kind
+mismatches; index date disagreement; non-public rights; and attribution against
+`sources.yml`.
