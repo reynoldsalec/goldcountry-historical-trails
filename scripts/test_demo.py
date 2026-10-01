@@ -1231,8 +1231,9 @@ def test_missing_ledger_rejected(tree):
 def test_committed_manifest_meets_the_contract():
     """Runs without data/raw: schema, allowlist, dates, rights and ring geometry."""
     manifest = demo.read_json(demo.MANIFEST_PATH)
+    assert manifest["version"] == 2
     crops = demo.check_metadata(manifest, demo.SCHEMA_PATH, demo.INDEX_PATH, demo.SOURCES_PATH)
-    assert sorted(crops) == sorted(demo.EDITION_ORDER)
+    assert list(crops) == demo.EXPANDED_EDITION_ORDER
 
 
 def real_raw_root():
@@ -1241,20 +1242,28 @@ def real_raw_root():
 
 
 def selected_real_paths():
+    """The seven scans and two PDFs, or None. The PDFs also need their E2 renders."""
     root = real_raw_root()
     paths = {}
-    for eid in demo.EDITION_ORDER:
-        topo_id = demo.EXPECTED_EDITIONS[eid]["source_id"]
-        candidate = root / "topo" / f"{topo_id}_geo.tif"
-        if not candidate.exists():
+    for eid in demo.EXPANDED_EDITION_ORDER:
+        contract = demo.EXPANDED_EXPECTED_EDITIONS[eid]
+        if contract["source_kind"] == "us_topo_pdf":
+            receipt = demo_sources.load_ledger().get(contract["source_id"])
+            candidate = None if receipt is None else root / receipt["path"]
+        else:
+            candidate = root / "topo" / f"{contract['source_id']}_geo.tif"
+        if candidate is None or not candidate.exists():
             return None
         paths[eid] = candidate
+    if not (demo.EXPANSION_ROOT / demo.PDF_RECORD_NAME).is_file():
+        return None
     return paths
 
 
 needs_real_bytes = pytest.mark.skipif(
     selected_real_paths() is None,
-    reason="selected source bytes are not present; set DEMO_RAW_ROOT or run make fetch-topo",
+    reason="selected source bytes or their PDF renders are not present; set DEMO_RAW_ROOT "
+    "and run make expansion-pdf",
 )
 
 
@@ -1264,22 +1273,23 @@ def test_committed_manifest_matches_the_real_sources():
         demo.cli, ["check", "--raw-root", str(real_raw_root())], catch_exceptions=False
     )
     assert result.exit_code == 0, result.output
-    assert "4 public editions verified" in result.output
+    assert "9 public editions verified" in result.output
 
 
 @needs_real_bytes
 def test_real_tree_with_only_the_selected_inputs(tmp_path):
-    """A fresh checkout holding only the four selected scans passes unchanged."""
+    """A fresh raw root holding only the seven selected scans and two PDFs passes unchanged."""
     paths = selected_real_paths()
     raw_root = tmp_path / "raw"
-    (raw_root / "topo").mkdir(parents=True)
+    real = real_raw_root()
     for source in paths.values():
-        target = raw_root / "topo" / source.name
+        target = raw_root / source.relative_to(real)
+        target.parent.mkdir(parents=True, exist_ok=True)
         try:
             os.link(source, target)
         except OSError:
             target.write_bytes(source.read_bytes())
-    assert len(list((raw_root / "topo").iterdir())) == 4
+    assert len([path for path in raw_root.rglob("*") if path.is_file()]) == 9
     result = CliRunner().invoke(
         demo.cli, ["check", "--raw-root", str(raw_root)], catch_exceptions=False
     )

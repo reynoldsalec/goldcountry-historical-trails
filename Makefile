@@ -105,7 +105,8 @@ verify-backup:
 DEMO_RAW_ROOT ?= data/raw
 export DEMO_RAW_ROOT
 
-## verify the four-edition manifest against its schema, the index, receipts and scans
+## verify the nine-edition manifest against its schema, index, receipts, scans and PDFs
+# Reads only; the two US Topo editions need the renders 'make expansion-pdf' writes.
 demo-check:
 	$(RUN) python scripts/demo.py check
 
@@ -113,26 +114,26 @@ demo-check:
 demo-inspect:
 	$(RUN) python scripts/demo.py inspect
 
-## warp the four verified sources onto one EPSG:3857 grid -> build/rasters/ (D2a)
+## warp the four 1:24,000 base sources onto one EPSG:3857 grid -> build/rasters/ (D2a)
 # Uses the GDAL inside the rasterio wheel; no gdalwarp binary is needed. Re-running warps
 # only what changed. See docs/demo-processing.md.
-demo-cogs:
+demo-cogs: expansion-pdf
 	$(RUN) python scripts/demo.py cogs
 
-## preflight + COGs + bounded XYZ PNG tiles -> build/tiles/demo/<edition>/{z}/{x}/{y}.png (D2b)
-# Zooms 10-16, XYZ y orientation, cut with the same bundled GDAL as demo-cogs. Unchanged
+## preflight + COGs + bounded XYZ PNG tiles for all nine editions (D2b, #58)
+# The four base pyramids go to build/tiles/demo/, the five added ones to
+# build/expansion/tiles/, each from zoom 10 up to its own native_max_zoom. Unchanged COGs and
 # pyramids are reused. See docs/demo-processing.md.
-demo-rasters:
+demo-rasters: expansion-pdf
 	$(RUN) python scripts/demo.py rasters
 
-## nine-edition expansion sources (issue #55); none are in demo-editions.json yet
+## the five sources the nine-edition manifest adds (issue #55), then the whole manifest
 # Offline: full-file SHA-256 of the three reused historical TIFFs and two US Topo PDFs
-# against their receipts under DEMO_RAW_ROOT, then the staged version-2 manifest against
-# all nine sources (#57). The PDF editions need 'make expansion-pdf' to have run.
-EXPANDED_MANIFEST := data/sources/demo-editions-expanded.json
+# against their receipts under DEMO_RAW_ROOT, then demo-editions.json against all nine
+# sources. The PDF editions need 'make expansion-pdf' to have run.
 expansion-check:
 	$(RUN) python scripts/demo_sources.py check
-	$(RUN) python scripts/demo.py check --manifest $(EXPANDED_MANIFEST)
+	$(RUN) python scripts/demo.py check
 
 ## download the two US Topo PDFs into DEMO_RAW_ROOT/us-topo/sha256/; reruns are no-ops
 expansion-fetch:
@@ -144,9 +145,9 @@ expansion-fetch:
 expansion-pdf:
 	$(RUN) python scripts/demo_pdf.py run
 
-## the five added editions -> COGs and bounded XYZ pyramids under build/expansion/ (#57)
-# Each edition is tiled from zoom 10 up to its own native_max_zoom only. Unchanged COGs and
-# pyramids are reused. Record: build/expansion/demo-expansion-processing.json.
+## only the five added editions -> COGs and bounded XYZ pyramids under build/expansion/ (#57)
+# 'make demo-rasters' runs this step too. Each edition is tiled from zoom 10 up to its own
+# native_max_zoom only. Record: build/expansion/demo-expansion-processing.json.
 expansion-rasters: expansion-pdf
 	$(RUN) python scripts/demo_expansion.py rasters
 
@@ -171,10 +172,11 @@ demo-frontend-test: site-deps
 
 ## vite dev server for the edition browser -> http://127.0.0.1:5173/
 # Serves /editions.json from data/sources/demo-editions.json and /tiles from
-# build/tiles/demo, so run 'make demo-rasters' first or the map has no imagery.
+# build/tiles/demo and build/expansion/tiles, so run 'make demo-rasters' first.
 demo-dev: site-deps
-	@test -d build/tiles/demo || { \
-	  echo 'demo-dev: no tiles in build/tiles/demo; run "make demo-rasters" first.'; exit 1; }
+	@test -d build/tiles/demo -a -d build/expansion/tiles || { \
+	  echo 'demo-dev: no tiles in build/tiles/demo or build/expansion/tiles; run' \
+	    '"make demo-rasters" first.'; exit 1; }
 	cd $(SITE) && $(NPM) run dev
 
 ## install the headless browser Playwright drives; idempotent once the cache is populated
@@ -196,17 +198,18 @@ demo-browser-test: site-browsers
 	cd $(SITE) && $(NPM) run test:browser
 	cd $(SITE) && $(NPM) run test:browser:built
 
-## preflight + rasters + site bundle -> allowlisted build/public/ (D4a)
-# Only the four recorded tile trees, the built app assets and a sanitized editions.json are
-# copied. Nothing is published until the staged tree passes its completeness and
-# restricted-value checks, so a failure leaves any previous build/public untouched.
-# The output inventory is written to build/publish/demo-publish.json.
-demo-build: site-deps
+## preflight + rasters + site bundle -> allowlisted build/public/ (D4a, #58)
+# Only the nine recorded tile trees, the built app assets and a sanitized editions.json are
+# copied; no PDF, receipt or processing record. Nothing is published until the staged tree
+# passes its completeness, zoom-range and restricted-value checks, so a failure leaves any
+# previous build/public untouched. The inventory goes to build/publish/demo-publish.json.
+demo-build: site-deps expansion-pdf
 	$(RUN) python scripts/demo.py build
 
 demo-test: demo-frontend-test demo-browser-test
 	$(RUN) pytest -q scripts/test_demo.py scripts/test_demo_rasters.py \
-	  scripts/test_demo_build.py scripts/test_demo_make.py
+	  scripts/test_demo_build.py scripts/test_demo_make.py \
+	  scripts/test_demo_sources.py scripts/test_demo_pdf.py scripts/test_demo_expansion.py
 
 ## the local release gate: offline demo suites, the real build, then baseline validation (D4b)
 # Validation runs last and on purpose: scripts/validate.py scans the build/public tree this

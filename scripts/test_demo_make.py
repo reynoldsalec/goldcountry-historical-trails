@@ -62,6 +62,28 @@ def test_demo_accept_includes_the_frontend_and_browser_suites():
         assert command in text
 
 
+def test_demo_build_renders_the_us_topo_pdfs_before_it_builds():
+    # The two US Topo editions are checked and tiled from the renders expansion-pdf writes.
+    order(dry_run("demo-build"), "scripts/demo_pdf.py run", "scripts/demo.py build")
+
+
+def test_demo_test_runs_the_nine_edition_suites():
+    text = dry_run("demo-test")
+    for suite in (
+        "scripts/test_demo_build.py",
+        "scripts/test_demo_expansion.py",
+        "scripts/test_demo_sources.py",
+        "scripts/test_demo_pdf.py",
+    ):
+        assert suite in text
+
+
+def test_expansion_check_verifies_the_active_manifest():
+    text = dry_run("expansion-check")
+    order(text, "scripts/demo_sources.py check", "scripts/demo.py check")
+    assert "demo-editions-expanded.json" not in text
+
+
 def test_demo_accept_validates_after_the_build_not_before():
     text = dry_run("demo-accept")
     assert text.count("scripts/validate.py") == 1

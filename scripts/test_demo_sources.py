@@ -255,14 +255,23 @@ def test_committed_topo_receipts_are_reused_not_duplicated():
         assert record["raw_path"] == f"topo/{topo_id}_geo.tif"
 
 
-def test_expansion_sources_stay_out_of_the_live_manifest():
-    ds.check_not_live(ds.CATALOG_PATH, ds.EDITIONS_PATH)
+def test_the_active_manifest_carries_the_five_sources():
+    ds.check_live(ds.CATALOG_PATH, ds.EDITIONS_PATH)
     assert ds.EXPANSION_ORDER[2:6] == (
         "auburn-1953",
         "auburn-1973",
         "auburn-1975",
         "auburn-1981",
     )
+
+
+def test_a_manifest_missing_an_added_source_is_not_the_nine_edition_set(tmp_path):
+    manifest = json.loads(ds.EDITIONS_PATH.read_text(encoding="utf-8"))
+    manifest["editions"] = [e for e in manifest["editions"] if e["id"] != "auburn-2021"]
+    path = tmp_path / "demo-editions.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(click.ClickException, match="missing auburn-2021"):
+        ds.check_live(ds.CATALOG_PATH, path)
 
 
 def topo_fixture(tmp_path, present=True, corrupt=False):

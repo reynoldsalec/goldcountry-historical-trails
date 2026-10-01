@@ -1,4 +1,5 @@
-"""The staged nine-edition manifest (#57): contract, crops, zoom limits and the raster stage.
+"""The nine-edition manifest (#57, active since #58): contract, crops, zoom limits and the
+raster stage of the five added editions.
 
 Synthetic sources come from test_demo.py; nothing here reads data/raw/ or writes outside
 tmp_path, except the committed-manifest checks, which read data/sources/ only.
@@ -30,6 +31,27 @@ expanded_tree = test_demo.expanded_tree
 ADDED = [eid for eid in demo.EXPANDED_EDITION_ORDER if eid not in demo.EDITION_ORDER]
 # Zoom 15 is the cheapest cap that still shows the 1891 and 1994 sheets stopping below it.
 TEST_ZOOM_CAP = 15
+# SHA-256 of each original four-edition entry (sorted-key JSON of its version-1 fields) as
+# committed in data/sources/demo-editions.json before #58 promoted the nine-edition file.
+ORIGINAL_FOUR = {
+    "auburn-1953": "2805b5b7ef23df70b001c94cf0d3286da6853db129dbe66e1b558b92816a6286",
+    "auburn-1973": "eb0143445999d6372294deb0632bc60bc2736b3e47545d32c3577bd021839e2e",
+    "auburn-1975": "efcb51825633f62b66b62b7b10451ff5f2d780680fccd0c6b084144032c5cc7f",
+    "auburn-1981": "40bd8c20db6aafc682d477e18dd8b14932e5004dcb5c47b2a0c7058441c835af",
+}
+VERSION_1_FIELDS = (
+    "attribution",
+    "citation",
+    "crop_wgs84",
+    "date_note",
+    "dates",
+    "id",
+    "kind",
+    "label",
+    "rights",
+    "source_id",
+    "source_url",
+)
 
 
 def run_expansion(tree, *args):
@@ -51,22 +73,23 @@ def test_committed_expanded_manifest_meets_the_contract():
     assert manifest["initial_edition"] == "auburn-1953"
 
 
-def test_the_four_live_editions_are_carried_over_unchanged():
-    live = demo.read_json(demo.MANIFEST_PATH)
-    staged = demo.read_json(demo.EXPANDED_MANIFEST_PATH)
-    assert live["version"] == 1
-    assert staged["view_bounds_wgs84"] == live["view_bounds_wgs84"]
-    assert staged["tile_zoom"] == live["tile_zoom"]
-    for edition in live["editions"]:
-        carried = by_id(staged, edition["id"])
-        for key in edition:
-            assert carried[key] == edition[key], (edition["id"], key)
-
-
-def test_the_live_manifest_still_passes_its_own_contract():
+def test_the_nine_edition_manifest_is_the_active_one():
+    assert demo.EXPANDED_MANIFEST_PATH == demo.MANIFEST_PATH
+    assert not (demo.REPO_ROOT / "data/sources/demo-editions-expanded.json").exists()
     manifest = demo.read_json(demo.MANIFEST_PATH)
-    crops = demo.check_metadata(manifest, demo.SCHEMA_PATH, demo.INDEX_PATH, demo.SOURCES_PATH)
-    assert list(crops) == demo.EDITION_ORDER
+    assert manifest["version"] == 2
+    assert manifest["edition_order"] == demo.EXPANDED_EDITION_ORDER
+
+
+def test_the_four_original_editions_are_carried_over_unchanged():
+    manifest = demo.read_json(demo.MANIFEST_PATH)
+    # The camera bounds and zoom range of the original four-edition viewer.
+    assert manifest["view_bounds_wgs84"] == [-121.126028, 38.874881, -121.001023, 38.99988]
+    assert manifest["tile_zoom"] == {"min": 10, "max": 16}
+    for edition_id, digest in ORIGINAL_FOUR.items():
+        carried = {key: by_id(manifest, edition_id)[key] for key in VERSION_1_FIELDS}
+        text = json.dumps(carried, sort_keys=True).encode()
+        assert hashlib.sha256(text).hexdigest() == digest, edition_id
 
 
 def test_one_shared_nine_edition_contract():
@@ -139,17 +162,27 @@ def test_us_topo_credits_are_the_catalog_text_verbatim():
             assert edition["printed_credit_note"] is None
 
 
-def test_the_live_pipeline_refuses_the_staged_manifest(tmp_path):
-    with pytest.raises(Exception, match="only the live version-1 manifest"):
-        demo.run_cogs(
-            demo.EXPANDED_MANIFEST_PATH,
-            demo.SCHEMA_PATH,
-            demo.INDEX_PATH,
-            demo.RECEIPTS_PATH,
-            demo.SOURCES_PATH,
-            tmp_path / "raw",
-            tmp_path / "build",
-        )
+def test_the_base_pipeline_warps_only_the_four_base_editions(expanded_tree, tmp_path):
+    result = demo.run_cogs(
+        expanded_tree.manifest_path,
+        demo.SCHEMA_PATH,
+        expanded_tree.index_path,
+        expanded_tree.receipts_path,
+        expanded_tree.sources_path,
+        expanded_tree.raw_root,
+        tmp_path / "build",
+        12,
+        demo_sources.CATALOG_PATH,
+        expanded_tree.ledger_path,
+        expanded_tree.expansion_root,
+    )
+    record = result["record"]
+    assert [entry["id"] for entry in record["editions"]] == demo.EDITION_ORDER
+    assert record["base_editions"] == demo.EDITION_ORDER
+    assert record["edition_order"] == demo.EXPANDED_EDITION_ORDER
+    assert sorted(p.name for p in (tmp_path / "build" / "rasters").glob("*.tif")) == sorted(
+        f"{eid}.tif" for eid in demo.EDITION_ORDER
+    )
 
 
 # --- the version-2 check on synthetic sources ------------------------------------------

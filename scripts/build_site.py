@@ -1,5 +1,5 @@
 """Assemble build/public/ for the Auburn map browser: app assets, sanitized edition
-metadata and the four tile pyramids, published atomically (AGENTS.md §2.5, D4a).
+metadata and the nine tile pyramids, published atomically (AGENTS.md §2.5, D4a, #58).
 
 Nothing is copied that is not named by an allowlist here, so a file added anywhere under
 data/, docs/ or build/ cannot reach the public build by being in the way. Publication is
@@ -18,6 +18,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import demo
+import demo_expansion
+import demo_sources
 import validate
 import warp_raster
 from demo import fail, read_json
@@ -36,6 +38,8 @@ PUBLISH_DIRNAME = "publish"
 PUBLISH_FILENAME = "demo-publish.json"
 EDITIONS_FILENAME = "editions.json"
 TILE_PREFIX = "tiles"
+EXPANSION_DIRNAME = "expansion"
+PUBLISHED_MANIFEST_VERSION = 2
 
 # The viewer fetches ./editions.json and resolves tile templates against its own document,
 # so every published path is relative and same-origin.
@@ -50,6 +54,11 @@ REQUIRED_APP_FILE = "index.html"
 PROHIBITED_NAMES = frozenset(
     {
         demo.PROCESSING_FILENAME,
+        demo.PDF_RECORD_NAME,
+        demo_expansion.RECORD_NAME,
+        demo_sources.CATALOG_PATH.name,
+        demo_sources.LEDGER_PATH.name,
+        "demo-expansion-topo.json",
         "demo-editions.json",
         "retrievals.jsonl",
         "coverage.json",
@@ -85,31 +94,57 @@ PROHIBITED_SUFFIXES = frozenset(
 # bundle is what users get, so it is checked again here.
 FORBIDDEN_BUNDLE_TOKEN = "__demoTestProbe"
 
-# Internal-only manifest keys, and anything naming this machine or this checkout. If one of
-# these strings reaches editions.json the export has stopped being display-only.
-FORBIDDEN_METADATA_TOKENS = ("crop_wgs84", "raw_path", "sha256", "retrieved_at", "data/raw")
+# Internal-only manifest, receipt and processing-record keys, and anything naming this
+# machine or this checkout. If one reaches editions.json it has stopped being display-only.
+FORBIDDEN_METADATA_TOKENS = (
+    "crop_wgs84",
+    "raw_path",
+    "sha256",
+    "retrieved_at",
+    "data/raw",
+    "retrieval_url",
+    "metadata_url",
+    "size_bytes",
+    "rendered_cog",
+    "fingerprint",
+    "us-topo/sha256",
+    ".pdf",
+    ".tif",
+    "processing.json",
+)
 
 EDITION_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 REFERENCE_PATTERN = re.compile(r'(?:src|href)="([^"]*)"')
 TILE_COMPONENT_PATTERN = re.compile(r"^(0|[1-9][0-9]{0,8})$")
 
+# `native_max_zoom` is published as the top zoom actually cut for the edition: above it the
+# viewer overzooms that level instead of asking for tiles that do not exist.
 PUBLIC_EDITION_KEYS = (
     "id",
     "source_id",
     "kind",
+    "source_kind",
     "label",
+    "sheet_name",
+    "scale",
     "citation",
     "source_url",
     "rights",
     "attribution",
+    "printed_credit_note",
+    "publication_date",
     "dates",
+    "component_dates",
     "date_note",
+    "native_resolution_metres",
+    "native_max_zoom",
     "tile_url",
 )
 PUBLIC_MANIFEST_KEYS = (
     "version",
     "area_id",
     "edition_order",
+    "initial_edition",
     "view_bounds_wgs84",
     "tile_zoom",
     "editions",
@@ -121,7 +156,7 @@ PUBLIC_MANIFEST_KEYS = (
 # --------------------------------------------------------------------------------------
 
 
-def public_edition(edition: dict, edition_id: str) -> dict:
+def public_edition(edition: dict, edition_id: str, max_zoom: int) -> dict:
     """One edition reduced to the display fields, plus its relative tile template."""
     projected = {}
     for key in PUBLIC_EDITION_KEYS:
@@ -130,17 +165,21 @@ def public_edition(edition: dict, edition_id: str) -> dict:
                 edition_id=edition_id, z="{z}", x="{x}", y="{y}"
             )
             continue
+        if key == "native_max_zoom":
+            projected[key] = max_zoom
+            continue
         if key not in edition:
             fail(f"{edition_id}: the manifest has no {key}; the public card cannot be built.")
         projected[key] = edition[key]
     return projected
 
 
-def sanitize_manifest(manifest: dict, tile_zoom: dict) -> dict:
+def sanitize_manifest(manifest: dict, tile_zoom: dict, edition_zoom: dict[str, int]) -> dict:
     """Project the internal manifest onto the display-only shape the viewer fetches.
 
     Mirrors `publicManifestFrom` in site/src/editions.ts, which the dev server uses, so
-    the built site and `make demo-dev` read the same shape.
+    the built site and `make demo-dev` read the same shape. `edition_zoom` is each edition's
+    top cut zoom.
     """
     editions = manifest.get("editions")
     order = manifest.get("edition_order")
@@ -149,15 +188,20 @@ def sanitize_manifest(manifest: dict, tile_zoom: dict) -> dict:
     by_id = {edition.get("id"): edition for edition in editions}
     if len(by_id) != len(editions):
         fail("The manifest holds two editions with the same id.")
+    if manifest.get("initial_edition") not in order:
+        fail(f"initial_edition {manifest.get('initial_edition')!r} is not in edition_order.")
     projected = []
     for edition_id in order:
         if edition_id not in by_id:
             fail(f"edition_order names unknown edition {edition_id!r}.")
-        projected.append(public_edition(by_id[edition_id], edition_id))
+        projected.append(
+            public_edition(by_id[edition_id], edition_id, edition_zoom[edition_id])
+        )
     payload = {
         "version": manifest["version"],
         "area_id": manifest["area_id"],
         "edition_order": list(order),
+        "initial_edition": manifest["initial_edition"],
         "view_bounds_wgs84": list(manifest["view_bounds_wgs84"]),
         "tile_zoom": {"min": tile_zoom["min"], "max": tile_zoom["max"]},
         "editions": projected,
@@ -180,6 +224,9 @@ def check_sanitized(payload: dict) -> None:
             fail(f"{edition['id']}: tile_url is not the relative published template.")
         if "://" in template or template.startswith("/"):
             fail(f"{edition['id']}: tile_url is not a relative same-origin path.")
+        zoom = payload["tile_zoom"]
+        if not zoom["min"] <= edition["native_max_zoom"] <= zoom["max"]:
+            fail(f"{edition['id']}: native_max_zoom is outside the published tile_zoom {zoom}.")
     blob = json.dumps(payload)
     leaked = [token for token in FORBIDDEN_METADATA_TOKENS if token in blob]
     # The host name and the checkout path say where the build ran; neither is site content.
@@ -248,13 +295,103 @@ def copy_app_assets(dist: Path, staging: Path) -> list[dict]:
     return inventory
 
 
-def recorded_pyramids(record: dict) -> dict[str, dict]:
+def recorded_pyramids(
+    build_root: Path, record: dict, manifest: dict, expansion_root: Path
+) -> dict[str, dict]:
+    """Every recorded pyramid, wherever it was cut, in one shape: where it is on disk, what
+    its bytes must hash to, the zoom range it was cut over and the crop it was cut for.
+
+    The four base pyramids come from demo-processing.json; the five added ones from the
+    expansion record, which must describe this same manifest.
+    """
     tiles = record.get("tiles")
     if not isinstance(tiles, dict) or not tiles.get("editions"):
         fail(
             f"{demo.PROCESSING_FILENAME} records no tile pyramids; run make demo-rasters first."
         )
-    return {entry["id"]: entry for entry in tiles["editions"]}
+    cogs = {entry["id"]: entry for entry in record.get("editions", [])}
+    base_root = build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR
+    found = {}
+    for entry in tiles["editions"]:
+        found[entry["id"]] = {
+            "root": base_root,
+            "source_id": entry["source_id"],
+            "digest": entry["digest"],
+            "tiles": entry["tiles"],
+            "bytes": entry["bytes"],
+            "transparent_tiles": entry["transparent_tiles"],
+            "zoom": {"min": tiles["zoom"]["min"], "max": tiles["zoom"]["max"]},
+            "crop_wgs84": cogs.get(entry["id"], {}).get("crop_wgs84"),
+            "record": demo.PROCESSING_FILENAME,
+        }
+    added_path = expansion_root / demo_expansion.RECORD_NAME
+    if not added_path.is_file():
+        fail(f"No {demo_expansion.RECORD_NAME} at {added_path}; run make demo-rasters first.")
+    added = read_json(added_path)
+    if added.get("edition_order") != manifest["edition_order"] or added.get(
+        "view_bounds_wgs84"
+    ) != list(manifest["view_bounds_wgs84"]):
+        fail(
+            f"{demo_expansion.RECORD_NAME} was built for another edition set or view; "
+            "re-run make demo-rasters."
+        )
+    for entry in added.get("editions", []):
+        cut = entry["tiles"]
+        if cut["path"] != f"{demo_expansion.TILE_DIRNAME}/{entry['id']}":
+            fail(f"{entry['id']}: the recorded pyramid path {cut['path']!r} is not its own.")
+        found[entry["id"]] = {
+            "root": expansion_root / demo_expansion.TILE_DIRNAME,
+            "source_id": entry["source"]["source_id"],
+            "digest": cut["digest"],
+            "tiles": cut["tiles"],
+            "bytes": cut["bytes"],
+            "transparent_tiles": cut["transparent_tiles"],
+            "zoom": {"min": entry["zoom"]["min"], "max": entry["zoom"]["max"]},
+            "crop_wgs84": entry["crop_wgs84"],
+            "record": demo_expansion.RECORD_NAME,
+        }
+    return found
+
+
+def check_edition_ids(order: list[str]) -> None:
+    """Names are checked before any tree is read, so a traversing id cannot reach a copy."""
+    for edition_id in order:
+        if not isinstance(edition_id, str) or not EDITION_ID_PATTERN.fullmatch(edition_id):
+            fail(f"Edition id {edition_id!r} is not a safe published directory name.")
+
+
+def expected_zoom(edition: dict, tile_zoom: dict) -> dict:
+    """The range an edition must have been cut over: from the shared minimum up to its own
+    native zoom, or the build's top zoom when that is lower (a reduced test build)."""
+    return {
+        "min": tile_zoom["min"],
+        "max": min(edition.get("native_max_zoom", tile_zoom["max"]), tile_zoom["max"]),
+    }
+
+
+def check_pyramids_agree(manifest: dict, pyramids: dict, tile_zoom: dict) -> dict[str, dict]:
+    """Each pyramid was cut for this manifest's crop and over its edition's own zoom range,
+    so no pyramid from an older manifest or a differently capped run can be mixed in."""
+    zooms = {}
+    for edition in manifest["editions"]:
+        eid = edition["id"]
+        entry = pyramids.get(eid)
+        if entry is None:
+            fail(f"{eid}: no pyramid recorded in {demo.PROCESSING_FILENAME} or the expansion.")
+        if entry["crop_wgs84"] != edition["crop_wgs84"]:
+            fail(
+                f"{eid}: the pyramid in {entry['record']} was cut for another crop than the "
+                "manifest declares; re-run make demo-rasters."
+            )
+        expected = expected_zoom(edition, tile_zoom)
+        if entry["zoom"] != expected:
+            fail(
+                f"{eid}: the pyramid in {entry['record']} covers zoom {entry['zoom']}, not "
+                f"{expected} for native zoom {edition.get('native_max_zoom')} under this "
+                f"build's top zoom {tile_zoom['max']}; re-run make demo-rasters."
+            )
+        zooms[eid] = expected
+    return zooms
 
 
 def check_tile_names(root: Path, files: list[Path], zoom: dict, edition_id: str) -> None:
@@ -271,31 +408,34 @@ def check_tile_names(root: Path, files: list[Path], zoom: dict, edition_id: str)
             fail(f"{edition_id}: zoom {z} is outside the built range {zoom}.")
 
 
-def copy_tile_trees(tile_root: Path, staging: Path, record: dict) -> list[dict]:
-    """The four recorded pyramids, verified complete against their digests, and only those."""
-    if not tile_root.is_dir():
-        fail(f"No tiles at {tile_root}; run make demo-rasters first.")
-    order = record["edition_order"]
-    recorded = recorded_pyramids(record)
-    zoom = record["tiles"]["zoom"]
-    # Names are checked before the tree is read, so a traversing id cannot reach a copy.
+def copy_tile_trees(
+    staging: Path, order: list[str], pyramids: dict[str, dict], zooms: dict[str, dict]
+) -> list[dict]:
+    """The nine recorded pyramids, verified complete against their digests, and only those."""
+    check_edition_ids(order)
     for edition_id in order:
-        if not EDITION_ID_PATTERN.fullmatch(edition_id):
-            fail(f"Edition id {edition_id!r} is not a safe published directory name.")
-    unexpected = sorted(path.name for path in tile_root.iterdir() if path.name not in order)
-    if unexpected:
-        fail(
-            f"{tile_root} holds unselected entries {unexpected}; the public build copies only "
-            f"{order}. Remove them or run make clean."
-        )
+        if edition_id not in pyramids:
+            fail(f"{edition_id}: no pyramid recorded in {demo.PROCESSING_FILENAME}.")
+    # Each tile root may hold only the editions recorded as cut there.
+    roots: dict[Path, set[str]] = {}
+    for edition_id in order:
+        roots.setdefault(pyramids[edition_id]["root"], set()).add(edition_id)
+    for tile_root, owned in roots.items():
+        if not tile_root.is_dir():
+            fail(f"No tiles at {tile_root}; run make demo-rasters first.")
+        unexpected = sorted(path.name for path in tile_root.iterdir() if path.name not in owned)
+        if unexpected:
+            fail(
+                f"{tile_root} holds unselected entries {unexpected}; the public build copies "
+                f"only {sorted(owned)} from it. Remove them or run make clean."
+            )
     inventory = []
     for edition_id in order:
-        source = tile_root / edition_id
+        entry = pyramids[edition_id]
+        zoom = zooms[edition_id]
+        source = entry["root"] / edition_id
         if not source.is_dir():
             fail(f"{edition_id}: no tile pyramid at {source}; the layer would be missing.")
-        entry = recorded.get(edition_id)
-        if entry is None:
-            fail(f"{edition_id}: no pyramid recorded in {demo.PROCESSING_FILENAME}.")
         files = source_files(source, f"{edition_id}'s pyramid")
         check_tile_names(source, files, zoom, edition_id)
         try:
@@ -319,6 +459,7 @@ def copy_tile_trees(tile_root: Path, staging: Path, record: dict) -> list[dict]:
                 "bytes": byte_count,
                 "transparent_tiles": entry["transparent_tiles"],
                 "zoom": {"min": zoom["min"], "max": zoom["max"]},
+                "record": entry["record"],
             }
         )
     return inventory
@@ -430,6 +571,10 @@ def publish_notes() -> dict:
             "recorded tile pyramids; nothing under data/ or docs/ is copied"
         ),
         "paths": "relative and same-origin; no host, origin or absolute path is published",
+        "zoom": (
+            "each edition is published up to its own cut zoom; editions.json names it as "
+            "native_max_zoom and the viewer overzooms that level beyond it"
+        ),
         "atomicity": (
             "staged under build/.public-incoming and swapped in by rename, so a failure "
             "leaves the previous build/public in place"
@@ -466,14 +611,24 @@ def assemble_public(
     manifest_path: Path,
     data_dir: Path = DATA_DIR,
     schema_dir: Path = SCHEMA_DIR,
+    expansion_root: Path | None = None,
 ) -> dict:
     """Stage, check, scan and publish. Returns the output inventory it also records."""
     manifest = read_json(manifest_path)
+    if manifest.get("version") != PUBLISHED_MANIFEST_VERSION:
+        fail(
+            f"The public build publishes the version-{PUBLISHED_MANIFEST_VERSION} nine-edition "
+            f"manifest, not version {manifest.get('version')!r}."
+        )
+    expansion_root = expansion_root or build_root / EXPANSION_DIRNAME
+    check_edition_ids(manifest["edition_order"])
     record_path = build_root / demo.RASTER_DIRNAME / demo.PROCESSING_FILENAME
     if not record_path.is_file():
         fail(f"No {demo.PROCESSING_FILENAME} at {record_path}; run make demo-rasters first.")
     record = read_json(record_path)
     zoom = check_record_agrees(manifest, record)
+    pyramids = recorded_pyramids(build_root, record, manifest, expansion_root)
+    zooms = check_pyramids_agree(manifest, pyramids, zoom)
 
     staging = build_root / STAGING_DIRNAME
     public = build_root / PUBLIC_DIRNAME
@@ -482,10 +637,11 @@ def assemble_public(
     staging.mkdir(parents=True)
     try:
         assets = copy_app_assets(dist, staging)
-        metadata = write_editions(staging, sanitize_manifest(manifest, zoom))
-        pyramids = copy_tile_trees(
-            build_root / demo.TILE_DIRNAME / demo.TILE_SUBDIR, staging, record
+        metadata = write_editions(
+            staging,
+            sanitize_manifest(manifest, zoom, {eid: z["max"] for eid, z in zooms.items()}),
         )
+        published = copy_tile_trees(staging, manifest["edition_order"], pyramids, zooms)
         files = check_staging(staging, manifest["edition_order"])
         leak_note = scan_for_restricted(staging, data_dir, schema_dir)
         staged_bytes = sum(path.stat().st_size for path in files)
@@ -499,6 +655,7 @@ def assemble_public(
         "published_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "area_id": manifest["area_id"],
         "edition_order": list(manifest["edition_order"]),
+        "initial_edition": manifest["initial_edition"],
         "root": f"{build_root.name}/{PUBLIC_DIRNAME}",
         "tile_template": TILE_TEMPLATE,
         "zoom": {"min": zoom["min"], "max": zoom["max"]},
@@ -506,12 +663,12 @@ def assemble_public(
         "tool_versions": record["tool_versions"],
         "app_assets": assets,
         "metadata": metadata,
-        "editions": pyramids,
+        "editions": published,
         "totals": {
             "files": staged_files,
             "bytes": staged_bytes,
-            "tiles": sum(entry["tiles"] for entry in pyramids),
-            "tile_bytes": sum(entry["bytes"] for entry in pyramids),
+            "tiles": sum(entry["tiles"] for entry in published),
+            "tile_bytes": sum(entry["bytes"] for entry in published),
         },
         "leak_scan": leak_note,
         "notes": publish_notes(),
@@ -556,8 +713,12 @@ def run_build(
     schema_dir: Path = SCHEMA_DIR,
     npm: str = "npm",
     vite: bool = True,
+    catalog_path: Path | None = None,
+    ledger_path: Path | None = None,
+    expansion_root: Path | None = None,
 ) -> dict:
     """Preflight, rasters, site build, allowlisted staging, leak scan, atomic publish."""
+    expansion_root = expansion_root or build_root / EXPANSION_DIRNAME
     rasters = demo.run_rasters(
         manifest_path,
         schema_path,
@@ -567,7 +728,12 @@ def run_build(
         raw_root,
         build_root,
         zoom,
+        catalog_path,
+        ledger_path,
+        expansion_root,
     )
     built = build_frontend(site_dir, npm) if vite else (dist or site_dir / DIST_DIRNAME)
-    published = assemble_public(build_root, built, manifest_path, data_dir, schema_dir)
+    published = assemble_public(
+        build_root, built, manifest_path, data_dir, schema_dir, expansion_root
+    )
     return {**published, "rasters": rasters, "dist": built}

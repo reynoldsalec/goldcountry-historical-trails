@@ -1,7 +1,7 @@
-"""Warp and tile the five editions the staged nine-edition manifest adds (#57).
+"""Warp and tile the five editions the nine-edition manifest adds to the four base ones (#57).
 
-Writes only under build/expansion/. The live four-edition COGs, pyramids and site are not
-read or touched; each added edition is tiled only up to its own native zoom.
+Writes only under build/expansion/; the four base COGs and pyramids belong to demo.py. Each
+added edition is tiled only up to its own native zoom. make demo-build publishes the result.
 """
 
 from __future__ import annotations
@@ -218,10 +218,12 @@ def notes() -> dict:
             "tile_zoom.min up to it only; a camera zoom above it overzooms that level"
         ),
         "active_editions": (
-            "the four live editions are not reprocessed here; make demo-rasters owns "
-            "build/tiles/demo"
+            "the four base editions are not reprocessed here; demo.py owns build/tiles/demo"
         ),
-        "published": "nothing in build/expansion is published",
+        "published": (
+            "make demo-build copies these pyramids to build/public after re-checking their "
+            "digests, crops and zoom ranges against this record; nothing else here is published"
+        ),
     }
 
 

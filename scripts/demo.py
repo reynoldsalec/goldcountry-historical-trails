@@ -1,8 +1,9 @@
 """Edition contract and selected-source preflight for the Auburn map-browser demo.
 
-Reads only the allowlisted inputs of the manifest version it is given: the live four
-editions (version 1) or the staged nine (version 2, #57). Nothing here writes to data/raw/
-or to a receipt ledger (AGENTS.md 2.2), and no value dates a mapped feature.
+Reads only the allowlisted inputs of the manifest version it is given: the active nine
+editions (version 2, #58) or the original four (version 1, kept for its regression suite).
+Nothing here writes to data/raw/ or to a receipt ledger (AGENTS.md 2.2), and no value dates
+a mapped feature.
 """
 
 from __future__ import annotations
@@ -161,10 +162,10 @@ EXPECTED_EDITIONS = {
     },
 }
 
-# --- the staged nine-edition contract (version 2, #57) --------------------------------------
-# Only `check --manifest ...expanded.json` and scripts/demo_expansion.py read it. The live
-# cogs/rasters/build pipeline refuses any manifest but version 1.
-EXPANDED_MANIFEST_PATH = REPO_ROOT / "data/sources/demo-editions-expanded.json"
+# --- the nine-edition contract (version 2, #57; active since #58) ---------------------------
+# The four editions above are warped by run_cogs into build/rasters/; the five added ones by
+# scripts/demo_expansion.py into build/expansion/. run_rasters drives both.
+EXPANDED_MANIFEST_PATH = MANIFEST_PATH
 EXPANSION_ROOT = BUILD_ROOT / "expansion"
 PDF_RECORD_NAME = "demo-pdf-processing.json"
 EXPANDED_EDITION_ORDER = list(demo_sources.EXPANSION_ORDER)
@@ -1497,17 +1498,28 @@ def run_cogs(
     raw_root: Path,
     build_root: Path,
     zoom: int | None = None,
+    catalog_path: Path | None = None,
+    ledger_path: Path | None = None,
+    expansion_root: Path | None = None,
 ) -> dict:
-    """Warp the four verified sources onto one EPSG:3857 grid and record how it was done."""
-    if read_json(manifest_path).get("version") != 1:
-        fail(
-            "demo-cogs and demo-rasters build only the live version-1 manifest; the staged "
-            "nine-edition manifest is built by make expansion-rasters into build/expansion/."
-        )
+    """Warp the four 1:24,000 base sources onto one EPSG:3857 grid and record how it was done.
+
+    A version-2 manifest is checked whole, all nine sources, but only its four base editions
+    are warped here; scripts/demo_expansion.py warps the other five.
+    """
     checked = run_check(
-        manifest_path, schema_path, index_path, receipts_path, sources_path, raw_root
+        manifest_path,
+        schema_path,
+        index_path,
+        receipts_path,
+        sources_path,
+        raw_root,
+        catalog_path,
+        ledger_path,
+        expansion_root,
     )
     manifest, resolved, reports = checked["manifest"], checked["resolved"], checked["reports"]
+    base = base_editions(manifest)
     try:
         versions = warp_raster.require_gdal()
         grid_zoom = manifest["tile_zoom"]["max"] if zoom is None else zoom
@@ -1528,7 +1540,7 @@ def run_cogs(
         shutil.rmtree(incoming)
     incoming.mkdir(parents=True)
     try:
-        for edition in manifest["editions"]:
+        for edition in base:
             eid = edition["id"]
             published = raster_root / f"{eid}.tif"
             try:
@@ -1550,12 +1562,12 @@ def run_cogs(
                 )
             except WarpError as exc:
                 fail(f"{eid}: {exc}")
-        for eid in manifest["edition_order"]:
+        for edition in base:
             # Raw bytes must be exactly what they were before the warp (AGENTS.md §2.2).
-            check_record(resolved[eid]["record"], raw_root)
+            check_record(resolved[edition["id"]]["record"], raw_root)
         # Nothing reaches build/rasters/ until every edition has been warped and
         # every source has been re-verified.
-        for edition in manifest["editions"]:
+        for edition in base:
             staged = incoming / f"{edition['id']}.tif"
             if staged.is_file():
                 os.replace(staged, raster_root / f"{edition['id']}.tif")
@@ -1566,7 +1578,9 @@ def run_cogs(
         "version": 1,
         "processing_version": warp_raster.PROCESSING_VERSION,
         "area_id": manifest["area_id"],
+        "manifest_version": manifest["version"],
         "edition_order": list(manifest["edition_order"]),
+        "base_editions": [edition["id"] for edition in base],
         "tile_zoom": manifest["tile_zoom"],
         "tool_versions": versions,
         "grid": grid,
@@ -1579,6 +1593,11 @@ def run_cogs(
         payload["tiles"] = previous["tiles"]
     write_record(record_path, payload)
     return {"record": payload, "record_path": record_path, "reused": reused}
+
+
+def base_editions(manifest: dict) -> list[dict]:
+    """The four 1:24,000 editions whose crops define the camera footprint, in manifest order."""
+    return [edition for edition in manifest["editions"] if edition["id"] in EDITION_ORDER]
 
 
 def common_footprint(manifest: dict) -> Polygon:
@@ -1711,8 +1730,15 @@ def run_rasters(
     raw_root: Path,
     build_root: Path,
     zoom: int | None = None,
+    catalog_path: Path | None = None,
+    ledger_path: Path | None = None,
+    expansion_root: Path | None = None,
 ) -> dict:
-    """Preflight, warp the four sources onto one grid, then cut one XYZ PNG pyramid each."""
+    """Preflight, warp the four base sources onto one grid, then cut one XYZ pyramid each.
+
+    For the version-2 manifest the five added editions are then warped and tiled by
+    scripts/demo_expansion.py, each to its own native zoom capped at the same `zoom`.
+    """
     tile_root = build_root / TILE_DIRNAME / TILE_SUBDIR
     record_path = build_root / RASTER_DIRNAME / PROCESSING_FILENAME
     known = {}
@@ -1731,6 +1757,9 @@ def run_rasters(
         raw_root,
         build_root,
         zoom,
+        catalog_path,
+        ledger_path,
+        expansion_root,
     )
     record = prepared["record"]
     grid = record["grid"]
@@ -1739,7 +1768,7 @@ def run_rasters(
     zoom_min, zoom_max = record["tile_zoom"]["min"], grid["zoom"]
     zooms = list(range(zoom_min, zoom_max + 1))
     manifest = read_json(manifest_path)
-    samples = sample_points(common_footprint(manifest))
+    samples = sample_points(common_footprint({"editions": base_editions(manifest)}))
 
     incoming = build_root / TILE_DIRNAME / INCOMING_DIRNAME
     if incoming.exists():
@@ -1807,6 +1836,22 @@ def run_rasters(
         },
     }
     write_record(record_path, payload)
+    expansion = None
+    if manifest["version"] == 2:
+        import demo_expansion
+
+        expansion = demo_expansion.run_rasters(
+            manifest_path,
+            schema_path,
+            index_path,
+            receipts_path,
+            sources_path,
+            raw_root,
+            catalog_path or demo_sources.CATALOG_PATH,
+            ledger_path or demo_sources.LEDGER_PATH,
+            expansion_root or EXPANSION_ROOT,
+            zoom,
+        )
     return {
         "record": payload,
         "record_path": record_path,
@@ -1814,6 +1859,7 @@ def run_rasters(
         "reused_cogs": prepared["reused"],
         "reused": reused,
         "samples": samples,
+        "expansion": expansion,
     }
 
 
@@ -1964,6 +2010,7 @@ def check(
 
 @cli.command()
 @_common_options
+@_expansion_options
 @click.option(
     "--build-root",
     "build_root",
@@ -1986,10 +2033,13 @@ def cogs(
     receipts_path,
     sources_path,
     raw_root,
+    catalog_path,
+    ledger_path,
+    expansion_root,
     build_root,
     zoom,
 ) -> None:
-    """Warp the four verified sources onto one EPSG:3857 grid as COGs under build/rasters/."""
+    """Warp the four base sources onto one EPSG:3857 grid as COGs under build/rasters/."""
     result = run_cogs(
         manifest_path,
         schema_path,
@@ -1999,6 +2049,9 @@ def cogs(
         raw_root,
         build_root,
         zoom,
+        catalog_path,
+        ledger_path,
+        expansion_root,
     )
     record = result["record"]
     grid = record["grid"]
@@ -2020,6 +2073,7 @@ def cogs(
 
 @cli.command()
 @_common_options
+@_expansion_options
 @click.option(
     "--build-root",
     "build_root",
@@ -2032,8 +2086,8 @@ def cogs(
     "zoom",
     type=int,
     default=None,
-    help="Grid zoom to warp onto, and the pyramid's top zoom; defaults to the manifest "
-    "maximum. Lower values are for inspection and tests.",
+    help="Grid zoom to warp onto, and the top zoom of every pyramid; defaults to the "
+    "manifest maximum. Lower values are for inspection and tests.",
 )
 def rasters(
     manifest_path,
@@ -2042,10 +2096,17 @@ def rasters(
     receipts_path,
     sources_path,
     raw_root,
+    catalog_path,
+    ledger_path,
+    expansion_root,
     build_root,
     zoom,
 ) -> None:
-    """Preflight, warp to COGs, then cut bounded XYZ PNG pyramids under build/tiles/demo/."""
+    """Preflight, warp to COGs, then cut bounded XYZ PNG pyramids for every edition.
+
+    The four base pyramids go to build/tiles/demo/, the five added ones to
+    build/expansion/tiles/.
+    """
     started = time.monotonic()
     result = run_rasters(
         manifest_path,
@@ -2056,6 +2117,9 @@ def rasters(
         raw_root,
         build_root,
         zoom,
+        catalog_path,
+        ledger_path,
+        expansion_root,
     )
     tiles = result["record"]["tiles"]
     for entry in tiles["editions"]:
@@ -2077,10 +2141,25 @@ def rasters(
         f"{tiles['totals']['bytes']} bytes, {warp_raster.TILE_SCHEME.upper()} scheme; "
         f"{time.monotonic() - started:.1f} s; record {result['record_path'].name}"
     )
+    if result["expansion"] is not None:
+        added = result["expansion"]["record"]
+        for entry in added["editions"]:
+            state = "reused" if entry["id"] in result["expansion"]["reused"] else "cut"
+            click.echo(
+                f"{entry['id']}: {state} {entry['tiles']['tiles']} tiles, zoom "
+                f"{entry['zoom']['min']}-{entry['zoom']['max']} (native "
+                f"{entry['zoom']['native_max_zoom']}), {entry['tiles']['bytes']} bytes"
+            )
+        click.echo(
+            f"demo-rasters: {len(added['editions'])} added pyramids, "
+            f"{added['tiles']['totals']['tiles']} tiles; record "
+            f"{result['expansion']['record_path'].name}"
+        )
 
 
 @cli.command()
 @_common_options
+@_expansion_options
 @click.option(
     "--build-root",
     "build_root",
@@ -2120,6 +2199,9 @@ def build(
     receipts_path,
     sources_path,
     raw_root,
+    catalog_path,
+    ledger_path,
+    expansion_root,
     build_root,
     zoom,
     site_dir,
@@ -2156,6 +2238,9 @@ def build(
         raw_root,
         build_root,
         zoom,
+        catalog_path=catalog_path,
+        ledger_path=ledger_path,
+        expansion_root=expansion_root,
         npm=npm,
         vite=vite,
         **optional,
@@ -2169,7 +2254,8 @@ def build(
     for entry in inventory["editions"]:
         click.echo(
             f"{entry['id']}: {entry['path']}/{{z}}/{{x}}/{{y}}.png {entry['tiles']} tiles, "
-            f"{entry['bytes']} bytes, digest={entry['digest'][:12]}"
+            f"zoom {entry['zoom']['min']}-{entry['zoom']['max']}, {entry['bytes']} bytes, "
+            f"digest={entry['digest'][:12]}"
         )
     click.echo(inventory["leak_scan"])
     totals = inventory["totals"]
@@ -2228,11 +2314,11 @@ def derive_added_editions(
 ) -> dict[str, dict]:
     """Geometry, pixel size and zoom limit of the five added sources, from the allowlist.
 
-    `view_manifest` supplies the verified crops of the four view editions. `check` recomputes
+    `view_manifest` supplies the verified crops of the four base editions. `check` recomputes
     every value here and compares it with the committed version-2 manifest.
     """
     rows = read_index(index_path)
-    view = common_footprint(view_manifest)
+    view = common_footprint({"editions": base_editions(view_manifest)})
     view_seed = seed_of(rows[EXPECTED_EDITIONS[BASE_EDITION_ID]["source_id"]])
     _, south, _, north = view_manifest["view_bounds_wgs84"]
     added = [eid for eid in EXPANDED_EDITION_ORDER if eid not in EDITION_ORDER]
@@ -2298,8 +2384,8 @@ def inspect_expanded(
 ) -> None:
     """Print the derived crop, pixel size and zoom limit of each added edition.
 
-    The view comes from the live manifest's verified crops, so this can author the version-2
-    manifest that `check` later verifies.
+    The view comes from the verified crops of the manifest's four base editions, so this can
+    re-derive the version-2 values that `check` later verifies.
     """
     manifest = read_json(manifest_path)
     payload = derive_added_editions(
