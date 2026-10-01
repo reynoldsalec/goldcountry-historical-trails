@@ -1,6 +1,6 @@
-// Dev-server wiring for the edition browser shell (issue #42). The public build that
-// writes editions.json and copies the tile trees is D4; until then the dev server serves
-// both straight out of the repo so the shell can be inspected against the real rasters.
+// Dev-server wiring for the edition browser shell (issue #42). `make demo-build` writes the
+// published editions.json and copies the tile trees; the dev server serves both straight
+// out of the repo so the shell can be inspected against the real rasters.
 
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
@@ -17,17 +17,26 @@ const REPO_ROOT = resolve(SITE_DIR, "..");
 const MANIFEST_PATH = resolve(
   process.env.DEMO_MANIFEST ?? join(REPO_ROOT, "data/sources/demo-editions.json"),
 );
-const TILE_ROOT = resolve(process.env.DEMO_TILE_ROOT ?? join(REPO_ROOT, "build/tiles/demo"));
+// The four base pyramids and the five added ones are cut into different roots (issue #58);
+// a fixture root set through DEMO_TILE_ROOT replaces both.
+const TILE_ROOTS = process.env.DEMO_TILE_ROOT
+  ? [resolve(process.env.DEMO_TILE_ROOT)]
+  : [join(REPO_ROOT, "build/tiles/demo"), join(REPO_ROOT, "build/expansion/tiles")];
 const PORT = Number(process.env.DEMO_PORT ?? 5173);
 
-/** Reject `..` before it is joined, so a request cannot escape the tile tree. */
+/** Reject `..` before it is joined, so a request cannot escape a tile tree. */
 function safeTilePath(urlPath: string): string | null {
   const relative = normalize(decodeURIComponent(urlPath)).replace(/^[/\\]+/, "");
   if (relative.split(/[/\\]/).includes("..")) {
     return null;
   }
-  const absolute = join(TILE_ROOT, relative);
-  return absolute.startsWith(TILE_ROOT + "/") ? absolute : null;
+  const candidates = TILE_ROOTS.map((root) => join(root, relative)).filter((absolute, index) =>
+    absolute.startsWith(TILE_ROOTS[index] + "/"),
+  );
+  if (candidates.length === 0) {
+    return null;
+  }
+  return candidates.find((absolute) => existsSync(absolute)) ?? candidates[0];
 }
 
 function demoDevServer(): Plugin {
@@ -61,11 +70,11 @@ function demoDevServer(): Plugin {
         createReadStream(path).pipe(response).on("error", next);
       });
 
-      const missing = !existsSync(TILE_ROOT);
+      const missing = TILE_ROOTS.filter((root) => !existsSync(root));
       server.config.logger.info(
-        missing
-          ? `demo-dev: no tiles at ${TILE_ROOT}; run "make demo-rasters" first`
-          : `demo-dev: serving /tiles from ${TILE_ROOT}`,
+        missing.length > 0
+          ? `demo-dev: no tiles at ${missing.join(", ")}; run "make demo-rasters" first`
+          : `demo-dev: serving /tiles from ${TILE_ROOTS.join(", ")}`,
       );
     },
   };

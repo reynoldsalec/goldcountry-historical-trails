@@ -174,15 +174,28 @@ button:disabled {
 
 .card-note,
 .card-citation,
+.card-credits,
 .card-attribution,
-.card-caveat {
+.card-caveat,
+.card-detail-limit {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
 }
 
 .card-citation,
+.card-credits,
 .card-attribution {
   color: #4a4438;
+}
+
+/* The credit note is one long run of "|"-separated sources and must wrap on a phone. */
+.card-credits {
+  overflow-wrap: anywhere;
+}
+
+.card-detail-limit {
+  border-left: 3px solid var(--warn);
+  padding-left: 0.4rem;
 }
 
 .card-caveat {

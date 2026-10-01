@@ -42,11 +42,11 @@ interface FakeMap extends MapLike, TileEventSource {
   onScreen(): string[];
 }
 
-function buildMap(layerIds: string[]): FakeMap {
+function buildMap(layerIds: string[], initialLayer: string): FakeMap {
   const visibility: Record<string, string> = {};
   const opacity: Record<string, number> = {};
-  for (const [index, id] of layerIds.entries()) {
-    visibility[id] = index === 0 ? "visible" : "none";
+  for (const id of layerIds) {
+    visibility[id] = id === initialLayer ? "visible" : "none";
     opacity[id] = 0;
   }
   const listeners = new Map<string, Set<(event: TileEvent) => void>>();
@@ -99,7 +99,10 @@ function buildMap(layerIds: string[]): FakeMap {
 
 function harness(): { browser: EditionBrowser; map: FakeMap } {
   const parsed = manifest();
-  const map = buildMap(parsed.edition_order.map(layerIdFor));
+  const map = buildMap(
+    parsed.edition_order.map(layerIdFor),
+    layerIdFor(parsed.initial_edition),
+  );
   const browser = new EditionBrowser({ manifest: parsed, map });
   attachTileWatcher(browser, map);
   // The page's first edition finishes loading before the user can touch a control.
@@ -137,7 +140,10 @@ async function notFoundTileError(editionId: string, tilePath: string): Promise<T
 describe("attachTileWatcher", () => {
   it("displays the first edition only once its source reports loaded", () => {
     const parsed = manifest();
-    const map = buildMap(parsed.edition_order.map(layerIdFor));
+    const map = buildMap(
+      parsed.edition_order.map(layerIdFor),
+      layerIdFor(parsed.initial_edition),
+    );
     const browser = new EditionBrowser({ manifest: parsed, map });
     attachTileWatcher(browser, map);
 
@@ -408,7 +414,10 @@ describe("attachTileWatcher", () => {
 
   it("stops listening once detached", () => {
     const parsed = manifest();
-    const map = buildMap(parsed.edition_order.map(layerIdFor));
+    const map = buildMap(
+      parsed.edition_order.map(layerIdFor),
+      layerIdFor(parsed.initial_edition),
+    );
     const browser = new EditionBrowser({ manifest: parsed, map });
     attachTileWatcher(browser, map).detach();
 
