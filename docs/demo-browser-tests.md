@@ -26,18 +26,22 @@ nothing about them, and no compatibility claim beyond Chromium may be made from 
 `site/vite.config.ts` takes three environment overrides: `DEMO_MANIFEST`, `DEMO_TILE_ROOT`
 and `DEMO_PORT`. `site/playwright.config.ts` sets all three, so the dev server serves a
 generated fixture manifest and generated fixture tiles instead of
-`data/sources/demo-editions.json` and `build/tiles/demo`. A test run reads no raw scan, no
+`data/sources/demo-editions.json`, `build/tiles/demo` and `build/expansion/tiles`. A test run reads no raw scan, no
 receipt and no real pyramid, and writes nothing under `data/`.
 
 The fixtures are built by `site/tests/fixtures/manifest.ts` into
 `site/.playwright-fixtures/` (gitignored) when the Playwright config loads:
 
-- four editions with invented ids (`fixture-first` … `fixture-fourth`), invented source ids
-  (`FIXTURE_SOURCE_1_NOT_A_REAL_SCAN` …), invented citations and years 1899–1920;
+- nine editions with invented ids, shaped like the real set (#58): two coarse regional
+  sheets, a 1:62,500 sheet, four base sheets (`fixture-first` … `fixture-fourth`, one a
+  photo product) and two modern products with invented printed credits; invented source
+  ids (`FIXTURE_SOURCE_1_NOT_A_REAL_SCAN` …), citations and years 1880–1950. The third,
+  `fixture-first`, is `initial_edition`, so the viewer opens mid-order;
 - bounds `[0, 0, 0.5, 0.5]` — half a degree in the Gulf of Guinea, nowhere near Auburn;
-- zooms 10–12, 26 tiles per edition, each a flat colour PNG written by the hand-rolled
-  encoder in `site/tests/fixtures/png.ts`, so no binary fixture is committed and the bytes
-  are identical every run.
+- zooms 10–12; each edition's pyramid stops at its own `native_max_zoom` (10, 11 or 12), so
+  a viewer that asked for a level above it would get a 404. Each tile is a flat colour PNG
+  written by the hand-rolled encoder in `site/tests/fixtures/png.ts`, so no binary fixture
+  is committed and the bytes are identical every run.
 
 Nothing in the fixture set can be mistaken for evidence, and nothing in it is committed as
 data. `source_url` points at `https://fixture-source-record.invalid`, which cannot resolve:
@@ -50,16 +54,20 @@ adopts or kills a server it did not start.
 
 ## 3. What is asserted
 
-`site/tests/editions.spec.ts`, 17 tests:
+`site/tests/editions.spec.ts`, 21 tests:
 
 | Area | Assertion |
 | --- | --- |
-| First load | the first edition's card and notice name the same edition; bearing 0, pitch 0, zoom inside the manifest range; one canvas; the layer's attribution is in the control |
-| Paging | Previous/Next walk all four forward and back; Previous is disabled at the first edition and Next at the last |
+| First load | the initial (third) edition's card and notice name the same edition; both Previous and Next enabled; no other edition's tiles fetched; bearing 0, pitch 0, zoom inside the manifest range; one canvas; the layer's attribution is in the control |
+| Paging | Previous/Next walk all nine forward and back; Previous is disabled at the first edition and Next at the last |
 | Direct jump | the selector reaches any edition from any other |
-| Camera invariant | after a zoom and a drag, every one of the six switches leaves centre, zoom, bearing and pitch bit-identical, and `resetViewCalls` stays 0 |
+| Camera invariant | after a zoom to 12 and a drag, every switch across all nine, into and out of sheets cut to 10 and 11, leaves centre, zoom, bearing and pitch bit-identical, and `resetViewCalls` stays 0 |
 | Reset view | returns to the fitted camera, counts one call, and leaves the selected edition alone |
-| Fast clicks | three Next clicks inside one load settle on the fourth edition, with one canvas and an unmoved camera |
+| Fast clicks | three Next clicks inside one load settle on the requested edition, with one canvas and an unmoved camera |
+| Rapid paging | at zoom 12, eight Next clicks then eight Previous clicks with no waits settle on the last and then the first edition; camera unmoved, no reset, one canvas |
+| Overzoom | at zoom 12, selecting each sheet cut to 10 or 11 keeps the camera, requests no tile above the sheet's own top zoom, paints the sheet's colour at the map centre (not blank), and shows the card's detail-limit line; returning to a zoom-12 sheet removes the line |
+| Detail line | on a coarse sheet the detail-limit line appears once a zoom passes its limit |
+| Regional and modern cards | sheet name and scale (`1:125,000`, `1:100,000`), survey year, US Topo product, publication date and printed credits verbatim; null fields omitted |
 | Slow load | notice reads `Loading X; still showing Y.` and the card still names Y |
 | HTTP 404 | the switch fails, the old sheet and card stay, the notice names the failed edition and the one still showing, Retry appears, the camera does not move, and Retry settles clean |
 | Aborted request | same outcome as a 404: an error and the previous sheet, never a blank success |
