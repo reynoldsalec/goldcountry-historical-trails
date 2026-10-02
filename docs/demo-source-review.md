@@ -189,16 +189,17 @@ skip when they are absent; the fixture cases run everywhere from synthetic scans
 
 ---
 
-## 8. The staged nine-edition manifest (version 2, issue #57)
+## 8. The nine-edition manifest (version 2, issue #57; active since #58)
 
-`data/sources/demo-editions-expanded.json` is a version-2 manifest. It adds five editions
-to the four above. It is staged only: `make demo-*` and `build/public` still use
-`demo-editions.json`, and `demo.py cogs/rasters` refuse a version-2 manifest. The same
+This section was written for `data/sources/demo-editions-expanded.json`; #58 promoted that
+file unchanged to `data/sources/demo-editions.json`. It adds five editions
+to the four above. Since #58 `make demo-*` and `build/public` use it and `demo.py
+cogs/rasters` warp its four base editions, `demo_expansion.py` the other five. The same
 inspection caveat applies: every value here came from a script run on 2026-09-29. No
 human reviewed a sheet.
 
-- Commands: `make expansion-check` (runs `demo.py check --manifest
-  data/sources/demo-editions-expanded.json` after the source hash check) and
+- Commands: `make expansion-check` (runs `demo.py check` on the active manifest
+  after the source hash check) and
   `demo.py inspect-expanded`, which printed the derived values that the manifest records.
 - Schema: `schema/demo-editions.schema.json` selects version 1 or version 2 with `if`/`then`.
   Version 1 is unchanged. Version 2 fixes the nine IDs, their order and

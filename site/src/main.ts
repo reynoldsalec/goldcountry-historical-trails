@@ -1,4 +1,4 @@
-// One MapLibre map, four raster layers, edition controls and source cards. Readiness,
+// One MapLibre map, nine raster layers, edition controls and source cards. Readiness,
 // failure and retry are decided by EditionBrowser; tileWatcher.ts feeds it map events
 // (issues #42, #43). Nothing on this page reads or writes browser storage.
 
@@ -24,6 +24,7 @@ import {
   type MapLike,
   type PublicManifest,
   cardRows,
+  detailLimitNotice,
   layerIdFor,
   noticeFor,
   resamplingFor,
@@ -42,7 +43,11 @@ function element<T extends HTMLElement>(id: string): T {
   return found as T;
 }
 
-/** Only the first edition is loading; a switch flips visibility, never the camera. */
+/**
+ * Only the initial edition is loading; a switch flips visibility, never the camera. Each
+ * source stops at its own top zoom, so a closer camera enlarges that level rather than
+ * requesting tiles that were never cut (issue #58).
+ */
 function buildStyle(manifest: PublicManifest): StyleSpecification {
   const sources: Record<string, RasterSourceSpecification> = {};
   const layers: (RasterLayerSpecification | StyleSpecification["layers"][number])[] = [
@@ -53,13 +58,13 @@ function buildStyle(manifest: PublicManifest): StyleSpecification {
     },
   ];
 
-  for (const [index, edition] of manifest.editions.entries()) {
+  for (const edition of manifest.editions) {
     sources[sourceIdFor(edition.id)] = {
       type: "raster",
       tiles: [strictTileUrl(edition.tile_url)],
       tileSize: 256,
       minzoom: manifest.tile_zoom.min,
-      maxzoom: manifest.tile_zoom.max,
+      maxzoom: edition.native_max_zoom,
       bounds: manifest.view_bounds_wgs84,
       attribution: edition.attribution,
     };
@@ -67,7 +72,7 @@ function buildStyle(manifest: PublicManifest): StyleSpecification {
       id: layerIdFor(edition.id),
       type: "raster",
       source: sourceIdFor(edition.id),
-      layout: { visibility: index === 0 ? "visible" : "none" },
+      layout: { visibility: edition.id === manifest.initial_edition ? "visible" : "none" },
       paint: {
         "raster-resampling": resamplingFor(edition.kind),
         "raster-fade-duration": 0,
@@ -84,7 +89,7 @@ function buildStyle(manifest: PublicManifest): StyleSpecification {
   return { version: 8, sources, layers } as StyleSpecification;
 }
 
-function renderCard(browser: EditionBrowser): void {
+function renderCard(browser: EditionBrowser, zoom: number): void {
   const displayed = browser.displayedEdition;
   if (displayed === null) {
     // No sheet is on screen, so no card may claim one is (issue #43).
@@ -98,11 +103,17 @@ function renderCard(browser: EditionBrowser): void {
     .map((row) => `<dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.value)}</dd>`)
     .join("");
 
+  const limit = detailLimitNotice(displayed, zoom);
+
   element("card").innerHTML = [
     `<p class="card-label">${escapeHtml(card.label)}</p>`,
+    limit === null ? "" : `<p class="card-detail-limit">${escapeHtml(limit)}</p>`,
     `<dl class="card-facts">${facts}</dl>`,
     `<p class="card-note">${escapeHtml(card.dateNote)}</p>`,
     `<p class="card-citation">${escapeHtml(card.citation)}</p>`,
+    card.credits === null
+      ? ""
+      : `<p class="card-credits">Printed credits: ${escapeHtml(card.credits)}</p>`,
     `<p class="card-citation"><a href="${escapeHtml(card.sourceUrl)}" rel="noreferrer">` +
       `Original source record</a></p>`,
     `<p class="card-attribution">${escapeHtml(card.attribution)}</p>`,
@@ -210,10 +221,12 @@ async function start(): Promise<void> {
     notice.textContent = noticeFor(state, browser);
     notice.dataset.status = state.status;
     notice.dataset.warning = String(state.warningMessage !== null);
-    renderCard(browser);
+    renderCard(browser, map.getZoom());
   }
 
   browser.subscribe(render);
+  // The detail-limit line follows the camera, so it is re-read when a zoom settles.
+  map.on("zoomend", () => renderCard(browser, map.getZoom()));
 
   // No per-click waiter: the watcher is attached for the page's life and reads the
   // generation and viewport token off the state each time an event arrives.

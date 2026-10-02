@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Auburn map-browser edition manifest",
-  "description": "Display metadata and verified crop footprint for the allowlisted Auburn editions. Version 1 is the live four-edition manifest; version 2 is the staged nine-edition manifest. Dates describe the source sheet, never the age of an individual mapped feature.",
+  "description": "Display metadata and verified crop footprint for the allowlisted Auburn editions. Version 2 is the active nine-edition manifest (data/sources/demo-editions.json, since #58); version 1 is the original four-edition shape, kept for its regression fixtures. Dates describe the source sheet, never the age of an individual mapped feature.",
   "type": "object",
   "required": ["version"],
   "properties": {
@@ -12,7 +12,7 @@
   "else": { "$ref": "#/$defs/manifest_v2" },
   "$defs": {
     "manifest_v1": {
-      "description": "The live four-edition manifest (data/sources/demo-editions.json).",
+      "description": "The original four-edition manifest; no committed file uses it since #58.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -41,7 +41,7 @@
       }
     },
     "manifest_v2": {
-      "description": "The staged nine-edition manifest (data/sources/demo-editions-expanded.json). Camera bounds and zoom are those of version 1.",
+      "description": "The active nine-edition manifest (data/sources/demo-editions.json). Camera bounds and zoom are those of version 1.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -117,7 +117,7 @@
       "pattern": "^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$"
     },
     "edition_v1": {
-      "description": "An edition of the live four-edition manifest.",
+      "description": "An edition of the original four-edition manifest.",
       "$ref": "#/$defs/edition_fields",
       "properties": {
         "id": {
@@ -135,7 +135,7 @@
       "unevaluatedProperties": false
     },
     "edition_v2": {
-      "description": "An edition of the staged nine-edition manifest. Source kind, sheet, scale and zoom limit are explicit, never inferred from the ID.",
+      "description": "An edition of the nine-edition manifest. Source kind, sheet, scale and zoom limit are explicit, never inferred from the ID.",
       "$ref": "#/$defs/edition_fields",
       "required": [
         "source_kind",

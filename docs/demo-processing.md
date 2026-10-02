@@ -405,9 +405,15 @@ five added editions, and only into `build/expansion/`:
 - `tiles/<edition>/{z}/{x}/{y}.png`: XYZ tiles.
 - `demo-expansion-processing.json`: the record.
 
-The run does not read or write the four live COGs and pyramids, `build/tiles/demo` or
+The run does not read or write the four base COGs and pyramids, `build/tiles/demo` or
 `build/public`. The run date is 2026-09-29, with the tool versions of §1. Each result
 below is a machine check. No human reviewed any of them.
+
+Since E4 (#58) `make demo-rasters` runs this stage after the four base editions, with the
+same top-zoom cap, and `make demo-build` publishes the five pyramids from
+`build/expansion/tiles/`. The build re-checks each tree's digest, its crop against the
+manifest and its own zoom range (10 up to `native_max_zoom`, or the cap) against this
+record, so a pyramid from another manifest or another cap cannot be mixed in.
 
 ### 10.1 Per-edition grid and zoom range
 
@@ -498,7 +504,7 @@ and two NAD83 UTM pages standing in for the PDF renders. The tests cover:
 - bounded tile ranges and two-valued, crop-exact alpha;
 - output confined to the expansion root, reuse, and raw bytes left unchanged;
 - phase-correlation sign and refusal on unrelated patches;
-- compatibility of the four old editions with the live manifest.
+- the four original editions carried over byte-for-byte into the active manifest.
 
 The negative tests in `scripts/test_demo.py` now run against both the four-edition and
 the nine-edition tree. They cover missing, duplicate, extra and reordered editions; kind

@@ -12,10 +12,12 @@ import {
   type MapLike,
   type PublicManifest,
   cardRows,
+  detailLimitNotice,
   layerIdFor,
   noticeFor,
   publicManifestFrom,
   resamplingFor,
+  scaleLabel,
   sourceIdFor,
 } from "./editions";
 
@@ -81,15 +83,15 @@ const START_CAMERA: Camera = { lng: -121.0725, lat: 38.8965, zoom: 13 };
 
 let mapsBuilt = 0;
 
-function buildMap(layerIds: string[]): FakeMap {
+function buildMap(layerIds: string[], initialLayer: string): FakeMap {
   mapsBuilt += 1;
   const calls: Array<{ method: string; args: unknown[] }> = [];
   const visibility: Record<string, string> = {};
   const opacity: Record<string, number> = {};
   const tiles: Record<string, string[]> = {};
-  // The style ships the first edition visible at zero opacity: it is loading, not shown.
-  for (const [index, id] of layerIds.entries()) {
-    visibility[id] = index === 0 ? "visible" : "none";
+  // The style ships the initial edition visible at zero opacity: it is loading, not shown.
+  for (const id of layerIds) {
+    visibility[id] = id === initialLayer ? "visible" : "none";
     opacity[id] = 0;
   }
   const map = {
@@ -135,10 +137,13 @@ function browserFor(
   manifest: PublicManifest,
   options: { ready?: boolean } = {},
 ): { browser: EditionBrowser; map: FakeMap } {
-  const map = buildMap(manifest.edition_order.map(layerIdFor));
+  const map = buildMap(
+    manifest.edition_order.map(layerIdFor),
+    layerIdFor(manifest.initial_edition),
+  );
   const browser = new EditionBrowser({ manifest, map });
   if (options.ready !== false) {
-    browser.confirmDisplayed(manifest.edition_order[0], browser.state.generation);
+    browser.confirmDisplayed(manifest.initial_edition, browser.state.generation);
     map.calls.length = 0;
   }
   return { browser, map };
@@ -158,10 +163,22 @@ function expectSameCamera(before: Camera, after: Camera): void {
   expect(Math.abs(after.zoom - before.zoom)).toBeLessThan(1e-6);
 }
 
+const FIXTURE_FIELDS = {
+  source_kind: "historical_geotiff",
+  sheet_name: "Fixtureville",
+  scale: 24000,
+  printed_credit_note: null,
+  publication_date: null,
+  component_dates: { survey_year: null, edit_year: null, imprint_year: null },
+  native_resolution_metres: 2.03,
+  native_max_zoom: 16,
+} as const;
+
 const SYNTHETIC: PublicManifest = {
-  version: 1,
+  version: 2,
   area_id: "fixture",
   edition_order: ["fixture-a", "fixture-b"],
+  initial_edition: "fixture-a",
   view_bounds_wgs84: [-121.1, 38.9, -121.0, 39.0],
   tile_zoom: { min: 10, max: 16 },
   editions: [
@@ -185,6 +202,7 @@ const SYNTHETIC: PublicManifest = {
         revision_field_checked: null,
       },
       date_note: "fixture A note",
+      ...FIXTURE_FIELDS,
       tile_url: "tiles/fixture-a/{z}/{x}/{y}.png",
     },
     {
@@ -207,20 +225,29 @@ const SYNTHETIC: PublicManifest = {
         revision_field_checked: null,
       },
       date_note: "fixture B note",
+      ...FIXTURE_FIELDS,
       tile_url: "tiles/fixture-b/{z}/{x}/{y}.png",
     },
   ],
 };
 
+const NINE = [
+  "sacramento-1891",
+  "auburn-1944",
+  "auburn-1953",
+  "auburn-1973",
+  "auburn-1975",
+  "auburn-1981",
+  "sacramento-1994",
+  "auburn-2018",
+  "auburn-2021",
+];
+
 describe("publicManifestFrom", () => {
-  it("keeps the four editions in display order and drops crop geometry", () => {
+  it("keeps the nine editions in display order and drops crop geometry", () => {
     const manifest = realManifest();
-    expect(manifest.edition_order).toEqual([
-      "auburn-1953",
-      "auburn-1973",
-      "auburn-1975",
-      "auburn-1981",
-    ]);
+    expect(manifest.edition_order).toEqual(NINE);
+    expect(manifest.initial_edition).toBe("auburn-1953");
     expect(manifest.editions.map((edition) => edition.id)).toEqual(manifest.edition_order);
     for (const edition of manifest.editions) {
       expect(edition).not.toHaveProperty("crop_wgs84");
@@ -233,11 +260,45 @@ describe("publicManifestFrom", () => {
 
   it("carries the exact source IDs the demo is pinned to", () => {
     expect(realManifest().editions.map((edition) => edition.source_id)).toEqual([
+      "CA_Sacramento_299588_1891_125000",
+      "CA_Auburn_296741_1944_62500",
       "CA_Auburn_288101_1953_24000",
       "CA_Auburn_288103_1953_24000",
       "CA_Auburn_288104_1975_24000",
       "CA_Auburn_288105_1953_24000",
+      "CA_Sacramento_299157_1994_100000",
+      "5d3aeb27e4b01d82ce8d133b",
+      "61d7a9e2d34ed79294005276",
     ]);
+  });
+
+  it("carries each sheet's own top zoom, capped at the shared maximum", () => {
+    const zooms = Object.fromEntries(
+      realManifest().editions.map((edition) => [edition.id, edition.native_max_zoom]),
+    );
+    expect(zooms).toEqual({
+      "sacramento-1891": 14,
+      "auburn-1944": 15,
+      "auburn-1953": 16,
+      "auburn-1973": 16,
+      "auburn-1975": 16,
+      "auburn-1981": 16,
+      "sacramento-1994": 14,
+      "auburn-2018": 16,
+      "auburn-2021": 16,
+    });
+    const source = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+    source.tile_zoom.max = 15;
+    const capped = publicManifestFrom(source);
+    expect(capped.editions.map((edition) => edition.native_max_zoom)).toEqual([
+      14, 15, 15, 15, 15, 15, 14, 15, 15,
+    ]);
+  });
+
+  it("refuses an initial edition that is not in the order", () => {
+    const source = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+    source.initial_edition = "auburn-1999";
+    expect(() => publicManifestFrom(source)).toThrow(/initial_edition/);
   });
 });
 
@@ -248,10 +309,15 @@ describe("resamplingFor", () => {
       manifest.editions.map((edition) => [edition.id, resamplingFor(edition.kind)]),
     );
     expect(byKind).toEqual({
+      "sacramento-1891": "nearest",
+      "auburn-1944": "nearest",
       "auburn-1953": "nearest",
       "auburn-1973": "nearest",
       "auburn-1975": "linear",
       "auburn-1981": "nearest",
+      "sacramento-1994": "nearest",
+      "auburn-2018": "nearest",
+      "auburn-2021": "nearest",
     });
   });
 });
@@ -270,7 +336,7 @@ describe("order and default", () => {
     expect(map.onScreen()).toEqual([layerIdFor("auburn-1953")]);
   });
 
-  it("walks the fixed order forwards and back again", () => {
+  it("walks the fixed order forwards and back again from the 1953 sheet", () => {
     const { browser } = browserForRealManifest();
     const seen = [browser.state.displayedId];
     while (browser.canGoNext) {
@@ -278,37 +344,54 @@ describe("order and default", () => {
       browser.confirmDisplayed(browser.state.requestedId, generation);
       seen.push(browser.state.displayedId);
     }
-    expect(seen).toEqual(["auburn-1953", "auburn-1973", "auburn-1975", "auburn-1981"]);
+    expect(seen).toEqual(NINE.slice(2));
     while (browser.canGoPrevious) {
       const generation = browser.previous();
       browser.confirmDisplayed(browser.state.requestedId, generation);
       seen.push(browser.state.displayedId);
     }
-    expect(seen.slice(4)).toEqual(["auburn-1975", "auburn-1973", "auburn-1953"]);
+    expect(seen.slice(NINE.length - 2)).toEqual([...NINE].reverse().slice(1));
+  });
+
+  it("starts on the initial edition even though it is not first in the order", () => {
+    expect(() =>
+      browserFor({ ...SYNTHETIC, initial_edition: "fixture-z" }, { ready: false }),
+    ).toThrow(/initial edition/);
+    const { browser } = browserFor({ ...SYNTHETIC, initial_edition: "fixture-b" });
+    expect(browser.state.displayedId).toBe("fixture-b");
+    expect(browser.canGoPrevious).toBe(true);
+    expect(browser.canGoNext).toBe(false);
   });
 });
 
 describe("endpoint disabling", () => {
   it("disables previous on the first edition and next on the last", () => {
     const { browser } = browserForRealManifest();
+    // 1953 sits in the middle of the order, so both directions start enabled.
+    expect(browser.canGoPrevious).toBe(true);
+    expect(browser.canGoNext).toBe(true);
+
+    browser.confirmDisplayed("sacramento-1891", browser.select("sacramento-1891"));
     expect(browser.canGoPrevious).toBe(false);
     expect(browser.canGoNext).toBe(true);
 
-    browser.confirmDisplayed("auburn-1981", browser.select("auburn-1981"));
+    browser.confirmDisplayed("auburn-2021", browser.select("auburn-2021"));
     expect(browser.canGoPrevious).toBe(true);
     expect(browser.canGoNext).toBe(false);
   });
 
   it("does not wrap when the disabled direction is invoked anyway", () => {
     const { browser } = browserForRealManifest();
+    browser.confirmDisplayed("sacramento-1891", browser.select("sacramento-1891"));
+    const first = browser.state.generation;
     browser.previous();
-    expect(browser.state.requestedId).toBe("auburn-1953");
-    expect(browser.state.generation).toBe(0);
+    expect(browser.state.requestedId).toBe("sacramento-1891");
+    expect(browser.state.generation).toBe(first);
 
-    browser.confirmDisplayed("auburn-1981", browser.select("auburn-1981"));
+    browser.confirmDisplayed("auburn-2021", browser.select("auburn-2021"));
     const generation = browser.state.generation;
     browser.next();
-    expect(browser.state.requestedId).toBe("auburn-1981");
+    expect(browser.state.requestedId).toBe("auburn-2021");
     expect(browser.state.generation).toBe(generation);
   });
 });
@@ -398,7 +481,7 @@ describe("one map, no camera movement on switch", () => {
     const before = mapsBuilt;
     const { browser } = browserForRealManifest();
     expect(mapsBuilt).toBe(before + 1);
-    for (const id of ["auburn-1973", "auburn-1975", "auburn-1981", "auburn-1953"]) {
+    for (const id of [...NINE, "auburn-1953"]) {
       browser.confirmDisplayed(id, browser.select(id));
     }
     expect(mapsBuilt).toBe(before + 1);
@@ -406,7 +489,7 @@ describe("one map, no camera movement on switch", () => {
 
   it("touches only layer visibility and opacity while switching editions", () => {
     const { browser, map } = browserForRealManifest();
-    for (const id of ["auburn-1973", "auburn-1975", "auburn-1981", "auburn-1953"]) {
+    for (const id of [...NINE, "auburn-1953"]) {
       browser.confirmDisplayed(id, browser.select(id));
     }
     browser.previous();
@@ -538,10 +621,102 @@ describe("source card content", () => {
         card.citation,
         card.dateNote,
         card.attribution,
+        card.credits ?? "",
+        detailLimitNotice(edition, 16) ?? "",
         ...card.rows.map((r) => r.value),
       ].join("\n");
       expect(text).not.toMatch(forbidden);
     }
+  });
+
+  const rowsOf = (id: string) =>
+    Object.fromEntries(
+      cardRows(realManifest().editions.find((e) => e.id === id)!).rows.map((r) => [
+        r.label,
+        r.value,
+      ]),
+    );
+
+  it("names the regional and 15-minute sheets by their own sheet and scale", () => {
+    expect(rowsOf("sacramento-1891").Sheet).toBe("Sacramento 1:125,000");
+    expect(rowsOf("sacramento-1994").Sheet).toBe("Sacramento 1:100,000");
+    expect(rowsOf("auburn-1944").Sheet).toBe("Auburn 1:62,500");
+    expect(rowsOf("auburn-1953").Sheet).toBe("Auburn 1:24,000");
+    expect(scaleLabel(125000)).toBe("1:125,000");
+    for (const id of ["sacramento-1891", "sacramento-1994"]) {
+      const edition = realManifest().editions.find((e) => e.id === id)!;
+      expect(edition.label).toContain("Sacramento");
+      expect(edition.date_note).toContain("not an Auburn 7.5-minute map");
+    }
+  });
+
+  it("gives the date basis each sheet records and omits what it does not", () => {
+    const sacramento = rowsOf("sacramento-1891");
+    expect(sacramento.Surveyed).toBe("1888");
+    expect(sacramento["Map year on sheet"]).toBe("1891");
+    expect(sacramento).not.toHaveProperty("Edited");
+    expect(sacramento).not.toHaveProperty("Printed");
+    expect(sacramento).not.toHaveProperty("Published");
+    expect(sacramento).not.toHaveProperty("Revision");
+
+    expect(rowsOf("sacramento-1994").Edited).toBe("1994");
+    expect(rowsOf("auburn-1953").Printed).toBe("1955");
+    expect(rowsOf("auburn-1953")).not.toHaveProperty("Surveyed");
+  });
+
+  it("names the US Topo products, their publication dates and printed credits", () => {
+    const manifest = realManifest();
+    for (const [id, published] of [
+      ["auburn-2018", "2018-09-24"],
+      ["auburn-2021", "2021-12-30"],
+    ]) {
+      const edition = manifest.editions.find((e) => e.id === id)!;
+      const card = cardRows(edition);
+      const rows = Object.fromEntries(card.rows.map((r) => [r.label, r.value]));
+      expect(rows.Product).toBe("US Topo map");
+      expect(rows.Published).toBe(published);
+      expect(rows).not.toHaveProperty("Base sheet");
+      expect(rows).not.toHaveProperty("Field check");
+      expect(card.credits).toBe(edition.printed_credit_note);
+      expect(card.credits).toContain("Produced by the United States Geological Survey");
+      expect(card.attribution).toBe("US Topo maps: U.S. Geological Survey");
+    }
+    for (const edition of manifest.editions.filter((e) => e.source_kind !== "us_topo_pdf")) {
+      expect(cardRows(edition).credits).toBeNull();
+    }
+  });
+
+  it("states each sheet's detail limit", () => {
+    expect(rowsOf("sacramento-1891")["Detail limit"]).toBe(
+      "zoom 14 (source pixel about 10.58 m)",
+    );
+    expect(rowsOf("auburn-1953")["Detail limit"]).toBe("zoom 16 (source pixel about 2.03 m)");
+  });
+});
+
+describe("detail-limit notice", () => {
+  it("speaks only when the camera is past the edition's own top zoom", () => {
+    const manifest = realManifest();
+    const sacramento = manifest.editions.find((e) => e.id === "sacramento-1891")!;
+    const auburn = manifest.editions.find((e) => e.id === "auburn-1953")!;
+    expect(detailLimitNotice(sacramento, 14)).toBeNull();
+    expect(detailLimitNotice(sacramento, 13.5)).toBeNull();
+    const notice = detailLimitNotice(sacramento, 15.2);
+    expect(notice).toContain("zoom 14");
+    expect(notice).toContain(sacramento.label);
+    expect(notice).toContain("no more detail");
+    expect(detailLimitNotice(auburn, 16)).toBeNull();
+  });
+
+  it("never moves the camera to avoid the overzoom", () => {
+    const { browser, map } = browserForRealManifest();
+    map.camera = { ...map.camera, zoom: 16 };
+    const before = { ...map.camera };
+    browser.confirmDisplayed("sacramento-1891", browser.select("sacramento-1891"));
+    browser.confirmDisplayed("auburn-1944", browser.select("auburn-1944"));
+    browser.confirmDisplayed("auburn-2021", browser.select("auburn-2021"));
+    expectSameCamera(before, map.camera);
+    expect(map.calls.some((call) => CAMERA_METHODS.includes(call.method as never))).toBe(false);
   });
 });
 

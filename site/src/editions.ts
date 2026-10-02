@@ -3,6 +3,8 @@
 // prove a switch touches no camera method and builds no second map.
 
 export type EditionKind = "topo" | "orthophotoquad";
+/** Which publisher product the raster came from; the card names it (issue #58). */
+export type SourceKind = "historical_geotiff" | "us_topo_pdf";
 
 export interface EditionDates {
   map_year: number;
@@ -15,18 +17,36 @@ export interface EditionDates {
   revision_field_checked: boolean | null;
 }
 
+/** Per-sheet index years that `dates` does not carry. Null means the index has none. */
+export interface ComponentDates {
+  survey_year: number | null;
+  edit_year: number | null;
+  imprint_year: number | null;
+}
+
 /** One edition as the viewer needs it. Crop geometry and receipts stay server-side. */
 export interface PublicEdition {
   id: string;
   source_id: string;
   kind: EditionKind;
+  source_kind: SourceKind;
   label: string;
+  sheet_name: string;
+  /** Denominator of the printed scale: 125000 for a 1:125,000 sheet. */
+  scale: number;
   citation: string;
   source_url: string;
   rights: string;
   attribution: string;
+  /** The publisher's printed credit note, verbatim, or null where none is transcribed. */
+  printed_credit_note: string | null;
+  publication_date: string | null;
   dates: EditionDates;
+  component_dates: ComponentDates;
   date_note: string;
+  native_resolution_metres: number;
+  /** The top zoom this edition's own tiles exist at. Above it the map enlarges that level. */
+  native_max_zoom: number;
   tile_url: string;
 }
 
@@ -39,6 +59,8 @@ export interface PublicManifest {
   version: number;
   area_id: string;
   edition_order: string[];
+  /** The edition requested on first load; not necessarily the first in order. */
+  initial_edition: string;
   view_bounds_wgs84: [number, number, number, number];
   tile_zoom: TileZoom;
   editions: PublicEdition[];
@@ -48,13 +70,19 @@ export const TILE_URL_PREFIX = "tiles";
 
 /**
  * Project `data/sources/demo-editions.json` onto the display-only shape the browser
- * fetches. Card text must come from the manifest, never retyped (issue #42).
+ * fetches. Card text must come from the manifest, never retyped (issue #42). Mirrors
+ * `sanitize_manifest` in scripts/build_site.py, which writes the published editions.json.
  */
 export function publicManifestFrom(source: unknown): PublicManifest {
   const raw = source as Record<string, unknown>;
   const order = raw.edition_order as string[];
   const editions = raw.editions as Record<string, unknown>[];
   const byId = new Map(editions.map((edition) => [edition.id as string, edition]));
+  const tileZoom = { ...(raw.tile_zoom as TileZoom) };
+  const initial = raw.initial_edition as string;
+  if (!order.includes(initial)) {
+    throw new Error(`demo-editions.json: initial_edition ${initial} is not in edition_order`);
+  }
 
   const projected = order.map((id) => {
     const edition = byId.get(id);
@@ -65,13 +93,23 @@ export function publicManifestFrom(source: unknown): PublicManifest {
       id,
       source_id: edition.source_id as string,
       kind: edition.kind as EditionKind,
+      source_kind: edition.source_kind as SourceKind,
       label: edition.label as string,
+      sheet_name: edition.sheet_name as string,
+      scale: edition.scale as number,
       citation: edition.citation as string,
       source_url: edition.source_url as string,
       rights: edition.rights as string,
       attribution: edition.attribution as string,
+      printed_credit_note: edition.printed_credit_note as string | null,
+      publication_date: edition.publication_date as string | null,
       dates: edition.dates as EditionDates,
+      component_dates: edition.component_dates as ComponentDates,
       date_note: edition.date_note as string,
+      native_resolution_metres: edition.native_resolution_metres as number,
+      // The published file carries the zoom actually cut; the source manifest carries the
+      // sheet's own limit, which the shared maximum caps the same way.
+      native_max_zoom: Math.min(edition.native_max_zoom as number, tileZoom.max),
       tile_url: `${TILE_URL_PREFIX}/${id}/{z}/{x}/{y}.png`,
     };
   });
@@ -80,13 +118,14 @@ export function publicManifestFrom(source: unknown): PublicManifest {
     version: raw.version as number,
     area_id: raw.area_id as string,
     edition_order: [...order],
+    initial_edition: initial,
     view_bounds_wgs84: (raw.view_bounds_wgs84 as number[]).slice(0, 4) as [
       number,
       number,
       number,
       number,
     ],
-    tile_zoom: { ...(raw.tile_zoom as TileZoom) },
+    tile_zoom: tileZoom,
     editions: projected,
   };
 }
@@ -123,6 +162,8 @@ export interface SourceCard {
   citation: string;
   sourceUrl: string;
   attribution: string;
+  /** The publisher's printed credit note, verbatim, when one is transcribed. */
+  credits: string | null;
   dateNote: string;
   rows: CardRow[];
 }
@@ -132,6 +173,16 @@ const PRODUCT_LABEL: Record<EditionKind, string> = {
   orthophotoquad: "Orthophotoquad",
 };
 
+const SOURCE_PRODUCT_LABEL: Record<SourceKind, string | null> = {
+  historical_geotiff: null,
+  us_topo_pdf: "US Topo map",
+};
+
+/** "1:125,000", grouped the way the sheets print it, whatever the browser locale. */
+export function scaleLabel(scale: number): string {
+  return `1:${String(scale).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+}
+
 /**
  * Card fields, built from the manifest so nothing is retyped (issue #42). A row is omitted
  * rather than filled with a placeholder when the manifest says null: the card describes
@@ -140,9 +191,18 @@ const PRODUCT_LABEL: Record<EditionKind, string> = {
 export function cardRows(edition: PublicEdition): SourceCard {
   const dates = edition.dates;
   const rows: CardRow[] = [
-    { label: "Product", value: PRODUCT_LABEL[edition.kind] },
+    {
+      label: "Product",
+      value: SOURCE_PRODUCT_LABEL[edition.source_kind] ?? PRODUCT_LABEL[edition.kind],
+    },
+    // The regional sheets must read as Sacramento sheets, never as Auburn 7.5-minute maps.
+    { label: "Sheet", value: `${edition.sheet_name} ${scaleLabel(edition.scale)}` },
     { label: "Source ID", value: edition.source_id },
   ];
+
+  if (edition.publication_date !== null) {
+    rows.push({ label: "Published", value: edition.publication_date });
+  }
 
   if (dates.base_year !== null) {
     rows.push({
@@ -181,7 +241,24 @@ export function cardRows(edition: PublicEdition): SourceCard {
     rows.push({ label: "Field check", value: fieldCheck.join("; ") });
   }
 
+  const components = edition.component_dates;
+  if (components.survey_year !== null) {
+    rows.push({ label: "Surveyed", value: String(components.survey_year) });
+  }
+  if (components.edit_year !== null) {
+    rows.push({ label: "Edited", value: String(components.edit_year) });
+  }
+  if (components.imprint_year !== null) {
+    rows.push({ label: "Printed", value: String(components.imprint_year) });
+  }
+
   rows.push({ label: "Map year on sheet", value: String(dates.map_year) });
+  rows.push({
+    label: "Detail limit",
+    value:
+      `zoom ${edition.native_max_zoom} ` +
+      `(source pixel about ${edition.native_resolution_metres} m)`,
+  });
 
   return {
     editionId: edition.id,
@@ -189,9 +266,25 @@ export function cardRows(edition: PublicEdition): SourceCard {
     citation: edition.citation,
     sourceUrl: edition.source_url,
     attribution: edition.attribution,
+    credits: edition.printed_credit_note,
     dateNote: edition.date_note,
     rows,
   };
+}
+
+/**
+ * Said only while the camera is past the edition's own top zoom: the map is then enlarging
+ * that level, and the extra size is not extra detail (issue #58). Null otherwise.
+ */
+export function detailLimitNotice(edition: PublicEdition, zoom: number): string | null {
+  if (zoom <= edition.native_max_zoom + 1e-6) {
+    return null;
+  }
+  return (
+    `This view is closer than ${edition.label} was tiled for (zoom ` +
+    `${edition.native_max_zoom}). Its zoom-${edition.native_max_zoom} image is enlarged ` +
+    `here; it shows no more detail than at that zoom.`
+  );
 }
 
 /**
@@ -277,11 +370,14 @@ export class EditionBrowser {
     this.manifest = manifest;
     this.map = map;
     this.resetPadding = options.resetPadding ?? 16;
-    // Nothing is displayed until tiles have actually loaded, so the first edition starts
+    // Nothing is displayed until tiles have actually loaded, so the initial edition starts
     // loading with no card. The style ships its layer visible at zero opacity: the
     // constructor must not call the map, whose style may not be ready yet (issue #43).
+    if (!manifest.edition_order.includes(manifest.initial_edition)) {
+      throw new Error(`initial edition ${manifest.initial_edition} is not in the order`);
+    }
     this.current = {
-      requestedId: manifest.edition_order[0],
+      requestedId: manifest.initial_edition,
       displayedId: null,
       generation: 0,
       viewportToken: 0,

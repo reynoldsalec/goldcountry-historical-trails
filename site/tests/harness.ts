@@ -185,6 +185,61 @@ export async function waitForCameraIdle(page: Page): Promise<Camera> {
   throw new Error("camera never settled");
 }
 
+export interface Colour {
+  r: number;
+  g: number;
+  b: number;
+}
+
+/**
+ * The colour actually painted at the centre of the map, read from a 1-pixel screenshot.
+ * WebGL keeps no readable drawing buffer, so the composited page is what is sampled; the
+ * PNG is decoded in the page itself, as a data: URL, to avoid a decoder dependency.
+ */
+export async function mapCentreColour(page: Page): Promise<Colour> {
+  const box = await page.locator("#map canvas").boundingBox();
+  if (box === null) {
+    throw new Error("map canvas has no box");
+  }
+  const png = await page.screenshot({
+    clip: {
+      x: Math.round(box.x + box.width / 2),
+      y: Math.round(box.y + box.height / 2),
+      width: 1,
+      height: 1,
+    },
+  });
+  return page.evaluate(async (base64) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext("2d")!;
+    context.drawImage(image, 0, 0);
+    const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+    return { r, g, b };
+  }, png.toString("base64"));
+}
+
+export function sameColour(actual: Colour, expected: Colour, tolerance = 3): boolean {
+  return (
+    Math.abs(actual.r - expected.r) <= tolerance &&
+    Math.abs(actual.g - expected.g) <= tolerance &&
+    Math.abs(actual.b - expected.b) <= tolerance
+  );
+}
+
+/** The z of every tile URL requested for one edition, from a list of request URLs. */
+export function requestedZooms(urls: string[], editionId: string): number[] {
+  const pattern = new RegExp(`/tiles/${escapeRe(editionId)}/(\\d+)/\\d+/\\d+\\.png`);
+  return urls.flatMap((url) => {
+    const match = pattern.exec(url);
+    return match === null ? [] : [Number(match[1])];
+  });
+}
+
 /** Drag the map canvas by a pixel offset, and wait for the move to finish. */
 export async function dragMap(page: Page, dx: number, dy: number): Promise<void> {
   const box = await page.locator("#map canvas").boundingBox();

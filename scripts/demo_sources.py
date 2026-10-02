@@ -1,4 +1,4 @@
-"""Catalog, fetch and verify the five map sources proposed for the nine-edition browser.
+"""Catalog, fetch and verify the five map sources the nine-edition browser adds.
 
 Historical TIFFs reuse retrievals.jsonl; the two US Topo PDFs have their own ledger
 because their receipt contract differs from schema/retrieval.schema.json (#55).
@@ -367,15 +367,18 @@ def check_pdfs(root: Path, catalog: Path, ledger: Path, inspect=inspect_raster) 
     return results
 
 
-def check_not_live(catalog: Path, editions: Path) -> None:
+def check_live(catalog: Path, editions: Path) -> None:
+    """The active manifest carries exactly these five sources, each under its own edition."""
     live = json.loads(editions.read_text(encoding="utf-8"))
-    ids = {e["source_id"] for e in live["editions"]} | {e["id"] for e in live["editions"]}
-    entries = load_catalog(catalog)
-    staged = set(TOPO_IDS) | set(entries) | {e["edition_id"] for e in entries.values()}
-    leaked = sorted(ids & staged)
-    if leaked:
+    pairs = {(e["id"], e["source_id"]) for e in live["editions"]}
+    expected = {(e["edition_id"], source_id) for source_id, e in load_catalog(catalog).items()}
+    topo = {e["source_id"] for e in live["editions"] if e.get("source_kind") != "us_topo_pdf"}
+    missing = sorted(f"{eid} {sid}" for eid, sid in expected - pairs)
+    missing += sorted(set(TOPO_IDS) - topo)
+    if list(live.get("edition_order", [])) != list(EXPANSION_ORDER) or missing:
         raise click.ClickException(
-            f"Expansion sources are already in the live manifest: {', '.join(leaked)}"
+            "The active manifest is not the nine-edition set"
+            + (f"; missing {', '.join(missing)}" if missing else "")
         )
 
 
@@ -398,7 +401,7 @@ def cli(ctx, raw_root: Path, catalog: Path, ledger: Path, receipts: Path) -> Non
 @click.pass_obj
 def check(paths) -> None:
     """Offline: verify full-file hashes of all five candidates against their receipts."""
-    check_not_live(paths["catalog"], EDITIONS_PATH)
+    check_live(paths["catalog"], EDITIONS_PATH)
     results = check_topo(paths["root"], paths["receipts"], INDEX_PATH, SELECTION_PATH)
     results += check_pdfs(paths["root"], paths["catalog"], paths["ledger"])
     for label, _, detail, blockers in results:

@@ -9,6 +9,10 @@ stays open after this record lands. Nothing is deployed; there is no public URL.
 This file is the filled worksheet from [mvp-runbook.md](mvp-runbook.md) §8 for the
 technical checks, plus the list of checks a human still has to do.
 
+**Two runs are recorded.** §1–§10 are the four-edition D4b run of 2026-09-29 and are kept
+as they were. §11 is the nine-edition E4 run of 2026-10-01 (issue #58), which is what the
+local preview now serves. §9 lists the human checks for the nine editions.
+
 ---
 
 ## 1. Code revision and environment
@@ -188,11 +192,14 @@ worktree has no `data/raw`; the selected four were verified through `DEMO_RAW_RO
 
 None of these can be produced by a coding agent, and none is claimed above.
 
-- [ ] A named human opens the served build and pages through all four editions.
+- [ ] A named human opens the served build and pages through all nine editions.
 - [ ] A human reads each source card against the scanned sheet margins and confirms the
       base, revision, photography and field-check wording (§3 of the runbook).
+- [ ] A human confirms the Sacramento 1891 and 1994 and Auburn 1944 cards against their
+      sheet margins (sheet name, scale, survey/edit years) and the 2018/2021 printed
+      credit notes against the PDFs.
 - [ ] A human judges whether the imagery is fit for visual comparison given the
-      registration limits in §6, or asks for ground control first.
+      registration limits in §6 and §11.5, or asks for ground control first.
 - [ ] Manual throttled-network, blocked-tile and rapid-switching passes in a real browser
       (§5 of the runbook), and a non-Chromium browser.
 - [ ] Screen-reader announcement quality; real touch device at 390 px.
@@ -220,4 +227,159 @@ Screenshots / logs:                  build/acceptance/ (gitignored, regenerable)
 Known limitations / failed checks:   §6, §8, §9
 Actual reviewer / UTC review time:   none — not performed
 Decision:                            NOT DECIDED; issue #38 remains open
+```
+
+---
+
+## 11. Nine-edition run (E4, issue #58)
+
+**Status: automated evidence only.** Produced by a coding agent on 2026-10-01. No human
+reviewed the sources or the viewer. Issue #38 stays open. Nothing is deployed.
+
+### 11.1 Code revision and environment
+
+| Item | Value |
+| --- | --- |
+| Commit the evidence was produced at | `196379b`, clean worktree. The pushed branch rebuilt that history without a comment-only edit to `.github/workflows/validate.yml` (the push token lacks `workflow` scope); the same tree there is `4cd0d83` |
+| Branch | `issue-58-expansion-e4-integrate-and-test-the-nin` |
+| OS, Python, Node, GDAL/PROJ | as §1: WSL2 x86_64, Python 3.11 via `uv`, Node v22.22.3, GDAL 3.10.3 / PROJ 9.7.1 (rasterio 1.4.4), pyproj 3.7.2 / PROJ 9.5.1 |
+| Raw sources | read-only from the primary checkout through `DEMO_RAW_ROOT=<primary>/data/raw` |
+| Derived inputs | the primary checkout's `build/rasters`, `build/tiles/demo` and `build/expansion` (E2 PDF renders) were copied into the worktree first, so unchanged COGs, pyramids and renders were reused after their bytes were re-verified |
+
+### 11.2 Sources and byte preservation
+
+`make demo-check` and every `make demo-build` resolve each source through its receipt and
+compare SHA-256 and byte count before reading a pixel. The SHA-256 of all nine files under
+`data/raw/` was taken before the first build and checked again after the last build and the
+publish step: all nine unchanged. No receipt line was written.
+
+| Edition | Source ID | SHA-256 | Bytes |
+| --- | --- | --- | --- |
+| sacramento-1891 | CA_Sacramento_299588_1891_125000 | `c0323977a7d5009ae87f9819df196968985b2bd997d251eb81937e7abf2ed85c` | 4,379,097 |
+| auburn-1944 | CA_Auburn_296741_1944_62500 | `986b31a266a1a654aa750f7210847d2e336074c48dea35107145e88a5af65579` | 8,057,515 |
+| auburn-1953 … auburn-1981 | as §2 | as §2 | as §2 |
+| sacramento-1994 | CA_Sacramento_299157_1994_100000 | `4bd33df67082b7437f214e9d83f798e355f00a8505254bc51250bd028b738524` | 20,019,247 |
+| auburn-2018 | ScienceBase 5d3aeb27e4b01d82ce8d133b (PDF) | `063afdbe7cb6b5470da215e97949d64e65bef81923ac53a53d66f35343cd5981` | 56,606,372 |
+| auburn-2021 | ScienceBase 61d7a9e2d34ed79294005276 (PDF) | `6723d80faca1521b98ff3b4af7d3dd6ff9aa7ed103c17ba01517222b0b2b1deb` | 53,100,102 |
+
+### 11.3 Commands and exit codes
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `make lint` | 0 | ruff clean |
+| `make test-validation` | 0 | 84 passed |
+| `make test-topo` | 0 | 52 passed, 1 skipped |
+| `make test-coverage` | 0 | 200 passed |
+| `make demo-check` | 0 | 9 public editions verified; footprint −121.126028, 38.874881, −121.001023, 38.99988; zoom 10–16 |
+| `make expansion-check` | 0 | 5 of 5 candidates verified by full-file SHA-256; 2 open blockers: the bundled GDAL cannot open the PDFs itself (E2 reads their georeferencing with pypdf instead) |
+| `make demo-accept` | 0 | twice; the second run, at `196379b`, is the one recorded here |
+| `make validate` (inside `demo-accept`) | 0 | all six checks; leak scan read the 6,500 files just published |
+
+`make demo-accept` at `196379b`:
+
+- `make demo-test` — prettier and `tsc` clean; vitest 72 passed; Playwright dev suite 21
+  passed (55 s); built-bundle suite 2 passed; pytest `test_demo.py test_demo_rasters.py
+  test_demo_build.py test_demo_make.py test_demo_sources.py test_demo_pdf.py
+  test_demo_expansion.py` 322 passed, 0 skipped (the real-source tests ran).
+- `make demo-build` — `expansion-pdf` reused both renders after re-hashing them; all nine
+  COGs and pyramids were reused after their bytes matched; 6,500 files published in 11.4 s.
+  The first run on this branch cut the five added pyramids from their COGs in 171.5 s total.
+- `make validate` — `source_archive.py verify --available` reported "0 sources match;
+  91 local copies absent" because the worktree has no `data/raw`; the nine sources were
+  verified through `DEMO_RAW_ROOT` above.
+
+### 11.4 Output and the refreshed preview
+
+| Item | Value |
+| --- | --- |
+| Files / bytes | 6,500 files, 584,417,191 bytes |
+| Tiles | 6,495 PNG tiles in exactly nine trees |
+| Per edition | sacramento-1891 90 tiles, zoom 10–14; auburn-1944 285, 10–15; auburn-1953/1973/1975/1981 1,005 each, 10–16; sacramento-1994 90, 10–14; auburn-2018/2021 1,005 each, 10–16 |
+| Metadata | `editions.json`, 14,166 bytes; `initial_edition` auburn-1953; per-edition `native_max_zoom` 14, 15, 16, 16, 16, 16, 14, 16, 16 |
+| Not published | no PDF, TIFF, receipt, processing record, `crop_wgs84`, `sha256` or `data/raw` value (checked on the staged tree and on `editions.json`) |
+| Inventory | `build/publish/demo-publish.json` |
+
+The verified tree was then published into the primary checkout: copied into its
+`build/.public-incoming`, every app asset and tile tree re-checked against the inventory
+digests, the staging and restricted-value checks run again there, then swapped in with the
+same two-rename `publish` step `make demo-build` uses. The loopback-only server already
+running there (`python3 -m http.server 5173 --bind 127.0.0.1 --directory build/public`)
+was not restarted.
+
+- `curl -s http://127.0.0.1:5173/editions.json` → `edition_order` lists the nine ids in
+  order.
+- `ls build/public/tiles` → exactly nine directories.
+
+No firewall, host or public URL was touched.
+
+### 11.5 Browser evidence on the real build
+
+Chromium 153.0.8010.12 (Playwright 1.63.0's bundle), headless, 1280×800 and 390×780,
+driven by an uncommitted script against the published bundle. That bundle has no test
+probe, so the camera is judged from the tile coordinates each edition requests. Run first
+against a loopback copy on port 8318 (stopped afterwards), then against the refreshed
+preview on 5173, with the same results. Screenshots are in the worktree's
+`build/acceptance/` and `build/acceptance-5173/` (gitignored).
+
+| Check | Observed |
+| --- | --- |
+| First load | "1953 topographic map" in card and notice, `data-status="displayed"`; Previous and Next both enabled |
+| Zoom to the top (zoom 16, scale bar 300 ft) then Previous ×2, Next ×8 | Every edition settled with its own card. Editions that fetched tiles requested the same zoom-14 parent tile `2682/6265`: 1:24,000 editions four z16 tiles, 1944 one z15 tile, the two Sacramento sheets one z14 tile. No request above an edition's own top zoom, no 4xx |
+| Overzoom | At zoom 16 the 1891, 1944 and 1994 sheets show their top level enlarged with nearest sampling, not blank, and the card shows the detail-limit line; the 1:24,000 editions show none |
+| Endpoints | Previous disabled on 1891, Next on 2021 |
+| Rapid paging | eight Previous then eight Next clicks with no waits settled on 1891 and then 2021 |
+| Blocked edition (all 1994 tiles aborted, fresh page) | "Could not load Sacramento 1:100,000 sheet, 1994: … Failed to fetch. Still showing 1953 topographic map." Card stayed on 1953. Retry after unblocking: "Showing Sacramento 1:100,000 sheet, 1994." |
+| Source cards | product, sheet and scale ("Sacramento 1:125,000"), survey/edit/print years where the index has them, publication date and verbatim printed credits for 2018/2021, detail limit, citation, link, attribution, caveat |
+| Storage | `localStorage` 0, `sessionStorage` 0, no service worker, no cookie |
+| Network | all responses same-origin; no 4xx/5xx. The only failed requests are the 12 deliberately aborted 1994 tiles and a few 1953 tiles MapLibre cancelled mid-zoom |
+| 390 px | 0 px horizontal overflow; Previous reaches the 1944 sheet; map about 180 px tall under the banner |
+
+Not exercised: Firefox, WebKit, real mobile hardware, screen readers, throttled networks,
+touch input.
+
+### 11.6 Registration limitations of the added editions
+
+From `build/expansion/demo-expansion-processing.json`. Offsets are carried, not corrected.
+
+| Edition | Drawn neatline off graticule | Datum accuracy | Phase-correlation offsets vs 1953 |
+| --- | --- | --- | --- |
+| sacramento-1891 | 29.21 m (on the two edges that bound the view) | 7 m | none distinct (0 of 5) |
+| auburn-1944 | 9.895 m | 7 m | none distinct (0 of 5) |
+| sacramento-1994 | 15.24 m | 7 m | NW (+2.8, −14.3), NE (+4.5, −6.5), SW (+7.4, −21.6) m |
+| auburn-2018 | neatline 1.373 m from nominal; PDF GPTS residual 0.17 m | 4 m | SE (−7.5, +3.7) m |
+| auburn-2021 | neatline 1.218 m from nominal; PDF GPTS residual 0.22 m | 4 m | SE (−7.2, +3.2) m |
+
+The four base editions keep the limits in §6. No independent ground control exists in the
+repository, so the runbook's three-landmark check was **not run**. Treat differences of a
+few tens of metres on the Sacramento sheets, and under about 10 m elsewhere, as possible
+registration error rather than change on the ground. Source accuracy is unresolved, not
+verified.
+
+### 11.7 Backup
+
+`make verify-backup` covers only `retrievals.jsonl` TIFFs. **The two US Topo PDFs have no
+verified backup**; they are hash-pinned by `demo-pdf-retrievals.jsonl` and can be
+downloaded again. The archive drive was not mounted for this run either (§8).
+
+### 11.8 Worksheet
+
+```text
+Code revision:                       196379b; same code tree pushed as 4cd0d83
+Selected source IDs / receipt hashes: §11.2, all nine verified; raw bytes unchanged
+Processing manifest / tool versions:  build/rasters/demo-processing.json,
+                                      build/expansion/demo-expansion-processing.json,
+                                      build/expansion/demo-pdf-processing.json; tools as §1
+Output size:                         6,500 files, 584,417,191 bytes, 6,495 tiles
+Build and test commands / exits:     §11.3, all 0
+Browser versions / viewports / URL:  Chromium 153.0.8010.12; 1280x800 and 390x780;
+                                     http://127.0.0.1:5173/ (refreshed build/public)
+Stable landmarks / offsets:          NOT RUN — no independent ground control; §11.6
+Edition paging and camera tests:     §11.5; same tile parents across all nine editions
+Slow-load / error / retry tests:     automated suites pass; blocked 1994 recorded in §11.5;
+                                     manual throttling still pending
+Accessibility / network / output:    §11.4, §11.5; screen-reader and touch checks pending
+Screenshots / logs:                  worktree build/acceptance*/ (gitignored)
+Known limitations / failed checks:   §11.6, §11.7, §9
+Actual reviewer / UTC review time:
+Decision:
 ```

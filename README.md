@@ -5,36 +5,41 @@ keeping the map position and zoom unchanged. Display original cartography and ae
 imagery with honest source dates—not reconstructed trail history.
 
 **Expansion approved 2026-09-29 (issue #55):** the owner authorized growing the browser
-from four to nine editions, including pre-1950 sheets as raster display context. The
-live manifest still holds the four D1–D4 editions until the expansion steps (E1 onward)
-land. The expansion changes no evidence, privacy or legal-copy safeguard in AGENTS.md §2.
+from four to nine editions, including pre-1950 sheets as raster display context. Since E4
+(issue #58) the active manifest, build and viewer hold all nine. The expansion changes no
+evidence, privacy or legal-copy safeguard in AGENTS.md §2.
 
 **Scope decision: 2026-09-28.** The Nevada/Placer countywide trail atlas remains a
 long-term direction, not this first-release gate. This is a planning revision, not a
 claim that the raster pipeline, viewer or acceptance checks are implemented.
 
-> **Success:** “I can zoom into one place, page through four source editions without
+> **Success:** “I can zoom into one place, page through nine source editions without
 > losing my position, and see exactly which map I am viewing.”
 
 ## 1. User experience
 
 Open to the Auburn quadrangle with the 1953 topo selected. Pan and zoom, then use
 **Previous**, **Next**, or the **Map editions** selector. Preserve the camera when
-switching; provide a separate **Reset view** button. Show a source card with base,
-revision, photography and field-check dates, the source identifier, USGS attribution
-and an original-source link. Disable Previous/Next at endpoints; do not wrap.
+switching; provide a separate **Reset view** button. Show a source card with product,
+sheet name and scale, the dates the sheet records (publication, base, revision,
+photography, field check, survey, edit, print; nulls omitted), the source identifier,
+printed credits where transcribed, USGS attribution, the edition's detail limit and an
+original-source link. Disable Previous/Next at endpoints; do not wrap.
 
-Current order: **1953 base → 1973 revision → 1975 aerial → 1981 revision**. These are
-source editions, not a continuous timeline. A revision year does not date every mapped
-feature.
+Order: **sacramento-1891 → auburn-1944 → auburn-1953 → auburn-1973 → auburn-1975
+(aerial) → auburn-1981 → sacramento-1994 → auburn-2018 → auburn-2021**. The 1953 edition
+is the initial selection. These are source editions, not a continuous timeline. A
+revision or publication year does not date every mapped feature. The 1891 and 1994
+editions are regional Sacramento sheets at 1:125,000 and 1:100,000, not Auburn
+7.5-minute maps; their labels and source cards show the original sheet name and scale.
 
-Approved nine-edition order: **sacramento-1891 → auburn-1944 → auburn-1953 →
-auburn-1973 → auburn-1975 → auburn-1981 → sacramento-1994 → auburn-2018 → auburn-2021**.
-The 1953 edition stays the initial selection. The 1891 and 1994 editions are regional
-Sacramento sheets at 1:125,000 and 1:100,000, not Auburn 7.5-minute maps; their labels
-and source cards must show the original sheet name and scale.
+Each edition is tiled only to its own native zoom (14 for the Sacramento sheets, 15 for
+the 1944 sheet, 16 otherwise). A switch never moves the camera: past an edition's limit
+the map enlarges its top level and the card says so.
 
-## 2. Four existing sources
+## 2. The nine sources
+
+The four 1:24,000 base editions:
 
 | UI label | Exact source ID | Interpretation |
 | --- | --- | --- |
@@ -54,7 +59,7 @@ from actual georeferencing; nominal NAD27 corners are not exact WGS84 values. Th
 original sheet includes context outside Placer County. Displaying it does not expand
 future trail-data scope or claim countywide coverage. Colfax is deferred.
 
-### Five expansion sources (E1, issue #55)
+### Five added sources (E1, issue #55)
 
 | Edition | Exact source ID | What it is |
 | --- | --- | --- |
@@ -68,13 +73,14 @@ The three TIFFs already have `existing_file` receipts with `retrieved_at: null` 
 `data/sources/retrievals.jsonl`; they are verified and reused, not downloaded again.
 The two PDFs are cataloged in `data/sources/demo-pdf-sources.json` with their metadata
 URL, verbatim use constraints and source statements, and printed credit note. Their
-receipts are in `data/sources/demo-pdf-retrievals.jsonl`. None of the five is in
-`data/sources/demo-editions.json` yet. Registration, crops, zoom limits and the PDF
-rendering are later steps; open items are in `docs/open-questions.md`.
+receipts are in `data/sources/demo-pdf-retrievals.jsonl`. All nine editions are in
+`data/sources/demo-editions.json` (schema version 2) since #58. Crops, zoom limits and the
+PDF rendering were derived in E2–E3; registration is machine-checked only and open items
+are in `docs/open-questions.md`.
 
 ## 3. Required versus deferred
 
-Required: four raster layers, one visible at a time; common projection; fixed-camera
+Required: nine raster layers, one visible at a time; common projection; fixed-camera
 paging; source card and attribution; explicit loading, failure and no-data states;
 keyboard and narrow-screen usability; reproducible local static build.
 
@@ -97,9 +103,10 @@ display; same-origin **static XYZ PNG tiles**, zooms **10–16**. No React, runt
 backend, tile server, external basemap, browser storage, analytics or external fonts.
 
 ```text
-four immutable, receipted GeoTIFFs + edition manifest
-  → EPSG:3857 preparation, verified common mapped crop
-  → static XYZ PNG tiles
+seven immutable, receipted GeoTIFFs + two receipted US Topo PDFs + edition manifest
+  → PDF render with embedded georeferencing (expansion-pdf)
+  → EPSG:3857 preparation, verified crop inside the common camera footprint
+  → static XYZ PNG tiles, each edition up to its own native zoom
   → one map + edition controls + source card
   → build/public/ served over ordinary static HTTP
 ```
@@ -120,9 +127,12 @@ performance claim is made here. PMTiles is a separately approved optimization if
 | D3 | Static edition browser | Four layers work; camera and source cards stay correct |
 | D4 | Tests, public build and handoff | Automated checks and manual runbook pass on actual output |
 | E1 | Acquire and catalog five expansion sources | Full-file hashes against receipts, verbatim rights evidence, no live-manifest change |
+| E2 | Render the two US Topo PDFs | Embedded georeferencing, publisher-default layers, recorded render |
+| E3 | Nine-edition manifest and added pyramids | Crops, native zooms and pyramids derived from the sources |
+| E4 | Integrate nine editions into build and viewer | Baseline and expanded suites pass; real build coherent; preview refreshed |
 
 D1–D4 are new plan identifiers, not GitHub issue numbers or renamed M0–M5 milestones.
-E1 onward are the nine-edition expansion steps; E1 is issue #55.
+E1 onward are the nine-edition expansion steps: E1 is issue #55, E4 is issue #58.
 See [worker contracts](docs/implementation-plan.md) and
 [the MVP testing runbook](docs/mvp-runbook.md). This document does not launch workers.
 
@@ -139,36 +149,43 @@ make validate
 ```
 
 `make verify-sources` requires all receipted sources locally. Keep backup tooling; never
-claim an independent backup without verifying real archive storage. The new selected
-preflight requires only the four MVP inputs.
+claim an independent backup without verifying real archive storage. The demo preflight
+requires only the nine selected inputs.
 
-Expansion sources and staged rasters (E1–E3):
+The nine-edition demo:
 
 ```sh
-make expansion-test                      # offline unit tests
-make expansion-fetch                     # download the two US Topo PDFs once
-make expansion-check                     # source hashes, then the staged nine-edition manifest
-make expansion-pdf                       # the two PDFs -> georeferenced COGs (E2)
-make expansion-rasters                   # five added pyramids -> build/expansion/ only (E3)
+make demo-check        # manifest, receipts, scans and PDF renders; reads only
+make demo-rasters      # renders the PDFs, then all nine pyramids
+make demo-test         # offline unit, raster, build, expansion and browser suites
+make demo-build        # allowlisted build/public/ with exactly nine tile trees
+make demo-accept       # demo-test, demo-build, then validate (local only)
+make demo-dev          # vite dev server on http://127.0.0.1:5173/
 ```
 
-The staged manifest is `data/sources/demo-editions-expanded.json` (schema version 2);
-the live browser still reads `data/sources/demo-editions.json` (version 1).
+Expansion source tools (E1–E3), still available on their own:
 
-Both `expansion-*` source targets use `DEMO_RAW_ROOT` (default `data/raw`). A worktree
-points it at the primary checkout's raw root. **PDF backup is not verified:**
+```sh
+make expansion-test     # offline unit tests (also run by demo-test)
+make expansion-fetch    # download the two US Topo PDFs once
+make expansion-check    # source hashes, then the nine-edition manifest
+make expansion-pdf      # the two PDFs -> georeferenced COGs (E2)
+make expansion-rasters  # only the five added pyramids -> build/expansion/ (E3)
+```
+
+The four base pyramids are cut to `build/tiles/demo/`, the five added ones to
+`build/expansion/tiles/`; `make demo-build` checks both against their processing records
+and copies them to `build/public/tiles/`.
+
+All demo and `expansion-*` source targets use `DEMO_RAW_ROOT` (default `data/raw`). A
+worktree points it at the primary checkout's raw root. **PDF backup is not verified:**
 `make backup-sources`, `restore-sources` and `verify-backup` read only
 `retrievals.jsonl`, so they do not cover `data/raw/us-topo/`. The PDFs are
 hash-pinned by their receipts and can be downloaded again, but no archive copy exists.
 
-**Planned, not yet available:** `make demo-check`, `make demo-rasters`, `make demo-test`,
-`make demo-build`, `make demo-dev`, `make demo-accept`. Build output before leak checks;
-fail if artifacts/tests are absent. Do not gate the demo on `coverage-ready`.
-
-Bare `make`, `rasters`, `tiles`, `build-public`, `build-restricted` and `dev` still contain
-older scaffold behavior/placeholders and milestone messages. They are not working demo
-commands today. D4 aligns public/dev/default targets with the finished demo; vector and
-restricted targets remain deferred.
+Bare `make` and `build-public` run the demo build, then validation; `dev` is
+`demo-dev`. `rasters`, `tiles` and `build-restricted` stay deferred with the countywide
+program. Do not gate the demo on `coverage-ready`.
 
 ## 7. Layout and preservation
 

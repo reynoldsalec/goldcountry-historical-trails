@@ -4,32 +4,34 @@
 research checklist as the next MVP's release gate. Do not mark a check passed until you
 have exercised it yourself.
 
-D1–D4 have landed, so the commands below now run. The automated half of this checklist
-has a recorded result in [demo-acceptance.md](demo-acceptance.md); that record is machine
+D1–D4 and the nine-edition expansion (E1–E4, issues #55–#58) have landed, so the
+commands below now run against nine editions. The automated half of this checklist has a
+recorded result in [demo-acceptance.md](demo-acceptance.md); that record is machine
 evidence, not a reviewer's decision, and it lists the checks here that a human still owes
 (issue #38).
 
 ## 1. What you are testing
 
-> Zoom into one place, page through four map editions without losing your position,
+> Zoom into one place, page through nine map editions without losing your position,
 > and see exactly which source you are viewing.
 
 You are not deciding whether a road was a foot trail or whether public access exists.
 You do not need to research both counties, digitize a trail, obtain new aerials, or pass
 `coverage-ready` to evaluate this demo.
 
-Expected sequence:
-1. 1953 topographic base map — `CA_Auburn_288101_1953_24000`.
-2. 1973 photorevision — `CA_Auburn_288103_1953_24000`.
-3. 1975 aerial orthophotoquad — `CA_Auburn_288104_1975_24000`.
-4. 1981 photorevision — `CA_Auburn_288105_1953_24000`.
+Expected sequence (approved 2026-09-29, issue #55). The viewer opens on the third, 1953:
+1. Sacramento 1:125,000 sheet, 1891 — `CA_Sacramento_299588_1891_125000` (regional).
+2. Auburn 1:62,500 sheet, 1944 — `CA_Auburn_296741_1944_62500` (15-minute).
+3. 1953 topographic base map — `CA_Auburn_288101_1953_24000`.
+4. 1973 photorevision — `CA_Auburn_288103_1953_24000`.
+5. 1975 aerial orthophotoquad — `CA_Auburn_288104_1975_24000`.
+6. 1981 photorevision — `CA_Auburn_288105_1953_24000`.
+7. Sacramento 1:100,000 sheet, 1994 — `CA_Sacramento_299157_1994_100000` (regional).
+8. Auburn 2018 US Topo map — ScienceBase `5d3aeb27e4b01d82ce8d133b`.
+9. Auburn 2021 US Topo map — ScienceBase `61d7a9e2d34ed79294005276`.
 
-**Approved expansion (2026-09-29, issue #55):** nine editions in this order:
-sacramento-1891, auburn-1944, auburn-1953, auburn-1973, auburn-1975, auburn-1981,
-sacramento-1994, auburn-2018, auburn-2021. The 1891 and 1994 editions are regional
-Sacramento sheets at 1:125,000 and 1:100,000, not Auburn 7.5-minute maps. Until the
-expansion reaches the live manifest, the four-edition sequence above is what you test;
-the expansion source checks in §3 apply now.
+The 1891 and 1994 editions are regional Sacramento sheets, not Auburn 7.5-minute maps.
+They are tiled to zoom 14 and the 1944 sheet to zoom 15; the others to 16.
 
 ## 2. Preparation and honest status
 
@@ -46,9 +48,9 @@ make validate
 Stop on a genuine validation failure. A documented research gap is allowed; it is not
 an excuse to change inventory states.
 
-The demo needs the four selected scans. They are not in the repository: point
-`DEMO_RAW_ROOT` at the directory holding them, or fetch them first with
-`make fetch-topo-selected SELECTION=<file>` (see
+The demo needs the seven selected scans and the two US Topo PDFs. They are not in the
+repository: point `DEMO_RAW_ROOT` at the directory holding them, or fetch them first with
+`make fetch-topo-selected SELECTION=<file>` and `make expansion-fetch` (see
 [demo-acceptance.md](demo-acceptance.md) §8). The pipeline only reads them.
 
 ```sh
@@ -56,12 +58,13 @@ export DEMO_RAW_ROOT=/path/to/data/raw   # unnecessary if data/raw is populated
 make demo-accept     # demo-test, then demo-build, then validation of the built tree
 ```
 
-`make demo-accept` is the whole gate: it runs the unit, browser and pipeline suites, does
-the real four-source build into `build/public/`, and only then runs `make validate`, whose
+`make demo-accept` is the whole gate: it runs the unit, browser, pipeline and expansion
+suites, renders the two PDFs if needed, does the real nine-source build into
+`build/public/`, and only then runs `make validate`, whose
 restricted-value scan reads the tree that run just published. Bare `make` is the same
 build and validation without the test suites. The single steps still exist for
 diagnosis — `make demo-check`, `make demo-inspect`, `make demo-cogs`, `make demo-rasters`,
-`make demo-test`, `make demo-build`.
+`make demo-test`, `make demo-build`, `make expansion-check`, `make expansion-pdf`.
 
 Then serve the built output and open the URL you actually get:
 
@@ -79,12 +82,18 @@ nothing about the real editions.
 
 ## 3. Source and raster checks
 
-- [ ] All four selected inputs match receipt hashes/byte counts; no raw file changed.
+- [ ] All nine selected inputs (seven TIFFs, two PDFs) match receipt hashes/byte counts;
+  no raw file changed.
 - [ ] Source IDs match the expected variants, not duplicate prints with different stamps.
 - [ ] Dates and attribution match the scanned margins and source index.
 - [ ] 1975 is labeled aerial/orthophotoquad, not a topographic line-map revision.
 - [ ] The 1973 and 1981 labels disclose the 1953 base and non-field-checked revisions.
 - [ ] 1981 card names 1978 photography and other source data; no universal 1981 claim.
+- [ ] The 1891 and 1994 labels and cards name the Sacramento sheet and its scale
+  (1:125,000, 1:100,000); the 1944 card names 1:62,500. None reads as an Auburn
+  7.5-minute map.
+- [ ] The 2018 and 2021 cards name the US Topo product, its publication date and the
+  printed credit note verbatim; the hidden orthoimage layer is not shown.
 - [ ] Common mapped crop excludes page decoration without erasing white map areas.
 - [ ] Orientation is north-up, XYZ tile rows are not vertically flipped, and map labels
   are legible at useful zooms. Empty coverage has a deliberate no-data appearance.
@@ -117,10 +126,11 @@ Use a desktop browser first. Repeat the essential sequence in a narrow viewport.
 | --- | --- |
 | Open a fresh page | Auburn shared footprint, 1953 layer, matching source card and attribution |
 | Pan and zoom to a landmark | Readable detail; map stays usable within the selected footprint |
-| Next through 1973, 1975, 1981 | Same center, zoom, bearing and pitch; only edition changes |
-| Previous back to 1953 | Same location throughout; expected reverse sequence |
+| Next through 1973 … 2021 | Same center, zoom, bearing and pitch; only edition changes |
+| Previous back to 1891 | Same location throughout; expected reverse sequence |
+| At zoom 15–16, choose 1891 or 1994 | Camera unchanged; sheet enlarged, not blank; card shows the detail-limit line |
 | Choose 1981 then 1973 directly | Direct selection works without a camera reset |
-| First/last edition | Previous/Next disabled respectively; no wraparound |
+| First/last edition | Previous disabled on 1891, Next on 2021; no wraparound |
 | Reset view | Explicitly returns to shared Auburn extent, not triggered by edition changes |
 | Open the source information | Correct title, identifier, dates, caveat, USGS attribution and original link |
 | Reload | Predictable default 1953 view; no browser-storage persistence |
@@ -157,8 +167,9 @@ Use browser network throttling and request blocking; do not damage real source f
 - [ ] Original-source links work when clicked; these intentional navigations are separate
   from background requests made by the viewer.
 - [ ] `build/public/` contains only the allowlisted app, public edition metadata and
-  four selected tile trees. No raw TIFFs, authoritative fixtures, receipts, research
-  inventory, private paths, restricted records, or broad copied data directories.
+  nine selected tile trees. No raw TIFFs or PDFs, authoritative fixtures, receipts,
+  processing records, research inventory, private paths, restricted records, or broad
+  copied data directories.
 - [ ] Existing restricted-value scanner runs against actual build output. Allowlist
   tests also pass; neither an empty tree nor a missing build is a release-safety check.
 - [ ] Output size and load behavior are measured with the test environment recorded.
@@ -166,7 +177,7 @@ Use browser network throttling and request blocking; do not damage real source f
 
 ## 7. Pass, block and handoff
 
-Pass only when all four actual editions are usable, camera/state behavior is correct,
+Pass only when all nine actual editions are usable, camera/state behavior is correct,
 source/date information is honest, raw bytes are preserved, and all relevant automated
 and manual checks above have recorded results. If a check fails, describe the failure
 and affected step; do not expand scope to unrelated countywide research.

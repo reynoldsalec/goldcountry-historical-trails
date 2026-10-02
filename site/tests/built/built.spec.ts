@@ -4,9 +4,9 @@
 
 import { expect, test, type Request, type Response } from "@playwright/test";
 
-import { FIXTURE_EDITIONS } from "../fixtures/manifest.ts";
+import { INITIAL_EDITION } from "../fixtures/manifest.ts";
 
-const [FIRST] = FIXTURE_EDITIONS;
+const FIRST = INITIAL_EDITION;
 const PREFIX = "/sub/";
 
 interface Traffic {
@@ -21,7 +21,7 @@ function watchTraffic(page: import("@playwright/test").Page): Traffic {
   return traffic;
 }
 
-test("the built bundle renders the first edition from a subpath", async ({ page }) => {
+test("the built bundle renders the initial edition from a subpath", async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto("./");
 
