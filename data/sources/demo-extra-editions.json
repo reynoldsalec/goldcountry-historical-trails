@@ -1,0 +1,367 @@
+{
+  "version": 1,
+  "published_order": [
+    "sacramento-1891",
+    "tahoe-nf-1916",
+    "auburn-1944",
+    "sacramento-1947",
+    "auburn-1953",
+    "auburn-1954",
+    "sacramento-1956",
+    "auburn-1973",
+    "auburn-1975",
+    "auburn-1981",
+    "sacramento-1994",
+    "auburn-2018",
+    "auburn-2021"
+  ],
+  "downloads": [
+    {
+      "download_id": "archive-org-CAT10680171-jp2",
+      "kind": "scan_package",
+      "source_url": "https://archive.org/details/CAT10680171",
+      "metadata_url": "https://archive.org/metadata/CAT10680171",
+      "retrieval_url": "https://archive.org/download/CAT10680171/cat10680171_jp2.zip",
+      "publisher_sha1": "47b2ef7961628f33def9871e28d73613689ceea2",
+      "publisher_size_bytes": 139008606,
+      "suffix": ".zip"
+    },
+    {
+      "download_id": "blm-plss-cadnsdi-sections-t12-23n-r5-19e-mdm",
+      "kind": "plss_sections",
+      "source_url": "https://gis.blm.gov/arcgis/rest/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/2",
+      "metadata_url": "https://gis.blm.gov/arcgis/rest/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer?f=json",
+      "retrieval_url": "https://gis.blm.gov/arcgis/rest/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/2/query",
+      "plss_query": {
+        "states": [
+          "CA",
+          "NV"
+        ],
+        "meridian_code": "21",
+        "townships_north": [
+          12,
+          23
+        ],
+        "ranges_east": [
+          5,
+          19
+        ],
+        "out_fields": "PLSSID,FRSTDIVNO,FRSTDIVTYP",
+        "out_sr": 4326,
+        "geometry_precision": 6
+      },
+      "suffix": ".json"
+    },
+    {
+      "download_id": "usgs-gnis-checkpoint-towns",
+      "kind": "arcgis_query",
+      "source_url": "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/3",
+      "metadata_url": "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer?f=json",
+      "retrieval_url": "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/3/query",
+      "query": {
+        "where": "state_alpha='CA' AND county_name IN ('Placer','Nevada','Sierra') AND gaz_name IN ('Colfax','Foresthill','Iowa Hill','Dutch Flat','Downieville','Sierra City','Washington','Cisco','Truckee','Sierraville','Loyalton','Alleghany','Westville')",
+        "outFields": "gaz_id,gaz_name,county_name",
+        "returnGeometry": "true",
+        "outSR": "4326",
+        "orderByFields": "gaz_id",
+        "f": "json"
+      },
+      "suffix": ".json"
+    }
+  ],
+  "editions": [
+    {
+      "id": "tahoe-nf-1916",
+      "source_id": "CAT10680171",
+      "kind": "map",
+      "source_kind": "forest_service_scan",
+      "sheet_name": "Tahoe National Forest",
+      "scale": null,
+      "label": "Tahoe National Forest map, 1916",
+      "citation": "United States. Forest Service. California Region, Recreation map, Tahoe National Forest: information for mountain travelers, 1916; foldout sheet \"Tahoe National Forest, California and Nevada, Mt. Diablo Meridian, 1916\". USDA National Agricultural Library, call number 1 F7626Rt; scan on Internet Archive (CAT10680171, leaf 25).",
+      "source_url": "https://archive.org/details/CAT10680171",
+      "rights": "public_domain",
+      "attribution": "Tahoe National Forest map, 1916: U.S. Forest Service. Scan: USDA National Agricultural Library via Internet Archive. Placed with BLM PLSS corners.",
+      "printed_credit_note": "U. S. Department of Agriculture | Forest Service | Henry S. Graves, Forester | Printed by the U.S. Geological Survey",
+      "publication_date": null,
+      "dates": {
+        "map_year": 1916,
+        "base_year": null,
+        "revision_year": null,
+        "base_photography": null,
+        "revision_photography": null,
+        "photography": null,
+        "base_field_check_year": null,
+        "revision_field_checked": null
+      },
+      "component_dates": {
+        "survey_year": null,
+        "edit_year": null,
+        "imprint_year": null
+      },
+      "date_note": "Forest Service recreation map dated 1916 on the sheet. It covers the Tahoe National Forest, not the Auburn quadrangle: only its southwest corner, near Applegate and Clipper Gap, reaches the Auburn view. No scale is printed in the parts of the sheet inspected. Sheet dates describe the map, not the age of anything drawn on it.",
+      "registration_note": null,
+      "native_resolution_metres": 16.2,
+      "native_max_zoom": 13,
+      "processing": {
+        "method": "gcp_polynomial",
+        "download_id": "archive-org-CAT10680171-jp2",
+        "member": "cat10680171_jp2/cat10680171_0025.jp2",
+        "member_pixels": [
+          9402,
+          6814
+        ],
+        "polynomial_order": 2,
+        "resampling": "nearest",
+        "neatline_pixels": [
+          [
+            225,
+            125
+          ],
+          [
+            9210,
+            163
+          ],
+          [
+            9208,
+            6635
+          ],
+          [
+            198,
+            6640
+          ]
+        ],
+        "control": {
+          "download_id": "blm-plss-cadnsdi-sections-t12-23n-r5-19e-mdm",
+          "points_path": "data/sources/gcp/CAT10680171_0025.points",
+          "report_path": "data/sources/gcp/CAT10680171_0025.control.json",
+          "seed": {
+            "corners": [
+              {
+                "range_line": 8,
+                "township_line": 12,
+                "pixel": [
+                  1955,
+                  6572
+                ],
+                "label": "T13N R9E SW"
+              },
+              {
+                "range_line": 8,
+                "township_line": 13,
+                "pixel": [
+                  1945,
+                  5984
+                ],
+                "label": "T14N R9E SW"
+              },
+              {
+                "range_line": 9,
+                "township_line": 12,
+                "pixel": [
+                  2552,
+                  6584
+                ],
+                "label": "T13N R10E SW"
+              },
+              {
+                "range_line": 10,
+                "township_line": 12,
+                "pixel": [
+                  3157,
+                  6598
+                ],
+                "label": "T13N R11E SW"
+              }
+            ],
+            "evidence": "Read on full-resolution crops of the south-west corner of the mapped area. The R. 9 E., R. 10 E. and R. 11 E. labels are centred under the ranges these corners bound, T. 13 N. and T. 14 N. are labelled on the townships to their north, and Grizzly Bear House and the road 'To Auburn' are drawn beside the first corner."
+          },
+          "metres_per_pixel_guess": 16.2,
+          "max_source_spread_metres": 100,
+          "search_radius_px": 45,
+          "checkpoints": {
+            "download_id": "usgs-gnis-checkpoint-towns",
+            "max_error_metres": 1500,
+            "evidence": "Town symbols read on full-resolution crops; GNIS gives the modern feature position. Neither enters the fit, so a corner snapped one section off shows up here.",
+            "pixels": {
+              "Colfax": [
+                2304,
+                5411
+              ],
+              "Foresthill": [
+                3062,
+                5985
+              ],
+              "Iowa Hill": [
+                2816,
+                5375
+              ],
+              "Dutch Flat": [
+                2976,
+                4692
+              ],
+              "Downieville": [
+                3015,
+                2355
+              ],
+              "Sierra City": [
+                4038,
+                2322
+              ],
+              "Washington": [
+                3240,
+                3653
+              ],
+              "Cisco": [
+                4516,
+                4096
+              ],
+              "Truckee": [
+                6446,
+                3934
+              ],
+              "Sierraville": [
+                5450,
+                2187
+              ],
+              "Loyalton": [
+                6094,
+                1612
+              ],
+              "Alleghany": [
+                2913,
+                2956
+              ],
+              "Westville": [
+                3937,
+                4953
+              ]
+            }
+          }
+        }
+      },
+      "rights_evidence": {
+        "statement": "The contributing institution believes that this item is not in copyright.",
+        "statement_source": "https://archive.org/metadata/CAT10680171 (metadata.rights)",
+        "basis": "Work of the U.S. Department of Agriculture, Forest Service, dated 1916 and printed by the U.S. Geological Survey."
+      }
+    },
+    {
+      "id": "sacramento-1947",
+      "source_id": "CA_Sacramento_707563_1947_250000",
+      "kind": "topo",
+      "source_kind": "historical_geotiff",
+      "sheet_name": "Sacramento",
+      "scale": 250000,
+      "label": "Sacramento 1:250,000 sheet, 1947",
+      "citation": "U.S. Geological Survey, Sacramento quadrangle, California, 1:250,000, 1947 (CA_Sacramento_707563_1947_250000)",
+      "source_url": "https://www.sciencebase.gov/catalog/item/5a8a3c07e4b00f54eb3e6062",
+      "rights": "public_domain",
+      "attribution": "Historical topographic maps: U.S. Geological Survey",
+      "printed_credit_note": null,
+      "publication_date": null,
+      "dates": {
+        "map_year": 1947,
+        "base_year": 1947,
+        "revision_year": null,
+        "base_photography": "1945",
+        "revision_photography": null,
+        "photography": null,
+        "base_field_check_year": null,
+        "revision_field_checked": null
+      },
+      "component_dates": {
+        "survey_year": 1944,
+        "edit_year": null,
+        "imprint_year": 1948
+      },
+      "date_note": "Regional Sacramento 1 x 2 degree sheet at 1:250,000, dated 1947; the index records 1945 aerial photography and a 1944 survey. It is not an Auburn 7.5-minute map. Sheet dates describe the map, not the age of anything drawn on it.",
+      "registration_note": null,
+      "native_resolution_metres": 21.17,
+      "native_max_zoom": 13,
+      "processing": {
+        "method": "georeferenced_geotiff",
+        "topo_id": "CA_Sacramento_707563_1947_250000",
+        "resampling": "nearest"
+      }
+    },
+    {
+      "id": "auburn-1954",
+      "source_id": "CA_Auburn_296743_1954_62500",
+      "kind": "topo",
+      "source_kind": "historical_geotiff",
+      "sheet_name": "Auburn",
+      "scale": 62500,
+      "label": "Auburn 1:62,500 sheet, 1954",
+      "citation": "U.S. Geological Survey, Auburn quadrangle, California, 1:62,500, 1954 (CA_Auburn_296743_1954_62500)",
+      "source_url": "https://www.sciencebase.gov/catalog/item/5a8a3f95e4b00f54eb3ebcc7",
+      "rights": "public_domain",
+      "attribution": "Historical topographic maps: U.S. Geological Survey",
+      "printed_credit_note": null,
+      "publication_date": null,
+      "dates": {
+        "map_year": 1954,
+        "base_year": 1954,
+        "revision_year": null,
+        "base_photography": "1952",
+        "revision_photography": null,
+        "photography": null,
+        "base_field_check_year": null,
+        "revision_field_checked": null
+      },
+      "component_dates": {
+        "survey_year": null,
+        "edit_year": null,
+        "imprint_year": 1959
+      },
+      "date_note": "Auburn 15-minute sheet at 1:62,500, dated 1954; the index records 1952 aerial photography. It is not an Auburn 7.5-minute map. Sheet dates describe the map, not the age of anything drawn on it.",
+      "registration_note": null,
+      "native_resolution_metres": 5.29,
+      "native_max_zoom": 15,
+      "processing": {
+        "method": "georeferenced_geotiff",
+        "topo_id": "CA_Auburn_296743_1954_62500",
+        "resampling": "nearest"
+      }
+    },
+    {
+      "id": "sacramento-1956",
+      "source_id": "CA_Sacramento_299855_1956_250000",
+      "kind": "topo",
+      "source_kind": "historical_geotiff",
+      "sheet_name": "Sacramento",
+      "scale": 250000,
+      "label": "Sacramento 1:250,000 sheet, 1956",
+      "citation": "U.S. Geological Survey, Sacramento quadrangle, California, 1:250,000, 1956 (CA_Sacramento_299855_1956_250000)",
+      "source_url": "https://www.sciencebase.gov/catalog/item/5a8a3bfee4b00f54eb3e5f60",
+      "rights": "public_domain",
+      "attribution": "Historical topographic maps: U.S. Geological Survey",
+      "printed_credit_note": null,
+      "publication_date": null,
+      "dates": {
+        "map_year": 1956,
+        "base_year": 1956,
+        "revision_year": null,
+        "base_photography": "1945",
+        "revision_photography": null,
+        "photography": null,
+        "base_field_check_year": null,
+        "revision_field_checked": null
+      },
+      "component_dates": {
+        "survey_year": null,
+        "edit_year": null,
+        "imprint_year": 1956
+      },
+      "date_note": "Regional Sacramento 1 x 2 degree sheet at 1:250,000, dated 1956; the index records 1945 aerial photography. It is not an Auburn 7.5-minute map. Sheet dates describe the map, not the age of anything drawn on it.",
+      "registration_note": null,
+      "native_resolution_metres": 21.17,
+      "native_max_zoom": 13,
+      "processing": {
+        "method": "georeferenced_geotiff",
+        "topo_id": "CA_Sacramento_299855_1956_250000",
+        "resampling": "nearest"
+      }
+    }
+  ]
+}

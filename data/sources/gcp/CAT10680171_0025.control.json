@@ -1,0 +1,1811 @@
+{
+  "version": 1,
+  "edition_id": "tahoe-nf-1916",
+  "member": "cat10680171_jp2/cat10680171_0025.jp2",
+  "control_source": "blm-plss-cadnsdi-sections-t12-23n-r5-19e-mdm",
+  "seed": {
+    "corners": [
+      {
+        "range_line": 8,
+        "township_line": 12,
+        "pixel": [
+          1955,
+          6572
+        ],
+        "label": "T13N R9E SW"
+      },
+      {
+        "range_line": 8,
+        "township_line": 13,
+        "pixel": [
+          1945,
+          5984
+        ],
+        "label": "T14N R9E SW"
+      },
+      {
+        "range_line": 9,
+        "township_line": 12,
+        "pixel": [
+          2552,
+          6584
+        ],
+        "label": "T13N R10E SW"
+      },
+      {
+        "range_line": 10,
+        "township_line": 12,
+        "pixel": [
+          3157,
+          6598
+        ],
+        "label": "T13N R11E SW"
+      }
+    ],
+    "evidence": "Read on full-resolution crops of the south-west corner of the mapped area. The R. 9 E., R. 10 E. and R. 11 E. labels are centred under the ranges these corners bound, T. 13 N. and T. 14 N. are labelled on the townships to their north, and Grizzly Bear House and the road 'To Auburn' are drawn beside the first corner."
+  },
+  "method": "Township corners grown outward from the seed; each is the crossing of the nearest long printed lines to a prediction from accepted neighbours. Corners whose BLM sections disagree are excluded, then a polynomial fit rejects residual outliers.",
+  "points": [
+    {
+      "corner": "range line 5, township line 19",
+      "pixel_x": 238.42,
+      "pixel_y": 2438.37,
+      "lon": -121.353124,
+      "lat": 39.541726,
+      "blm_sections": [
+        "CA210190N0050E0 sec 1",
+        "CA210190N0060E0 sec 6",
+        "CA210200N0050E0 sec 36",
+        "CA210200N0060E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 557.6
+    },
+    {
+      "corner": "range line 7, township line 19",
+      "pixel_x": 1407.93,
+      "pixel_y": 2456.37,
+      "lon": -121.130961,
+      "lat": 39.541074,
+      "blm_sections": [
+        "CA210190N0070E0 sec 1",
+        "CA210190N0080E0 sec 6",
+        "CA210200N0070E0 sec 36",
+        "CA210200N0080E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 165.2
+    },
+    {
+      "corner": "range line 8, township line 12",
+      "pixel_x": 1955.0,
+      "pixel_y": 6572.0,
+      "lon": -121.026055,
+      "lat": 38.928097,
+      "blm_sections": [
+        "CA210120N0080E0 sec 1",
+        "CA210120N0090E0 sec 6",
+        "CA210130N0080E0 sec 36",
+        "CA210130N0090E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 176.1
+    },
+    {
+      "corner": "range line 8, township line 13",
+      "pixel_x": 1945.0,
+      "pixel_y": 5984.0,
+      "lon": -121.026587,
+      "lat": 39.01495,
+      "blm_sections": [
+        "CA210130N0080E0 sec 1",
+        "CA210130N0090E0 sec 6",
+        "CA210140N0080E0 sec 36",
+        "CA210140N0090E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 78.6
+    },
+    {
+      "corner": "range line 8, township line 14",
+      "pixel_x": 1926.85,
+      "pixel_y": 5426.09,
+      "lon": -121.029002,
+      "lat": 39.10191,
+      "blm_sections": [
+        "CA210140N0080E0 sec 1",
+        "CA210140N0090E0 sec 6",
+        "CA210150N0080E0 sec 36",
+        "CA210150N0090E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 392.9
+    },
+    {
+      "corner": "range line 8, township line 17",
+      "pixel_x": 2009.41,
+      "pixel_y": 3597.86,
+      "lon": -121.022361,
+      "lat": 39.375435,
+      "blm_sections": [
+        "CA210170N0080E0 sec 1",
+        "CA210170N0090E0 sec 6",
+        "CA210180N0080E0 sec 36",
+        "CA210180N0090E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 467.3
+    },
+    {
+      "corner": "range line 8, township line 18",
+      "pixel_x": 1983.55,
+      "pixel_y": 2996.03,
+      "lon": -121.02382,
+      "lat": 39.465577,
+      "blm_sections": [
+        "CA210180N0080E0 sec 1",
+        "CA210180N0090E0 sec 6",
+        "CA210190N0080E0 sec 36",
+        "CA210190N0090E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 375.7
+    },
+    {
+      "corner": "range line 8, township line 19",
+      "pixel_x": 1981.87,
+      "pixel_y": 2407.89,
+      "lon": -121.023213,
+      "lat": 39.551312,
+      "blm_sections": [
+        "CA210190N0080E0 sec 1",
+        "CA210190N0090E0 sec 6",
+        "CA210200N0080E0 sec 36",
+        "CA210200N0090E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 255.1
+    },
+    {
+      "corner": "range line 8, township line 21",
+      "pixel_x": 2016.89,
+      "pixel_y": 1300.84,
+      "lon": -121.025853,
+      "lat": 39.716598,
+      "blm_sections": [
+        "CA210210N0080E0 sec 1",
+        "CA210210N0090E0 sec 6",
+        "CA210220N0080E0 sec 36",
+        "CA210220N0090E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 397.0
+    },
+    {
+      "corner": "range line 9, township line 12",
+      "pixel_x": 2552.0,
+      "pixel_y": 6584.0,
+      "lon": -120.915036,
+      "lat": 38.925556,
+      "blm_sections": [
+        "CA210120N0090E0 sec 1",
+        "CA210120N0100E0 sec 6",
+        "CA210130N0090E0 sec 36",
+        "CA210130N0100E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 343.9
+    },
+    {
+      "corner": "range line 9, township line 16",
+      "pixel_x": 2606.33,
+      "pixel_y": 4161.25,
+      "lon": -120.90851,
+      "lat": 39.287447,
+      "blm_sections": [
+        "CA210160N0090E0 sec 1",
+        "CA210160N0100E0 sec 6",
+        "CA210170N0090E0 sec 36",
+        "CA210170N0100E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 330.4
+    },
+    {
+      "corner": "range line 9, township line 17",
+      "pixel_x": 2612.28,
+      "pixel_y": 3587.83,
+      "lon": -120.907123,
+      "lat": 39.372946,
+      "blm_sections": [
+        "CA210170N0090E0 sec 1",
+        "CA210170N0100E0 sec 6",
+        "CA210180N0090E0 sec 36",
+        "CA210180N0100E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 320.5
+    },
+    {
+      "corner": "range line 9, township line 19",
+      "pixel_x": 2601.48,
+      "pixel_y": 2417.14,
+      "lon": -120.907707,
+      "lat": 39.548232,
+      "blm_sections": [
+        "CA210190N0090E0 sec 1",
+        "CA210190N0100E0 sec 6",
+        "CA210200N0090E0 sec 36",
+        "CA210200N0100E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 360.3
+    },
+    {
+      "corner": "range line 9, township line 22",
+      "pixel_x": 2615.33,
+      "pixel_y": 720.45,
+      "lon": -120.914586,
+      "lat": 39.804617,
+      "blm_sections": [
+        "CA210220N0090E0 sec 1",
+        "CA210220N0100E0 sec 6",
+        "CA210230N0090E0 sec 36",
+        "CA210230N0100E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 422.1
+    },
+    {
+      "corner": "range line 10, township line 12",
+      "pixel_x": 3157.0,
+      "pixel_y": 6598.0,
+      "lon": -120.802199,
+      "lat": 38.92528,
+      "blm_sections": [
+        "CA210120N0100E0 sec 1",
+        "CA210120N0110E0 sec 6",
+        "CA210130N0100E0 sec 36",
+        "CA210130N0110E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 320.7
+    },
+    {
+      "corner": "range line 10, township line 14",
+      "pixel_x": 3176.82,
+      "pixel_y": 5487.01,
+      "lon": -120.789553,
+      "lat": 39.09384,
+      "blm_sections": [
+        "CA210140N0100E0 sec 1",
+        "CA210140N0110E0 sec 6",
+        "CA210150N0100E0 sec 36",
+        "CA210150N0110E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 737.6
+    },
+    {
+      "corner": "range line 10, township line 16",
+      "pixel_x": 3206.13,
+      "pixel_y": 4161.5,
+      "lon": -120.793292,
+      "lat": 39.287875,
+      "blm_sections": [
+        "CA210160N0100E0 sec 1",
+        "CA210160N0110E0 sec 6",
+        "CA210170N0100E0 sec 36",
+        "CA210170N0110E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 405.2
+    },
+    {
+      "corner": "range line 10, township line 17",
+      "pixel_x": 3209.3,
+      "pixel_y": 3586.77,
+      "lon": -120.79305,
+      "lat": 39.374869,
+      "blm_sections": [
+        "CA210170N0100E0 sec 1",
+        "CA210170N0110E0 sec 6",
+        "CA210180N0100E0 sec 36",
+        "CA210180N0110E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 300.1
+    },
+    {
+      "corner": "range line 10, township line 18",
+      "pixel_x": 3183.71,
+      "pixel_y": 3005.06,
+      "lon": -120.797711,
+      "lat": 39.464178,
+      "blm_sections": [
+        "CA210180N0100E0 sec 1",
+        "CA210180N0110E0 sec 6",
+        "CA210190N0100E0 sec 36",
+        "CA210190N0110E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 182.7
+    },
+    {
+      "corner": "range line 10, township line 21",
+      "pixel_x": 3210.63,
+      "pixel_y": 1297.08,
+      "lon": -120.80081,
+      "lat": 39.717212,
+      "blm_sections": [
+        "CA210210N0100E0 sec 1",
+        "CA210210N0110E0 sec 6",
+        "CA210220N0100E0 sec 36",
+        "CA210220N0110E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 491.3
+    },
+    {
+      "corner": "range line 11, township line 12",
+      "pixel_x": 3760.36,
+      "pixel_y": 6613.67,
+      "lon": -120.689961,
+      "lat": 38.926777,
+      "blm_sections": [
+        "CA210120N0110E0 sec 1",
+        "CA210120N0120E0 sec 6",
+        "CA210130N0110E0 sec 36",
+        "CA210130N0120E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 206.3
+    },
+    {
+      "corner": "range line 11, township line 13",
+      "pixel_x": 3759.77,
+      "pixel_y": 6028.94,
+      "lon": -120.690148,
+      "lat": 39.013556,
+      "blm_sections": [
+        "CA210130N0110E0 sec 1",
+        "CA210130N0120E0 sec 6",
+        "CA210140N0110E0 sec 36",
+        "CA210140N0120E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 162.9
+    },
+    {
+      "corner": "range line 11, township line 17",
+      "pixel_x": 3800.05,
+      "pixel_y": 3602.02,
+      "lon": -120.680051,
+      "lat": 39.375473,
+      "blm_sections": [
+        "CA210170N0110E0 sec 1",
+        "CA210170N0120E0 sec 6",
+        "CA210180N0110E0 sec 36",
+        "CA210180N0120E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 275.5
+    },
+    {
+      "corner": "range line 11, township line 18",
+      "pixel_x": 3799.96,
+      "pixel_y": 3007.83,
+      "lon": -120.680097,
+      "lat": 39.463205,
+      "blm_sections": [
+        "CA210180N0110E0 sec 1",
+        "CA210180N0120E0 sec 6",
+        "CA210190N0110E0 sec 36",
+        "CA210190N0120E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 374.1
+    },
+    {
+      "corner": "range line 11, township line 19",
+      "pixel_x": 3808.19,
+      "pixel_y": 2437.51,
+      "lon": -120.680148,
+      "lat": 39.550803,
+      "blm_sections": [
+        "CA210190N0110E0 sec 1",
+        "CA210190N0120E0 sec 6",
+        "CA210200N0110E0 sec 36",
+        "CA210200N0120E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 229.7
+    },
+    {
+      "corner": "range line 11, township line 21",
+      "pixel_x": 3799.99,
+      "pixel_y": 1295.67,
+      "lon": -120.683446,
+      "lat": 39.71895,
+      "blm_sections": [
+        "CA210210N0110E0 sec 1",
+        "CA210210N0120E0 sec 6",
+        "CA210220N0110E0 sec 36",
+        "CA210220N0120E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 344.2
+    },
+    {
+      "corner": "range line 11, township line 23",
+      "pixel_x": 3791.36,
+      "pixel_y": 156.93,
+      "lon": -120.683446,
+      "lat": 39.894525,
+      "blm_sections": [
+        "CA210230N0110E0 sec 1",
+        "CA210230N0120E0 sec 6"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 468.8
+    },
+    {
+      "corner": "range line 12, township line 12",
+      "pixel_x": 4354.09,
+      "pixel_y": 6624.89,
+      "lon": -120.576494,
+      "lat": 38.926303,
+      "blm_sections": [
+        "CA210120N0120E0 sec 1",
+        "CA210120N0130E0 sec 6",
+        "CA210130N0120E0 sec 36",
+        "CA210130N0130E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 83.3
+    },
+    {
+      "corner": "range line 12, township line 13",
+      "pixel_x": 4354.43,
+      "pixel_y": 6037.56,
+      "lon": -120.579496,
+      "lat": 39.012841,
+      "blm_sections": [
+        "CA210130N0120E0 sec 1",
+        "CA210130N0130E0 sec 6",
+        "CA210140N0120E0 sec 36",
+        "CA210140N0130E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 257.4
+    },
+    {
+      "corner": "range line 12, township line 14",
+      "pixel_x": 4348.98,
+      "pixel_y": 5475.93,
+      "lon": -120.579098,
+      "lat": 39.098119,
+      "blm_sections": [
+        "CA210140N0120E0 sec 1",
+        "CA210140N0130E0 sec 6",
+        "CA210150N0120E0 sec 36",
+        "CA210150N0130E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 172.2
+    },
+    {
+      "corner": "range line 12, township line 16",
+      "pixel_x": 4396.61,
+      "pixel_y": 4185.04,
+      "lon": -120.567622,
+      "lat": 39.28786,
+      "blm_sections": [
+        "CA210160N0120E0 sec 1",
+        "CA210160N0130E0 sec 6",
+        "CA210170N0120E0 sec 36",
+        "CA210170N0130E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 280.5
+    },
+    {
+      "corner": "range line 12, township line 17",
+      "pixel_x": 4400.42,
+      "pixel_y": 3605.16,
+      "lon": -120.567571,
+      "lat": 39.375153,
+      "blm_sections": [
+        "CA210170N0120E0 sec 1",
+        "CA210170N0130E0 sec 6",
+        "CA210180N0120E0 sec 36",
+        "CA210180N0130E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 224.3
+    },
+    {
+      "corner": "range line 12, township line 18",
+      "pixel_x": 4404.8,
+      "pixel_y": 3026.56,
+      "lon": -120.567192,
+      "lat": 39.462832,
+      "blm_sections": [
+        "CA210180N0120E0 sec 1",
+        "CA210180N0130E0 sec 6",
+        "CA210190N0120E0 sec 36",
+        "CA210190N0130E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 190.3
+    },
+    {
+      "corner": "range line 12, township line 19",
+      "pixel_x": 4408.92,
+      "pixel_y": 2442.19,
+      "lon": -120.56709,
+      "lat": 39.549803,
+      "blm_sections": [
+        "CA210190N0120E0 sec 1",
+        "CA210190N0130E0 sec 6",
+        "CA210200N0120E0 sec 36",
+        "CA210200N0130E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 179.7
+    },
+    {
+      "corner": "range line 12, township line 21",
+      "pixel_x": 4393.61,
+      "pixel_y": 1301.94,
+      "lon": -120.569719,
+      "lat": 39.718582,
+      "blm_sections": [
+        "CA210210N0120E0 sec 1",
+        "CA210210N0130E0 sec 6",
+        "CA210220N0120E0 sec 36",
+        "CA210220N0130E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 398.9
+    },
+    {
+      "corner": "range line 12, township line 22",
+      "pixel_x": 4403.98,
+      "pixel_y": 726.01,
+      "lon": -120.569941,
+      "lat": 39.806644,
+      "blm_sections": [
+        "CA210220N0120E0 sec 1",
+        "CA210220N0130E0 sec 6",
+        "CA210230N0120E0 sec 36",
+        "CA210230N0130E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 167.3
+    },
+    {
+      "corner": "range line 12, township line 23",
+      "pixel_x": 4407.95,
+      "pixel_y": 135.15,
+      "lon": -120.569837,
+      "lat": 39.894921,
+      "blm_sections": [
+        "CA210230N0120E0 sec 1",
+        "CA210230N0130E0 sec 6"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 197.4
+    },
+    {
+      "corner": "range line 13, township line 12",
+      "pixel_x": 4954.24,
+      "pixel_y": 6650.7,
+      "lon": -120.458773,
+      "lat": 38.922306,
+      "blm_sections": [
+        "CA210120N0130E0 sec 1",
+        "CA210120N0140E0 sec 6",
+        "CA210130N0130E0 sec 36",
+        "CA210130N0140E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 375.6
+    },
+    {
+      "corner": "range line 13, township line 13",
+      "pixel_x": 4953.28,
+      "pixel_y": 6035.98,
+      "lon": -120.460964,
+      "lat": 39.013982,
+      "blm_sections": [
+        "CA210130N0130E0 sec 1",
+        "CA210130N0140E0 sec 6",
+        "CA210140N0130E0 sec 36",
+        "CA210140N0140E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 235.2
+    },
+    {
+      "corner": "range line 13, township line 14",
+      "pixel_x": 4974.42,
+      "pixel_y": 5462.43,
+      "lon": -120.459629,
+      "lat": 39.099794,
+      "blm_sections": [
+        "CA210140N0130E0 sec 1",
+        "CA210140N0140E0 sec 6",
+        "CA210150N0130E0 sec 36",
+        "CA210150N0140E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 91.4
+    },
+    {
+      "corner": "range line 13, township line 16",
+      "pixel_x": 5000.29,
+      "pixel_y": 4191.3,
+      "lon": -120.45545,
+      "lat": 39.287673,
+      "blm_sections": [
+        "CA210160N0130E0 sec 1",
+        "CA210160N0140E0 sec 6",
+        "CA210170N0130E0 sec 36",
+        "CA210170N0140E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 120.6
+    },
+    {
+      "corner": "range line 13, township line 17",
+      "pixel_x": 5001.51,
+      "pixel_y": 3614.52,
+      "lon": -120.455362,
+      "lat": 39.374762,
+      "blm_sections": [
+        "CA210170N0130E0 sec 1",
+        "CA210170N0140E0 sec 6",
+        "CA210180N0130E0 sec 36",
+        "CA210180N0140E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 47.0
+    },
+    {
+      "corner": "range line 13, township line 18",
+      "pixel_x": 5003.52,
+      "pixel_y": 3030.91,
+      "lon": -120.455135,
+      "lat": 39.462329,
+      "blm_sections": [
+        "CA210180N0130E0 sec 1",
+        "CA210180N0140E0 sec 6",
+        "CA210190N0130E0 sec 36",
+        "CA210190N0140E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 59.9
+    },
+    {
+      "corner": "range line 13, township line 19",
+      "pixel_x": 5004.19,
+      "pixel_y": 2451.89,
+      "lon": -120.454842,
+      "lat": 39.549534,
+      "blm_sections": [
+        "CA210190N0130E0 sec 1",
+        "CA210190N0140E0 sec 6",
+        "CA210200N0130E0 sec 36"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 123.9
+    },
+    {
+      "corner": "range line 14, township line 12",
+      "pixel_x": 5549.84,
+      "pixel_y": 6650.63,
+      "lon": -120.347318,
+      "lat": 38.92261,
+      "blm_sections": [
+        "CA210120N0140E0 sec 1",
+        "CA210120N0150E0 sec 6",
+        "CA210130N0140E0 sec 36",
+        "CA210130N0150E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 294.1
+    },
+    {
+      "corner": "range line 14, township line 14",
+      "pixel_x": 5553.44,
+      "pixel_y": 5475.05,
+      "lon": -120.346471,
+      "lat": 39.098626,
+      "blm_sections": [
+        "CA210140N0140E0 sec 1",
+        "CA210140N0150E0 sec 6",
+        "CA210150N0140E0 sec 36",
+        "CA210150N0150E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 381.7
+    },
+    {
+      "corner": "range line 14, township line 16",
+      "pixel_x": 5601.52,
+      "pixel_y": 4201.24,
+      "lon": -120.344385,
+      "lat": 39.287162,
+      "blm_sections": [
+        "CA210160N0140E0 sec 1",
+        "CA210170N0140E0 sec 36"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 246.2
+    },
+    {
+      "corner": "range line 14, township line 17",
+      "pixel_x": 5600.22,
+      "pixel_y": 3625.91,
+      "lon": -120.344155,
+      "lat": 39.374139,
+      "blm_sections": [
+        "CA210170N0140E0 sec 1",
+        "CA210180N0140E0 sec 36"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 234.0
+    },
+    {
+      "corner": "range line 14, township line 18",
+      "pixel_x": 5602.99,
+      "pixel_y": 3035.92,
+      "lon": -120.344885,
+      "lat": 39.461633,
+      "blm_sections": [
+        "CA210180N0140E0 sec 1",
+        "CA210190N0140E0 sec 36"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 282.0
+    },
+    {
+      "corner": "range line 14, township line 21",
+      "pixel_x": 5540.62,
+      "pixel_y": 1390.76,
+      "lon": -120.352795,
+      "lat": 39.708161,
+      "blm_sections": [
+        "CA210210N0140E0 sec 1",
+        "CA210210N0150E0 sec 6",
+        "CA210220N0140E0 sec 36",
+        "CA210220N0150E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 137.8
+    },
+    {
+      "corner": "range line 14, township line 22",
+      "pixel_x": 5548.94,
+      "pixel_y": 805.98,
+      "lon": -120.352027,
+      "lat": 39.79537,
+      "blm_sections": [
+        "CA210220N0140E0 sec 1",
+        "CA210220N0150E0 sec 6",
+        "CA210230N0140E0 sec 36",
+        "CA210230N0150E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 70.8
+    },
+    {
+      "corner": "range line 14, township line 23",
+      "pixel_x": 5552.08,
+      "pixel_y": 214.36,
+      "lon": -120.35225,
+      "lat": 39.88248,
+      "blm_sections": [
+        "CA210230N0140E0 sec 1",
+        "CA210230N0150E0 sec 6"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 183.9
+    },
+    {
+      "corner": "range line 15, township line 13",
+      "pixel_x": 6023.85,
+      "pixel_y": 6049.66,
+      "lon": -120.259467,
+      "lat": 39.010066,
+      "blm_sections": [
+        "CA210130N0160E0 sec 6",
+        "CA210140N0160E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 126.6
+    },
+    {
+      "corner": "range line 15, township line 14",
+      "pixel_x": 6025.51,
+      "pixel_y": 5485.44,
+      "lon": -120.261664,
+      "lat": 39.098126,
+      "blm_sections": [
+        "CA210140N0160E0 sec 6",
+        "CA210150N0160E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 391.3
+    },
+    {
+      "corner": "range line 15, township line 16",
+      "pixel_x": 6082.89,
+      "pixel_y": 4307.02,
+      "lon": -120.254233,
+      "lat": 39.271376,
+      "blm_sections": [
+        "CA210160N0150E0 sec 1",
+        "CA210160N0160E0 sec 6",
+        "CA210170N0150E0 sec 36",
+        "CA210170N0160E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 395.7
+    },
+    {
+      "corner": "range line 15, township line 17",
+      "pixel_x": 6080.6,
+      "pixel_y": 3721.78,
+      "lon": -120.254038,
+      "lat": 39.358959,
+      "blm_sections": [
+        "CA210170N0150E0 sec 1",
+        "CA210170N0160E0 sec 6",
+        "CA210180N0150E0 sec 36",
+        "CA210180N0160E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 340.1
+    },
+    {
+      "corner": "range line 15, township line 18",
+      "pixel_x": 6082.2,
+      "pixel_y": 3125.92,
+      "lon": -120.254219,
+      "lat": 39.446757,
+      "blm_sections": [
+        "CA210180N0150E0 sec 1",
+        "CA210180N0160E0 sec 6",
+        "CA210190N0150E0 sec 36",
+        "CA210190N0160E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 351.8
+    },
+    {
+      "corner": "range line 15, township line 19",
+      "pixel_x": 6082.66,
+      "pixel_y": 2565.88,
+      "lon": -120.254103,
+      "lat": 39.534204,
+      "blm_sections": [
+        "CA210190N0150E0 sec 1",
+        "CA210190N0160E0 sec 6",
+        "CA210200N0150E0 sec 36",
+        "CA210200N0160E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 510.0
+    },
+    {
+      "corner": "range line 15, township line 21",
+      "pixel_x": 6136.49,
+      "pixel_y": 1394.73,
+      "lon": -120.240415,
+      "lat": 39.708033,
+      "blm_sections": [
+        "CA210210N0150E0 sec 1",
+        "CA210210N0160E0 sec 6",
+        "CA210220N0150E0 sec 36",
+        "CA210220N0160E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 212.3
+    },
+    {
+      "corner": "range line 15, township line 22",
+      "pixel_x": 6141.85,
+      "pixel_y": 812.84,
+      "lon": -120.239697,
+      "lat": 39.795107,
+      "blm_sections": [
+        "CA210220N0150E0 sec 1",
+        "CA210220N0160E0 sec 6",
+        "CA210230N0150E0 sec 36",
+        "CA210230N0160E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 193.9
+    },
+    {
+      "corner": "range line 15, township line 23",
+      "pixel_x": 6142.65,
+      "pixel_y": 217.8,
+      "lon": -120.238994,
+      "lat": 39.882233,
+      "blm_sections": [
+        "CA210230N0150E0 sec 1",
+        "CA210230N0160E0 sec 6"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 58.0
+    },
+    {
+      "corner": "range line 16, township line 13",
+      "pixel_x": 6622.93,
+      "pixel_y": 6048.67,
+      "lon": -120.152197,
+      "lat": 39.010085,
+      "blm_sections": [
+        "CA210130N0160E0 sec 1",
+        "CA210130N0170E0 sec 6",
+        "CA210140N0160E0 sec 36",
+        "CA210140N0170E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 482.7
+    },
+    {
+      "corner": "range line 16, township line 16",
+      "pixel_x": 6678.51,
+      "pixel_y": 4308.01,
+      "lon": -120.142172,
+      "lat": 39.272116,
+      "blm_sections": [
+        "CA210160N0160E0 sec 1",
+        "CA210160N0170E0 sec 6",
+        "CA210170N0160E0 sec 36",
+        "CA210170N0170E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 631.6
+    },
+    {
+      "corner": "range line 16, township line 17",
+      "pixel_x": 6677.22,
+      "pixel_y": 3727.98,
+      "lon": -120.141797,
+      "lat": 39.359482,
+      "blm_sections": [
+        "CA210170N0160E0 sec 1",
+        "CA210170N0170E0 sec 6",
+        "CA210180N0160E0 sec 36",
+        "CA210180N0170E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 637.2
+    },
+    {
+      "corner": "range line 16, township line 18",
+      "pixel_x": 6676.18,
+      "pixel_y": 3130.31,
+      "lon": -120.142029,
+      "lat": 39.446843,
+      "blm_sections": [
+        "CA210180N0160E0 sec 1",
+        "CA210180N0170E0 sec 6",
+        "CA210190N0160E0 sec 36",
+        "CA210190N0170E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 525.2
+    },
+    {
+      "corner": "range line 16, township line 19",
+      "pixel_x": 6674.81,
+      "pixel_y": 2572.32,
+      "lon": -120.141945,
+      "lat": 39.534369,
+      "blm_sections": [
+        "CA210190N0160E0 sec 1",
+        "CA210190N0170E0 sec 6",
+        "CA210200N0160E0 sec 36",
+        "CA210200N0170E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 789.8
+    },
+    {
+      "corner": "range line 16, township line 21",
+      "pixel_x": 6731.16,
+      "pixel_y": 1400.3,
+      "lon": -120.129747,
+      "lat": 39.707521,
+      "blm_sections": [
+        "CA210210N0160E0 sec 1",
+        "CA210210N0170E0 sec 6",
+        "CA210220N0160E0 sec 36",
+        "CA210220N0170E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 521.5
+    },
+    {
+      "corner": "range line 16, township line 22",
+      "pixel_x": 6736.78,
+      "pixel_y": 815.77,
+      "lon": -120.126619,
+      "lat": 39.794285,
+      "blm_sections": [
+        "CA210220N0160E0 sec 1",
+        "CA210220N0170E0 sec 6",
+        "CA210230N0160E0 sec 36",
+        "CA210230N0170E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 338.6
+    },
+    {
+      "corner": "range line 16, township line 23",
+      "pixel_x": 6736.01,
+      "pixel_y": 220.27,
+      "lon": -120.126058,
+      "lat": 39.881572,
+      "blm_sections": [
+        "CA210230N0160E0 sec 1",
+        "CA210230N0170E0 sec 6"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 128.2
+    },
+    {
+      "corner": "range line 18, township line 16",
+      "pixel_x": 7858.83,
+      "pixel_y": 4115.78,
+      "lon": -119.901057,
+      "lat": 39.287548,
+      "blm_sections": [
+        "NV210160N0180E0 sec 1",
+        "NV210160N0190E0 sec 6",
+        "NV210170N0180E0 sec 36",
+        "NV210170N0190E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 1001.1
+    },
+    {
+      "corner": "range line 18, township line 17",
+      "pixel_x": 7868.76,
+      "pixel_y": 3537.78,
+      "lon": -119.900694,
+      "lat": 39.374784,
+      "blm_sections": [
+        "NV210170N0180E0 sec 1",
+        "NV210170N0190E0 sec 6",
+        "NV210180N0180E0 sec 36",
+        "NV210180N0190E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 817.1
+    },
+    {
+      "corner": "range line 18, township line 18",
+      "pixel_x": 7882.06,
+      "pixel_y": 2975.32,
+      "lon": -119.899961,
+      "lat": 39.461671,
+      "blm_sections": [
+        "NV210180N0180E0 sec 1",
+        "NV210180N0190E0 sec 6",
+        "NV210190N0180E0 sec 36",
+        "NV210190N0190E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 463.1
+    },
+    {
+      "corner": "range line 18, township line 19",
+      "pixel_x": 7862.94,
+      "pixel_y": 2384.63,
+      "lon": -119.900641,
+      "lat": 39.548417,
+      "blm_sections": [
+        "NV210190N0180E0 sec 1",
+        "NV210190N0190E0 sec 6",
+        "NV210200N0180E0 sec 36",
+        "NV210200N0190E0 sec 31"
+      ],
+      "blm_spread_m": 0.0,
+      "residual_m": 764.4
+    }
+  ],
+  "excluded": [
+    {
+      "corner": "range line 5, township line 20",
+      "pixel_x": 270.95,
+      "pixel_y": 1863.71,
+      "lon": -121.354868,
+      "lat": 39.627074,
+      "blm_sections": [
+        "CA210200N0050E0 sec 1",
+        "CA210200N0060E0 sec 6",
+        "CA210210N0050E0 sec 36",
+        "CA210210N0060E0 sec 31"
+      ],
+      "blm_spread_m": 231.3,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 6, township line 20",
+      "pixel_x": 855.62,
+      "pixel_y": 1875.35,
+      "lon": -121.241781,
+      "lat": 39.627912,
+      "blm_sections": [
+        "CA210200N0060E0 sec 1",
+        "CA210200N0070E0 sec 6",
+        "CA210210N0060E0 sec 36",
+        "CA210210N0070E0 sec 31"
+      ],
+      "blm_spread_m": 205.4,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 7, township line 20",
+      "pixel_x": 1423.95,
+      "pixel_y": 1880.67,
+      "lon": -121.134006,
+      "lat": 39.628519,
+      "blm_sections": [
+        "CA210200N0070E0 sec 1",
+        "CA210200N0080E0 sec 6",
+        "CA210210N0070E0 sec 36",
+        "CA210210N0080E0 sec 31"
+      ],
+      "blm_spread_m": 524.5,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 8, township line 20",
+      "pixel_x": 2012.45,
+      "pixel_y": 1887.24,
+      "lon": -121.023983,
+      "lat": 39.629042,
+      "blm_sections": [
+        "CA210200N0080E0 sec 1",
+        "CA210200N0090E0 sec 6",
+        "CA210210N0080E0 sec 36",
+        "CA210210N0090E0 sec 31"
+      ],
+      "blm_spread_m": 191.2,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 8, township line 22",
+      "pixel_x": 2020.3,
+      "pixel_y": 721.21,
+      "lon": -121.026397,
+      "lat": 39.805354,
+      "blm_sections": [
+        "CA210220N0080E0 sec 1",
+        "CA210220N0090E0 sec 6",
+        "CA210230N0080E0 sec 36",
+        "CA210230N0090E0 sec 31",
+        "CA210230N0090E0 sec 31"
+      ],
+      "blm_spread_m": 804.9,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 9, township line 14",
+      "pixel_x": 2532.09,
+      "pixel_y": 5428.07,
+      "lon": -120.915222,
+      "lat": 39.101715,
+      "blm_sections": [
+        "CA210140N0090E0 sec 1",
+        "CA210140N0100E0 sec 6",
+        "CA210150N0090E0 sec 36",
+        "CA210150N0090E0 sec 36",
+        "CA210150N0100E0 sec 31"
+      ],
+      "blm_spread_m": 1216.9,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 9, township line 15",
+      "pixel_x": 2604.14,
+      "pixel_y": 4762.65,
+      "lon": -120.90773,
+      "lat": 39.201118,
+      "blm_sections": [
+        "CA210150N0090E0 sec 1",
+        "CA210150N0100E0 sec 6",
+        "CA210160N0090E0 sec 36",
+        "CA210160N0100E0 sec 31"
+      ],
+      "blm_spread_m": 205.3,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 9, township line 21",
+      "pixel_x": 2613.64,
+      "pixel_y": 1295.72,
+      "lon": -120.913923,
+      "lat": 39.716884,
+      "blm_sections": [
+        "CA210210N0090E0 sec 1",
+        "CA210210N0100E0 sec 6",
+        "CA210220N0090E0 sec 36",
+        "CA210220N0100E0 sec 31"
+      ],
+      "blm_spread_m": 104.3,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 10, township line 15",
+      "pixel_x": 3202.27,
+      "pixel_y": 4762.11,
+      "lon": -120.791629,
+      "lat": 39.20088,
+      "blm_sections": [
+        "CA210150N0100E0 sec 1",
+        "CA210150N0110E0 sec 6",
+        "CA210160N0100E0 sec 36",
+        "CA210160N0110E0 sec 31"
+      ],
+      "blm_spread_m": 408.1,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 10, township line 20",
+      "pixel_x": 3205.34,
+      "pixel_y": 1884.09,
+      "lon": -120.797688,
+      "lat": 39.630053,
+      "blm_sections": [
+        "CA210200N0100E0 sec 1",
+        "CA210200N0110E0 sec 6",
+        "CA210210N0100E0 sec 36",
+        "CA210210N0110E0 sec 31"
+      ],
+      "blm_spread_m": 162.4,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 10, township line 22",
+      "pixel_x": 3211.14,
+      "pixel_y": 722.08,
+      "lon": -120.800935,
+      "lat": 39.80585,
+      "blm_sections": [
+        "CA210220N0100E0 sec 1",
+        "CA210220N0110E0 sec 6",
+        "CA210230N0100E0 sec 36",
+        "CA210230N0110E0 sec 31"
+      ],
+      "blm_spread_m": 137.4,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 11, township line 15",
+      "pixel_x": 3796.86,
+      "pixel_y": 4777.33,
+      "lon": -120.680437,
+      "lat": 39.200273,
+      "blm_sections": [
+        "CA210150N0110E0 sec 1",
+        "CA210150N0120E0 sec 6",
+        "CA210160N0110E0 sec 36",
+        "CA210160N0120E0 sec 31"
+      ],
+      "blm_spread_m": 135.5,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 11, township line 20",
+      "pixel_x": 3811.87,
+      "pixel_y": 1890.76,
+      "lon": -120.681704,
+      "lat": 39.631125,
+      "blm_sections": [
+        "CA210200N0110E0 sec 1",
+        "CA210200N0120E0 sec 6",
+        "CA210210N0110E0 sec 36",
+        "CA210210N0120E0 sec 31"
+      ],
+      "blm_spread_m": 307.0,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 12, township line 15",
+      "pixel_x": 4347.08,
+      "pixel_y": 4780.21,
+      "lon": -120.572654,
+      "lat": 39.201023,
+      "blm_sections": [
+        "CA210150N0120E0 sec 1",
+        "CA210150N0130E0 sec 6",
+        "CA210160N0120E0 sec 36",
+        "CA210160N0130E0 sec 31"
+      ],
+      "blm_spread_m": 876.0,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 12, township line 20",
+      "pixel_x": 4405.44,
+      "pixel_y": 1893.24,
+      "lon": -120.56855,
+      "lat": 39.631454,
+      "blm_sections": [
+        "CA210200N0120E0 sec 1",
+        "CA210200N0130E0 sec 6",
+        "CA210210N0120E0 sec 36",
+        "CA210210N0130E0 sec 31"
+      ],
+      "blm_spread_m": 222.5,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 13, township line 15",
+      "pixel_x": 4980.72,
+      "pixel_y": 4787.88,
+      "lon": -120.457731,
+      "lat": 39.201548,
+      "blm_sections": [
+        "CA210150N0130E0 sec 1",
+        "CA210150N0140E0 sec 6",
+        "CA210160N0130E0 sec 36",
+        "CA210160N0140E0 sec 31"
+      ],
+      "blm_spread_m": 266.4,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 13, township line 20",
+      "pixel_x": 4943.4,
+      "pixel_y": 1896.76,
+      "lon": -120.465512,
+      "lat": 39.628245,
+      "blm_sections": [
+        "CA210200N0130E0 sec 1",
+        "CA210210N0130E0 sec 36",
+        "CA210210N0140E0 sec 31"
+      ],
+      "blm_spread_m": 1141.1,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 13, township line 22",
+      "pixel_x": 4996.81,
+      "pixel_y": 728.51,
+      "lon": -120.457138,
+      "lat": 39.801113,
+      "blm_sections": [
+        "CA210220N0130E0 sec 1",
+        "CA210220N0140E0 sec 6",
+        "CA210230N0130E0 sec 36",
+        "CA210230N0140E0 sec 31"
+      ],
+      "blm_spread_m": 1150.8,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 13, township line 23",
+      "pixel_x": 5000.73,
+      "pixel_y": 153.06,
+      "lon": -120.456986,
+      "lat": 39.888694,
+      "blm_sections": [
+        "CA210230N0130E0 sec 1",
+        "CA210230N0140E0 sec 6"
+      ],
+      "blm_spread_m": 1167.6,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 14, township line 15",
+      "pixel_x": 5594.68,
+      "pixel_y": 4797.08,
+      "lon": -120.349971,
+      "lat": 39.202474,
+      "blm_sections": [
+        "CA210150N0140E0 sec 1",
+        "CA210150N0150E0 sec 6",
+        "CA210160N0140E0 sec 36"
+      ],
+      "blm_spread_m": 654.2,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 14, township line 19",
+      "pixel_x": 5502.33,
+      "pixel_y": 2460.2,
+      "lon": -120.356772,
+      "lat": 39.548339,
+      "blm_sections": [
+        "CA210190N0140E0 sec 1",
+        "CA210200N0140E0 sec 36",
+        "CA210200N0150E0 sec 31"
+      ],
+      "blm_spread_m": 1599.7,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 14, township line 20",
+      "pixel_x": 5539.35,
+      "pixel_y": 1979.85,
+      "lon": -120.357895,
+      "lat": 39.621611,
+      "blm_sections": [
+        "CA210200N0140E0 sec 1",
+        "CA210200N0150E0 sec 6",
+        "CA210210N0140E0 sec 36",
+        "CA210210N0150E0 sec 31"
+      ],
+      "blm_spread_m": 834.7,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 15, township line 12",
+      "pixel_x": 6019.05,
+      "pixel_y": 6625.85,
+      "lon": -120.263745,
+      "lat": 38.925819,
+      "blm_sections": [
+        "CA210120N0160E0 sec 6",
+        "CA210130N0160E0 sec 31"
+      ],
+      "blm_spread_m": 737.8,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 15, township line 15",
+      "pixel_x": 6080.63,
+      "pixel_y": 4890.15,
+      "lon": -120.258216,
+      "lat": 39.185545,
+      "blm_sections": [
+        "CA210150N0160E0 sec 6",
+        "CA210160N0150E0 sec 36",
+        "CA210160N0160E0 sec 31"
+      ],
+      "blm_spread_m": 899.3,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 15, township line 20",
+      "pixel_x": 6134.53,
+      "pixel_y": 1971.15,
+      "lon": -120.247698,
+      "lat": 39.621651,
+      "blm_sections": [
+        "CA210200N0150E0 sec 1",
+        "CA210200N0160E0 sec 6",
+        "CA210210N0150E0 sec 36",
+        "CA210210N0160E0 sec 31"
+      ],
+      "blm_spread_m": 1184.7,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 16, township line 12",
+      "pixel_x": 6615.99,
+      "pixel_y": 6624.57,
+      "lon": -120.149457,
+      "lat": 38.923485,
+      "blm_sections": [
+        "CA210120N0160E0 sec 1",
+        "CA210120N0170E0 sec 6",
+        "CA210130N0160E0 sec 36",
+        "CA210130N0170E0 sec 31"
+      ],
+      "blm_spread_m": 406.9,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 16, township line 15",
+      "pixel_x": 6680.05,
+      "pixel_y": 4889.29,
+      "lon": -120.147594,
+      "lat": 39.183706,
+      "blm_sections": [
+        "CA210150N0160E0 sec 1",
+        "CA210150N0170E0 sec 6",
+        "CA210160N0160E0 sec 36",
+        "CA210160N0170E0 sec 31"
+      ],
+      "blm_spread_m": 944.4,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 17, township line 16",
+      "pixel_x": 7271.45,
+      "pixel_y": 4208.23,
+      "lon": -120.021887,
+      "lat": 39.282415,
+      "blm_sections": [
+        "CA210160N0170E0 sec 1",
+        "CA210160N0180E0 sec 6",
+        "CA210170N0170E0 sec 36",
+        "CA210170N0180E0 sec 31",
+        "NV210160N0180E0 sec 6",
+        "NV210170N0180E0 sec 31"
+      ],
+      "blm_spread_m": 2153.1,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 17, township line 17",
+      "pixel_x": 7274.76,
+      "pixel_y": 3633.49,
+      "lon": -120.021898,
+      "lat": 39.369145,
+      "blm_sections": [
+        "CA210170N0170E0 sec 1",
+        "CA210170N0180E0 sec 6",
+        "CA210180N0170E0 sec 36",
+        "CA210180N0180E0 sec 31",
+        "NV210170N0180E0 sec 6",
+        "NV210180N0180E0 sec 31"
+      ],
+      "blm_spread_m": 2127.2,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 17, township line 18",
+      "pixel_x": 7275.78,
+      "pixel_y": 3042.39,
+      "lon": -120.02091,
+      "lat": 39.456947,
+      "blm_sections": [
+        "CA210180N0170E0 sec 1",
+        "CA210180N0180E0 sec 6",
+        "CA210190N0170E0 sec 36",
+        "CA210190N0180E0 sec 31",
+        "NV210180N0180E0 sec 6",
+        "NV210190N0180E0 sec 31"
+      ],
+      "blm_spread_m": 2329.8,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 17, township line 19",
+      "pixel_x": 7269.12,
+      "pixel_y": 2485.57,
+      "lon": -120.020567,
+      "lat": 39.544142,
+      "blm_sections": [
+        "CA210190N0170E0 sec 1",
+        "CA210190N0180E0 sec 6",
+        "CA210200N0170E0 sec 36",
+        "CA210200N0180E0 sec 31",
+        "NV210190N0180E0 sec 6",
+        "NV210200N0180E0 sec 31"
+      ],
+      "blm_spread_m": 2454.4,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 17, township line 20",
+      "pixel_x": 7332.32,
+      "pixel_y": 1913.32,
+      "lon": -120.013436,
+      "lat": 39.631084,
+      "blm_sections": [
+        "CA210200N0170E0 sec 1",
+        "CA210200N0180E0 sec 6",
+        "CA210210N0170E0 sec 36",
+        "CA210210N0180E0 sec 31",
+        "NV210200N0180E0 sec 6",
+        "NV210210N0180E0 sec 31"
+      ],
+      "blm_spread_m": 2464.4,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 17, township line 21",
+      "pixel_x": 7331.25,
+      "pixel_y": 1324.61,
+      "lon": -120.011159,
+      "lat": 39.718043,
+      "blm_sections": [
+        "CA210210N0170E0 sec 1",
+        "CA210210N0180E0 sec 6",
+        "CA210220N0170E0 sec 36",
+        "CA210220N0180E0 sec 31",
+        "NV210210N0180E0 sec 6",
+        "NV210220N0180E0 sec 31"
+      ],
+      "blm_spread_m": 1587.3,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 17, township line 22",
+      "pixel_x": 7333.88,
+      "pixel_y": 721.35,
+      "lon": -120.010323,
+      "lat": 39.80377,
+      "blm_sections": [
+        "CA210220N0170E0 sec 1",
+        "CA210220N0180E0 sec 6",
+        "CA210230N0170E0 sec 36",
+        "CA210230N0180E0 sec 31",
+        "NV210220N0180E0 sec 6",
+        "NV210230N0180E0 sec 31"
+      ],
+      "blm_spread_m": 1512.1,
+      "reason": "BLM sections disagree on this corner"
+    },
+    {
+      "corner": "range line 17, township line 23",
+      "pixel_x": 7329.95,
+      "pixel_y": 156.74,
+      "lon": -120.010027,
+      "lat": 39.890173,
+      "blm_sections": [
+        "CA210230N0170E0 sec 1",
+        "CA210230N0180E0 sec 6",
+        "NV210230N0180E0 sec 6"
+      ],
+      "blm_spread_m": 1468.0,
+      "reason": "BLM sections disagree on this corner"
+    }
+  ],
+  "summary": {
+    "polynomial_order": 2,
+    "control_points": 73,
+    "rms_m": 380.6,
+    "median_m": 300.1,
+    "max_m": 1001.1,
+    "checkpoint_max_m": 1294.1
+  },
+  "checkpoints": [
+    {
+      "name": "Alleghany",
+      "gnis_id": 256186,
+      "pixel": [
+        2913,
+        2956
+      ],
+      "lon": -120.843292,
+      "lat": 39.469624,
+      "error_m": 660.4
+    },
+    {
+      "name": "Cisco",
+      "gnis_id": 258385,
+      "pixel": [
+        4516,
+        4096
+      ],
+      "lon": -120.546887,
+      "lat": 39.301574,
+      "error_m": 159.3
+    },
+    {
+      "name": "Colfax",
+      "gnis_id": 1655912,
+      "pixel": [
+        2304,
+        5411
+      ],
+      "lon": -120.953289,
+      "lat": 39.100735,
+      "error_m": 694.7
+    },
+    {
+      "name": "Downieville",
+      "gnis_id": 259519,
+      "pixel": [
+        3015,
+        2355
+      ],
+      "lon": -120.826904,
+      "lat": 39.559346,
+      "error_m": 519.9
+    },
+    {
+      "name": "Dutch Flat",
+      "gnis_id": 259631,
+      "pixel": [
+        2976,
+        4692
+      ],
+      "lon": -120.83773,
+      "lat": 39.206014,
+      "error_m": 635.4
+    },
+    {
+      "name": "Foresthill",
+      "gnis_id": 277518,
+      "pixel": [
+        3062,
+        5985
+      ],
+      "lon": -120.818002,
+      "lat": 39.020182,
+      "error_m": 159.3
+    },
+    {
+      "name": "Iowa Hill",
+      "gnis_id": 1656094,
+      "pixel": [
+        2816,
+        5375
+      ],
+      "lon": -120.859395,
+      "lat": 39.108514,
+      "error_m": 547.7
+    },
+    {
+      "name": "Loyalton",
+      "gnis_id": 277550,
+      "pixel": [
+        6094,
+        1612
+      ],
+      "lon": -120.241052,
+      "lat": 39.676299,
+      "error_m": 676.6
+    },
+    {
+      "name": "Sierra City",
+      "gnis_id": 1659662,
+      "pixel": [
+        4038,
+        2322
+      ],
+      "lon": -120.63384,
+      "lat": 39.565738,
+      "error_m": 543.2
+    },
+    {
+      "name": "Sierraville",
+      "gnis_id": 233103,
+      "pixel": [
+        5450,
+        2187
+      ],
+      "lon": -120.367443,
+      "lat": 39.589631,
+      "error_m": 354.1
+    },
+    {
+      "name": "Truckee",
+      "gnis_id": 1667886,
+      "pixel": [
+        6446,
+        3934
+      ],
+      "lon": -120.183266,
+      "lat": 39.327967,
+      "error_m": 366.2
+    },
+    {
+      "name": "Washington",
+      "gnis_id": 1660130,
+      "pixel": [
+        3240,
+        3653
+      ],
+      "lon": -120.799121,
+      "lat": 39.359348,
+      "error_m": 1294.1
+    },
+    {
+      "name": "Westville",
+      "gnis_id": 1660155,
+      "pixel": [
+        3937,
+        4953
+      ],
+      "lon": -120.647999,
+      "lat": 39.174907,
+      "error_m": 695.0
+    }
+  ]
+}

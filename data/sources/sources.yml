@@ -178,3 +178,39 @@ sources:
     blocked_on: >-
       The specific townships and ranges for the earlier corridor search have not been
       identified, so no plat is cited here. See docs/open-questions.md.
+
+  - id: usfs-tahoe-recreation-1916
+    title: Recreation map, Tahoe National Forest, information for mountain travelers (1916)
+    url: https://archive.org/details/CAT10680171
+    rights: public_domain
+    sensitivity: public
+    attribution: "Tahoe National Forest map, 1916: U.S. Forest Service. Scan: USDA National Agricultural Library via Internet Archive. Placed with BLM PLSS corners."
+    used_for: >-
+      The tahoe-nf-1916 extra edition (data/sources/demo-extra-editions.json): leaf 25 of
+      the archive.org JP2 package, receipted in demo-extra-retrievals.jsonl.
+    caution: >-
+      The sheet carries no georeferencing. It is placed by a second-order polynomial
+      through printed township corners; residuals are in
+      data/sources/gcp/CAT10680171_0025.control.json. Archive.org rights text: "The
+      contributing institution believes that this item is not in copyright." The map is a
+      1916 USDA Forest Service work printed by the U.S. Geological Survey.
+
+  - id: blm-plss-cadnsdi
+    title: BLM National PLSS CadNSDI, PLSS Section layer (MapServer/2)
+    url: https://gis.blm.gov/arcgis/rest/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/2
+    rights: public_domain
+    sensitivity: public
+    attribution: "PLSS corners: Bureau of Land Management CadNSDI"
+    used_for: >-
+      Ground positions of township corners used as control for the 1916 scan. Not
+      published as a layer and not used as trail evidence.
+
+  - id: usgs-gnis-places
+    title: USGS GNIS populated places (The National Map geonames MapServer/3)
+    url: https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/3
+    rights: public_domain
+    sensitivity: public
+    attribution: "Place names: USGS Geographic Names Information System"
+    used_for: >-
+      Independent checkpoints (town positions) for the 1916 scan's placement. Not
+      published as a layer.
