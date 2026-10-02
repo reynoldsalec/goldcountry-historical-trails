@@ -475,3 +475,30 @@ check now records these disagreements under `index_crs`, and positioning uses th
 embedded CRS. Both regional sheets pass the neatline check on the edges that bound the
 view (`docs/demo-source-review.md` §8.3). Whether the 1891 NAD27 assignment is right is
 still open.
+
+**2026-10-02: the 1916 Tahoe National Forest scan is only approximately placed.** The
+sheet has no graticule. `make extra-control` fits a second-order polynomial to 73
+printed township corners matched to BLM PLSS corners: RMS 381 m, worst control corner
+1001 m. Thirteen town symbols checked against GNIS are 159–1294 m off. The printed
+grid follows the 1916 surveys and the paper is folded, so a polynomial cannot remove
+all of the error. AGENTS.md §3 allows only polynomial 1 or 2 for map sheets.
+
+*To resolve.* A reviewer decides whether this accuracy is enough for display. A
+piecewise or thin-plate warp would need an explicit exception to AGENTS.md §3.
+
+**2026-10-02: further early Forest Service and county maps are not integrated.**
+Found but not added in this run:
+- Archive.org USDA NAL scans: Tahoe NF 1915 (CAT31437404), Eldorado NF 1914
+  (CAT31437379) and 1916 (CAT10680176), and the Tahoe forest atlas folio of 1909
+  (CAT31301920). Each carries the same "not in copyright" statement. Each needs its
+  own control points, and none covers the Auburn quadrangle.
+- Library of Congress, Placer County, California State Mining Bureau, 1902
+  (loc.gov item 2007633931). It covers Auburn and has a township grid, so it needs
+  the same control-point method.
+- Huntington ephMPCALIF0187 route map: the scan is 825 px, at about 1:1,000,000, and
+  its rights page was not readable (HTTP 429).
+- UC Davis 1930/1934/1949 holdings and the NFSL collections: no online map images.
+
+*To resolve.* Add each sheet as a `gcp_polynomial` entry in
+`data/sources/demo-extra-editions.json`, with seed corners and checkpoints read from
+the scan.

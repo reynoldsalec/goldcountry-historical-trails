@@ -158,7 +158,7 @@ The nine-edition demo:
 make demo-check        # manifest, receipts, scans and PDF renders; reads only
 make demo-rasters      # renders the PDFs, then all nine pyramids
 make demo-test         # offline unit, raster, build, expansion and browser suites
-make demo-build        # allowlisted build/public/ with exactly nine tile trees
+make demo-build        # allowlisted build/public/: the nine plus four extra tile trees
 make demo-accept       # demo-test, demo-build, then validate (local only)
 make demo-dev          # vite dev server on http://127.0.0.1:5173/
 ```
@@ -182,6 +182,20 @@ worktree points it at the primary checkout's raw root. **PDF backup is not verif
 `make backup-sources`, `restore-sources` and `verify-backup` read only
 `retrievals.jsonl`, so they do not cover `data/raw/us-topo/`. The PDFs are
 hash-pinned by their receipts and can be downloaded again, but no archive copy exists.
+
+Extra map options (`docs/demo-extra-sources.md`): the 1916 Tahoe National Forest scan,
+Auburn 1954 (1:62,500), and Sacramento 1947 and 1956 (1:250,000). Thirteen editions
+are published in all. The 1916 sheet covers its own area and is placed by control
+points to about 380 m RMS, so its card carries a Placement row. The archive.org scan
+and the BLM and GNIS control downloads are also not covered by `backup-sources`.
+
+```sh
+make extra-fetch      # receipted downloads: archive.org scan, BLM PLSS, GNIS checkpoints
+make extra-control    # regenerate the 1916 control points and their report
+make extra-check      # verify receipts and raw bytes
+make extra-rasters    # warp and tile into build/extra/ (demo-build runs this too)
+make extra-test       # offline tests (also run by demo-test)
+```
 
 Bare `make` and `build-public` run the demo build, then validation; `dev` is
 `demo-dev`. `rasters`, `tiles` and `build-restricted` stay deferred with the countywide
