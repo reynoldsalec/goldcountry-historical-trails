@@ -2,9 +2,12 @@
 // DOM-free and MapLibre-free on purpose: the map is injected as MapLike so a test can
 // prove a switch touches no camera method and builds no second map.
 
-export type EditionKind = "topo" | "orthophotoquad";
+export type EditionKind = "topo" | "orthophotoquad" | "map";
 /** Which publisher product the raster came from; the card names it (issue #58). */
-export type SourceKind = "historical_geotiff" | "us_topo_pdf";
+export type SourceKind = "historical_geotiff" | "us_topo_pdf" | "forest_service_scan";
+
+/** west, south, east, north in WGS84 degrees. */
+export type Bounds = [number, number, number, number];
 
 export interface EditionDates {
   map_year: number;
@@ -32,8 +35,8 @@ export interface PublicEdition {
   source_kind: SourceKind;
   label: string;
   sheet_name: string;
-  /** Denominator of the printed scale: 125000 for a 1:125,000 sheet. */
-  scale: number;
+  /** Denominator of the printed scale: 125000 for a 1:125,000 sheet. Null when unprinted. */
+  scale: number | null;
   citation: string;
   source_url: string;
   rights: string;
@@ -48,6 +51,10 @@ export interface PublicEdition {
   /** The top zoom this edition's own tiles exist at. Above it the map enlarges that level. */
   native_max_zoom: number;
   tile_url: string;
+  /** The area this edition's tiles cover; an extra edition may lie outside the Auburn view. */
+  coverage_bounds_wgs84: Bounds;
+  /** How a scanned sheet was placed and how far off it can be; null for USGS georeferencing. */
+  registration_note: string | null;
 }
 
 export interface TileZoom {
@@ -61,7 +68,9 @@ export interface PublicManifest {
   edition_order: string[];
   /** The edition requested on first load; not necessarily the first in order. */
   initial_edition: string;
-  view_bounds_wgs84: [number, number, number, number];
+  view_bounds_wgs84: Bounds;
+  /** The union of every edition's coverage: how far the camera may pan. */
+  pan_bounds_wgs84: Bounds;
   tile_zoom: TileZoom;
   editions: PublicEdition[];
 }
@@ -79,6 +88,7 @@ export function publicManifestFrom(source: unknown): PublicManifest {
   const editions = raw.editions as Record<string, unknown>[];
   const byId = new Map(editions.map((edition) => [edition.id as string, edition]));
   const tileZoom = { ...(raw.tile_zoom as TileZoom) };
+  const view = (raw.view_bounds_wgs84 as number[]).slice(0, 4) as Bounds;
   const initial = raw.initial_edition as string;
   if (!order.includes(initial)) {
     throw new Error(`demo-editions.json: initial_edition ${initial} is not in edition_order`);
@@ -111,6 +121,9 @@ export function publicManifestFrom(source: unknown): PublicManifest {
       // sheet's own limit, which the shared maximum caps the same way.
       native_max_zoom: Math.min(edition.native_max_zoom as number, tileZoom.max),
       tile_url: `${TILE_URL_PREFIX}/${id}/{z}/{x}/{y}.png`,
+      // The dev server serves only the nine, which are all cut to the Auburn view.
+      coverage_bounds_wgs84: view,
+      registration_note: null,
     };
   });
 
@@ -119,12 +132,8 @@ export function publicManifestFrom(source: unknown): PublicManifest {
     area_id: raw.area_id as string,
     edition_order: [...order],
     initial_edition: initial,
-    view_bounds_wgs84: (raw.view_bounds_wgs84 as number[]).slice(0, 4) as [
-      number,
-      number,
-      number,
-      number,
-    ],
+    view_bounds_wgs84: view,
+    pan_bounds_wgs84: view,
     tile_zoom: tileZoom,
     editions: projected,
   };
@@ -148,6 +157,7 @@ export function sourceIdFor(editionId: string): string {
 
 /** MapLibre resamples scanned line work nearest and photography linearly (AGENTS.md §3). */
 export function resamplingFor(kind: EditionKind): "nearest" | "linear" {
+  // Scanned maps ("map") are line work too, so they stay nearest.
   return kind === "orthophotoquad" ? "linear" : "nearest";
 }
 
@@ -171,11 +181,13 @@ export interface SourceCard {
 const PRODUCT_LABEL: Record<EditionKind, string> = {
   topo: "Topographic map",
   orthophotoquad: "Orthophotoquad",
+  map: "Map",
 };
 
 const SOURCE_PRODUCT_LABEL: Record<SourceKind, string | null> = {
   historical_geotiff: null,
   us_topo_pdf: "US Topo map",
+  forest_service_scan: "Forest Service map (scan)",
 };
 
 /** "1:125,000", grouped the way the sheets print it, whatever the browser locale. */
@@ -196,7 +208,13 @@ export function cardRows(edition: PublicEdition): SourceCard {
       value: SOURCE_PRODUCT_LABEL[edition.source_kind] ?? PRODUCT_LABEL[edition.kind],
     },
     // The regional sheets must read as Sacramento sheets, never as Auburn 7.5-minute maps.
-    { label: "Sheet", value: `${edition.sheet_name} ${scaleLabel(edition.scale)}` },
+    {
+      label: "Sheet",
+      value:
+        edition.scale === null
+          ? `${edition.sheet_name} (no printed scale found)`
+          : `${edition.sheet_name} ${scaleLabel(edition.scale)}`,
+    },
     { label: "Source ID", value: edition.source_id },
   ];
 
@@ -260,6 +278,10 @@ export function cardRows(edition: PublicEdition): SourceCard {
       `(source pixel about ${edition.native_resolution_metres} m)`,
   });
 
+  if (edition.registration_note !== null) {
+    rows.push({ label: "Placement", value: edition.registration_note });
+  }
+
   return {
     editionId: edition.id,
     label: edition.label,
@@ -285,6 +307,25 @@ export function detailLimitNotice(edition: PublicEdition, zoom: number): string 
     `${edition.native_max_zoom}). Its zoom-${edition.native_max_zoom} image is enlarged ` +
     `here; it shows no more detail than at that zoom.`
   );
+}
+
+/** True when the two boxes share any area. */
+export function boundsOverlap(a: Bounds, b: Bounds): boolean {
+  return a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+}
+
+export function containsPoint(bounds: Bounds, lng: number, lat: number): boolean {
+  return bounds[0] <= lng && lng <= bounds[2] && bounds[1] <= lat && lat <= bounds[3];
+}
+
+/**
+ * Said when the edition on screen draws nothing in the viewport: a blank map then means
+ * "outside this sheet", never "nothing was here". Null otherwise.
+ */
+export function coverageNotice(edition: PublicEdition, viewport: Bounds): string | null {
+  return boundsOverlap(edition.coverage_bounds_wgs84, viewport)
+    ? null
+    : `${edition.label} does not cover the area on screen. Use "Show this map's area" to go to it.`;
 }
 
 /**
@@ -359,6 +400,7 @@ export class EditionBrowser {
   private readonly listeners = new Set<(state: BrowserState) => void>();
   private current: BrowserState;
   private resetCount = 0;
+  private coverageCount = 0;
   /** Reload counter per edition; a retry needs a URL the browser cache has not failed on. */
   private readonly reloads = new Map<string, number>();
 
@@ -502,8 +544,8 @@ export class EditionBrowser {
   }
 
   /**
-   * The only action allowed to move the camera (implementation contract, issue #42).
-   * It never changes the selected edition.
+   * One of the two explicit actions allowed to move the camera (issue #42); the other is
+   * `showCoverage`. It never changes the selected edition.
    */
   resetView(): void {
     this.resetCount += 1;
@@ -513,6 +555,25 @@ export class EditionBrowser {
       bearing: 0,
       pitch: 0,
     });
+  }
+
+  /**
+   * The second, explicit camera action: frame the requested edition's own coverage. It
+   * never changes the selection, and no switch calls it.
+   */
+  showCoverage(): void {
+    this.coverageCount += 1;
+    this.map.fitBounds(this.requestedEdition.coverage_bounds_wgs84, {
+      padding: this.resetPadding,
+      animate: false,
+      bearing: 0,
+      pitch: 0,
+    });
+  }
+
+  /** "Show this map's area" actions performed; switching never adds to it. */
+  get showCoverageCalls(): number {
+    return this.coverageCount;
   }
 
   /**

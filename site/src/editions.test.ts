@@ -9,9 +9,14 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import {
   EditionBrowser,
+  type Bounds,
   type MapLike,
+  type PublicEdition,
   type PublicManifest,
+  boundsOverlap,
   cardRows,
+  containsPoint,
+  coverageNotice,
   detailLimitNotice,
   layerIdFor,
   noticeFor,
@@ -172,6 +177,8 @@ const FIXTURE_FIELDS = {
   component_dates: { survey_year: null, edit_year: null, imprint_year: null },
   native_resolution_metres: 2.03,
   native_max_zoom: 16,
+  coverage_bounds_wgs84: [-121.1, 38.9, -121.0, 39.0] as Bounds,
+  registration_note: null,
 } as const;
 
 const SYNTHETIC: PublicManifest = {
@@ -180,6 +187,7 @@ const SYNTHETIC: PublicManifest = {
   edition_order: ["fixture-a", "fixture-b"],
   initial_edition: "fixture-a",
   view_bounds_wgs84: [-121.1, 38.9, -121.0, 39.0],
+  pan_bounds_wgs84: [-121.1, 38.9, -121.0, 39.0],
   tile_zoom: { min: 10, max: 16 },
   editions: [
     {
@@ -897,5 +905,69 @@ describe("camera preservation across settled switches", () => {
     browser.confirmDisplayed("auburn-1975", browser.retry());
     expectSameCamera(before, map.camera);
     expect(map.calls.some((call) => CAMERA_METHODS.includes(call.method as never))).toBe(false);
+  });
+});
+
+/** An extra edition shaped like the published 1916 scan: its own area and a placement note. */
+function withScanEdition(): PublicManifest {
+  const base = SYNTHETIC;
+  const scan: PublicEdition = {
+    ...base.editions[0],
+    id: "fixture-scan",
+    source_id: "SCAN_1",
+    kind: "map",
+    source_kind: "forest_service_scan",
+    label: "fixture scan",
+    scale: null,
+    coverage_bounds_wgs84: [-120.9, 39.0, -120.0, 39.8],
+    registration_note: "Placed by a fixture polynomial; off by about 400 m.",
+    tile_url: "tiles/fixture-scan/{z}/{x}/{y}.png",
+  };
+  return {
+    ...base,
+    edition_order: [...base.edition_order, scan.id],
+    pan_bounds_wgs84: [-121.1, 38.9, -120.0, 39.8],
+    editions: [...base.editions, scan],
+  };
+}
+
+describe("editions with their own coverage", () => {
+  it("says when the edition on screen draws nothing in the viewport", () => {
+    const scan = withScanEdition().editions[2];
+    const auburn: Bounds = [-121.1, 38.9, -121.0, 39.0];
+    expect(boundsOverlap(scan.coverage_bounds_wgs84, auburn)).toBe(false);
+    expect(coverageNotice(scan, auburn)).toContain("does not cover the area on screen");
+    expect(coverageNotice(scan, [-120.5, 39.2, -120.4, 39.3])).toBeNull();
+    expect(containsPoint(scan.coverage_bounds_wgs84, -120.5, 39.5)).toBe(true);
+  });
+
+  it("switching to it leaves the camera alone; only the explicit action frames it", () => {
+    const { browser, map } = browserFor(withScanEdition());
+    browser.select("fixture-scan");
+    expect(map.calls.filter((call) => call.method === "fitBounds")).toHaveLength(0);
+
+    browser.showCoverage();
+
+    const fits = map.calls.filter((call) => call.method === "fitBounds");
+    expect(fits).toHaveLength(1);
+    expect(fits[0].args[0]).toEqual([-120.9, 39.0, -120.0, 39.8]);
+    expect(browser.state.requestedId).toBe("fixture-scan");
+    expect(browser.showCoverageCalls).toBe(1);
+    expect(browser.resetViewCalls).toBe(0);
+  });
+
+  it("cards an unprinted scale and the placement error instead of inventing them", () => {
+    const card = cardRows(withScanEdition().editions[2]);
+    const rows = Object.fromEntries(card.rows.map((row) => [row.label, row.value]));
+    expect(rows.Product).toBe("Forest Service map (scan)");
+    expect(rows.Sheet).toBe("Fixtureville (no printed scale found)");
+    expect(rows.Placement).toContain("400 m");
+    expect(resamplingFor("map")).toBe("nearest");
+  });
+
+  it("publishes no placement row for georeferenced sheets", () => {
+    for (const edition of realManifest().editions) {
+      expect(cardRows(edition).rows.some((row) => row.label === "Placement")).toBe(false);
+    }
   });
 });

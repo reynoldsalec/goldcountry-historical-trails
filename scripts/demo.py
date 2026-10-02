@@ -2183,6 +2183,13 @@ def rasters(
     default=None,
     help="Built site to publish from. Used with --no-vite to publish an existing bundle.",
 )
+@click.option(
+    "--extra-root",
+    "extra_root",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Also publish the extra editions warped by scripts/demo_extra.py into this root.",
+)
 @click.option("--data-dir", "data_dir", type=click.Path(path_type=Path), default=None)
 @click.option("--schema-dir", "schema_dir", type=click.Path(path_type=Path), default=None)
 @click.option("--npm", "npm", default="npm", show_default=True)
@@ -2206,6 +2213,7 @@ def build(
     zoom,
     site_dir,
     dist,
+    extra_root,
     data_dir,
     schema_dir,
     npm,
@@ -2241,6 +2249,7 @@ def build(
         catalog_path=catalog_path,
         ledger_path=ledger_path,
         expansion_root=expansion_root,
+        extra_root=extra_root,
         npm=npm,
         vite=vite,
         **optional,

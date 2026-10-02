@@ -19,6 +19,7 @@ from pathlib import Path
 
 import demo
 import demo_expansion
+import demo_extra
 import demo_sources
 import validate
 import warp_raster
@@ -58,6 +59,10 @@ PROHIBITED_NAMES = frozenset(
         demo_expansion.RECORD_NAME,
         demo_sources.CATALOG_PATH.name,
         demo_sources.LEDGER_PATH.name,
+        demo_extra.RECORD_NAME,
+        demo_extra.CATALOG_PATH.name,
+        demo_extra.LEDGER_PATH.name,
+        "demo-extra-topo.json",
         "demo-expansion-topo.json",
         "demo-editions.json",
         "retrievals.jsonl",
@@ -139,6 +144,8 @@ PUBLIC_EDITION_KEYS = (
     "native_resolution_metres",
     "native_max_zoom",
     "tile_url",
+    "coverage_bounds_wgs84",
+    "registration_note",
 )
 PUBLIC_MANIFEST_KEYS = (
     "version",
@@ -146,6 +153,7 @@ PUBLIC_MANIFEST_KEYS = (
     "edition_order",
     "initial_edition",
     "view_bounds_wgs84",
+    "pan_bounds_wgs84",
     "tile_zoom",
     "editions",
 )
@@ -156,7 +164,9 @@ PUBLIC_MANIFEST_KEYS = (
 # --------------------------------------------------------------------------------------
 
 
-def public_edition(edition: dict, edition_id: str, max_zoom: int) -> dict:
+def public_edition(
+    edition: dict, edition_id: str, max_zoom: int, view_bounds: list[float]
+) -> dict:
     """One edition reduced to the display fields, plus its relative tile template."""
     projected = {}
     for key in PUBLIC_EDITION_KEYS:
@@ -167,6 +177,13 @@ def public_edition(edition: dict, edition_id: str, max_zoom: int) -> dict:
             continue
         if key == "native_max_zoom":
             projected[key] = max_zoom
+            continue
+        if key == "coverage_bounds_wgs84" and key not in edition:
+            # The nine editions are all cut to the shared Auburn view.
+            projected[key] = list(view_bounds)
+            continue
+        if key == "registration_note" and key not in edition:
+            projected[key] = None
             continue
         if key not in edition:
             fail(f"{edition_id}: the manifest has no {key}; the public card cannot be built.")
@@ -195,14 +212,27 @@ def sanitize_manifest(manifest: dict, tile_zoom: dict, edition_zoom: dict[str, i
         if edition_id not in by_id:
             fail(f"edition_order names unknown edition {edition_id!r}.")
         projected.append(
-            public_edition(by_id[edition_id], edition_id, edition_zoom[edition_id])
+            public_edition(
+                by_id[edition_id],
+                edition_id,
+                edition_zoom[edition_id],
+                manifest["view_bounds_wgs84"],
+            )
         )
+    coverage = [edition["coverage_bounds_wgs84"] for edition in projected]
+    pan_bounds = [
+        min(bounds[0] for bounds in coverage),
+        min(bounds[1] for bounds in coverage),
+        max(bounds[2] for bounds in coverage),
+        max(bounds[3] for bounds in coverage),
+    ]
     payload = {
         "version": manifest["version"],
         "area_id": manifest["area_id"],
         "edition_order": list(order),
         "initial_edition": manifest["initial_edition"],
         "view_bounds_wgs84": list(manifest["view_bounds_wgs84"]),
+        "pan_bounds_wgs84": pan_bounds,
         "tile_zoom": {"min": tile_zoom["min"], "max": tile_zoom["max"]},
         "editions": projected,
     }
@@ -605,6 +635,56 @@ def check_record_agrees(manifest: dict, record: dict) -> dict:
     return zoom
 
 
+def merge_extras(
+    manifest: dict, extra_root: Path, pyramids: dict, zooms: dict, tile_zoom: dict
+) -> dict:
+    """Add the recorded extra editions (scripts/demo_extra.py) in the catalog's order.
+
+    Each one keeps its own crop, so its coverage bounds are published for the viewer.
+    """
+    record_path = extra_root / demo_extra.RECORD_NAME
+    if not record_path.is_file():
+        fail(f"No {demo_extra.RECORD_NAME} at {record_path}; run make extra-rasters first.")
+    record = read_json(record_path)
+    catalog = demo_extra.load_catalog()
+    if record.get("published_order") != catalog["published_order"]:
+        fail(f"{demo_extra.RECORD_NAME} was built for another order; run make extra-rasters.")
+    if record.get("view_bounds_wgs84") != list(manifest["view_bounds_wgs84"]):
+        fail(f"{demo_extra.RECORD_NAME} was built for another view; run make extra-rasters.")
+    cut = {entry["id"]: entry for entry in record["editions"]}
+    editions = list(manifest["editions"])
+    for edition in catalog["editions"]:
+        eid = edition["id"]
+        entry = cut.get(eid)
+        if entry is None:
+            fail(f"{eid}: no pyramid recorded in {demo_extra.RECORD_NAME}.")
+        expected = expected_zoom(edition, tile_zoom)
+        if entry["zoom"] != expected:
+            fail(f"{eid}: the extra pyramid covers zoom {entry['zoom']}, not {expected}.")
+        public = {
+            key: value
+            for key, value in edition.items()
+            if key not in ("processing", "rights_evidence")
+        }
+        public["coverage_bounds_wgs84"] = entry["coverage_bounds_wgs84"]
+        if entry.get("registration"):
+            public["registration_note"] = demo_extra.registration_note(entry["registration"])
+        editions.append(public)
+        pyramids[eid] = {
+            "root": extra_root / demo_extra.TILE_DIRNAME,
+            "source_id": entry["source_id"],
+            "digest": entry["tiles"]["digest"],
+            "tiles": entry["tiles"]["tiles"],
+            "bytes": entry["tiles"]["bytes"],
+            "transparent_tiles": entry["tiles"]["transparent_tiles"],
+            "zoom": entry["zoom"],
+            "crop_wgs84": entry["crop_wgs84"],
+            "record": demo_extra.RECORD_NAME,
+        }
+        zooms[eid] = expected
+    return {**manifest, "edition_order": list(catalog["published_order"]), "editions": editions}
+
+
 def assemble_public(
     build_root: Path,
     dist: Path,
@@ -612,6 +692,7 @@ def assemble_public(
     data_dir: Path = DATA_DIR,
     schema_dir: Path = SCHEMA_DIR,
     expansion_root: Path | None = None,
+    extra_root: Path | None = None,
 ) -> dict:
     """Stage, check, scan and publish. Returns the output inventory it also records."""
     manifest = read_json(manifest_path)
@@ -629,6 +710,8 @@ def assemble_public(
     zoom = check_record_agrees(manifest, record)
     pyramids = recorded_pyramids(build_root, record, manifest, expansion_root)
     zooms = check_pyramids_agree(manifest, pyramids, zoom)
+    if extra_root is not None:
+        manifest = merge_extras(manifest, extra_root, pyramids, zooms, zoom)
 
     staging = build_root / STAGING_DIRNAME
     public = build_root / PUBLIC_DIRNAME
@@ -716,6 +799,7 @@ def run_build(
     catalog_path: Path | None = None,
     ledger_path: Path | None = None,
     expansion_root: Path | None = None,
+    extra_root: Path | None = None,
 ) -> dict:
     """Preflight, rasters, site build, allowlisted staging, leak scan, atomic publish."""
     expansion_root = expansion_root or build_root / EXPANSION_DIRNAME
@@ -732,8 +816,10 @@ def run_build(
         ledger_path,
         expansion_root,
     )
+    if extra_root is not None:
+        demo_extra.run_rasters(raw_root, extra_root)
     built = build_frontend(site_dir, npm) if vite else (dist or site_dir / DIST_DIRNAME)
     published = assemble_public(
-        build_root, built, manifest_path, data_dir, schema_dir, expansion_root
+        build_root, built, manifest_path, data_dir, schema_dir, expansion_root, extra_root
     )
     return {**published, "rasters": rasters, "dist": built}

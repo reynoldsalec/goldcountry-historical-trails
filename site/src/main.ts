@@ -23,7 +23,10 @@ import {
   type BrowserState,
   type MapLike,
   type PublicManifest,
+  type Bounds,
   cardRows,
+  containsPoint,
+  coverageNotice,
   detailLimitNotice,
   layerIdFor,
   noticeFor,
@@ -65,7 +68,7 @@ function buildStyle(manifest: PublicManifest): StyleSpecification {
       tileSize: 256,
       minzoom: manifest.tile_zoom.min,
       maxzoom: edition.native_max_zoom,
-      bounds: manifest.view_bounds_wgs84,
+      bounds: edition.coverage_bounds_wgs84,
       attribution: edition.attribution,
     };
     layers.push({
@@ -163,7 +166,8 @@ async function start(): Promise<void> {
     fitBoundsOptions: { padding: 16 },
     minZoom: manifest.tile_zoom.min,
     maxZoom: manifest.tile_zoom.max,
-    maxBounds: bounds,
+    // Extra editions reach past the Auburn view, so panning is bounded by their union.
+    maxBounds: manifest.pan_bounds_wgs84,
     bearing: 0,
     pitch: 0,
     maxPitch: 0,
@@ -211,6 +215,13 @@ async function start(): Promise<void> {
   const next = element<HTMLButtonElement>("next");
   const retry = element<HTMLButtonElement>("retry");
 
+  const showArea = element<HTMLButtonElement>("show-area");
+
+  function viewport(): Bounds {
+    const view = map.getBounds();
+    return [view.getWest(), view.getSouth(), view.getEast(), view.getNorth()];
+  }
+
   function render(state: BrowserState): void {
     select.value = state.requestedId;
     previous.disabled = !browser.canGoPrevious;
@@ -218,7 +229,14 @@ async function start(): Promise<void> {
     // A standing tile warning also needs the button: the refetch is the only way back.
     retry.hidden = state.status !== "error" && state.warningMessage === null;
     const notice = element("notice");
-    notice.textContent = noticeFor(state, browser);
+    const displayed = browser.displayedEdition;
+    const outside = displayed === null ? null : coverageNotice(displayed, viewport());
+    notice.textContent =
+      outside === null ? noticeFor(state, browser) : `${noticeFor(state, browser)} ${outside}`;
+    notice.dataset.coverage = String(outside === null);
+    // Offered while the selected map's own area is mostly off screen.
+    const [west, south, east, north] = browser.requestedEdition.coverage_bounds_wgs84;
+    showArea.hidden = containsPoint(viewport(), (west + east) / 2, (south + north) / 2);
     notice.dataset.status = state.status;
     notice.dataset.warning = String(state.warningMessage !== null);
     renderCard(browser, map.getZoom());
@@ -227,6 +245,8 @@ async function start(): Promise<void> {
   browser.subscribe(render);
   // The detail-limit line follows the camera, so it is re-read when a zoom settles.
   map.on("zoomend", () => renderCard(browser, map.getZoom()));
+  // Coverage depends on where the camera is, so the status line follows every settled move.
+  map.on("moveend", () => render(browser.state));
 
   // No per-click waiter: the watcher is attached for the page's life and reads the
   // generation and viewport token off the state each time an event arrives.
@@ -235,6 +255,7 @@ async function start(): Promise<void> {
   select.addEventListener("change", () => browser.select(select.value));
   retry.addEventListener("click", () => browser.retry());
   element("reset-view").addEventListener("click", () => browser.resetView());
+  showArea.addEventListener("click", () => browser.showCoverage());
 
   const toggle = element<HTMLButtonElement>("detail-toggle");
   toggle.addEventListener("click", () => {
@@ -270,6 +291,7 @@ function exposeTestProbe(map: MapLibreMap, browser: EditionBrowser): void {
       };
     },
     resetViewCalls: () => browser.resetViewCalls,
+    showCoverageCalls: () => browser.showCoverageCalls,
   };
 }
 

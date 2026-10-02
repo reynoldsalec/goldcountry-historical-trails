@@ -17,7 +17,8 @@ export TRAIL_ARCHIVE_ROOT
         demo-check demo-inspect demo-test demo-cogs demo-rasters demo-build \
         demo-dev site-deps demo-frontend-test site-browsers demo-browser-test \
         demo-accept \
-        expansion-check expansion-fetch expansion-pdf expansion-rasters expansion-test
+        expansion-check expansion-fetch expansion-pdf expansion-rasters expansion-test \
+        extra-fetch extra-control extra-check extra-rasters extra-test
 
 ## build the public output, then validate the data and that output (AGENTS.md §4.3)
 # Sequential $(MAKE) lines, not prerequisites: the leak scan must read a tree that this
@@ -155,6 +156,28 @@ expansion-test:
 	$(RUN) pytest -q scripts/test_demo_sources.py scripts/test_demo_pdf.py \
 	  scripts/test_demo_expansion.py
 
+## extra map options beyond the nine (data/sources/demo-extra-editions.json)
+# The 1916 Tahoe National Forest scan is placed through committed control points; the
+# three further USGS sheets reuse their existing retrievals.jsonl receipts.
+EXTRA_ROOT ?= build/extra
+extra-fetch:
+	$(RUN) python scripts/fetch_topoview.py download --selection data/sources/demo-extra-topo.json
+	$(RUN) python scripts/demo_extra.py fetch
+
+## regenerate the scan's .points file and control report from the raw inputs
+extra-control:
+	$(RUN) python scripts/demo_extra.py control
+
+extra-check:
+	$(RUN) python scripts/demo_extra.py check
+
+## warp and tile the extra editions -> $(EXTRA_ROOT)/; unchanged pyramids are reused
+extra-rasters:
+	$(RUN) python scripts/demo_extra.py rasters
+
+extra-test:
+	$(RUN) pytest -q scripts/test_demo_extra.py
+
 NPM ?= npm
 SITE := site
 
@@ -199,16 +222,16 @@ demo-browser-test: site-browsers
 	cd $(SITE) && $(NPM) run test:browser:built
 
 ## preflight + rasters + site bundle -> allowlisted build/public/ (D4a, #58)
-# Only the nine recorded tile trees, the built app assets and a sanitized editions.json are
+# Only the nine recorded tile trees, the extra editions' trees, the built app assets and a sanitized editions.json are
 # copied; no PDF, receipt or processing record. Nothing is published until the staged tree
 # passes its completeness, zoom-range and restricted-value checks, so a failure leaves any
 # previous build/public untouched. The inventory goes to build/publish/demo-publish.json.
 demo-build: site-deps expansion-pdf
-	$(RUN) python scripts/demo.py build
+	$(RUN) python scripts/demo.py build --extra-root $(EXTRA_ROOT)
 
 demo-test: demo-frontend-test demo-browser-test
 	$(RUN) pytest -q scripts/test_demo.py scripts/test_demo_rasters.py \
-	  scripts/test_demo_build.py scripts/test_demo_make.py \
+	  scripts/test_demo_build.py scripts/test_demo_make.py scripts/test_demo_extra.py \
 	  scripts/test_demo_sources.py scripts/test_demo_pdf.py scripts/test_demo_expansion.py
 
 ## the local release gate: offline demo suites, the real build, then baseline validation (D4b)
@@ -294,4 +317,4 @@ lint:
 ## remove derived output; never touches data/
 clean:
 	rm -rf build/public build/restricted build/tiles build/rasters build/publish \
-	  build/.public-incoming build/.public-previous
+	  build/.public-incoming build/.public-previous build/extra
